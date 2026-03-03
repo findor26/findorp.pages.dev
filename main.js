@@ -102,22 +102,39 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-const themeToggle = document.getElementById('theme-toggle');
-const body = document.body;
+/**
+ * 暗黑模式切换核心逻辑
+ */
+const initTheme = () => {
+    const themeToggle = document.getElementById('theme-toggle');
+    const body = document.body;
 
-// 1. 初始化检查本地存储
-if (localStorage.getItem('theme') === 'dark') {
-    body.classList.add('dark-mode');
-}
+    if (!themeToggle) return; // 避免页面未找到按钮报错
 
-// 2. 绑定点击事件
-themeToggle.addEventListener('click', () => {
-    body.classList.toggle('dark-mode');
-    
-    // 3. 永久保存偏好
-    if (body.classList.contains('dark-mode')) {
-        localStorage.setItem('theme', 'dark');
-    } else {
-        localStorage.setItem('theme', 'light');
+    // 初始化：优先读取本地存储，其次读取系统偏好
+    const savedTheme = localStorage.getItem('theme');
+    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+    if (savedTheme === 'dark' || (!savedTheme && systemPrefersDark)) {
+        body.classList.add('dark-mode');
     }
-});
+
+    // 绑定点击事件
+    themeToggle.addEventListener('click', () => {
+        body.classList.toggle('dark-mode');
+        
+        // 记录状态
+        if (body.classList.contains('dark-mode')) {
+            localStorage.setItem('theme', 'dark');
+        } else {
+            localStorage.setItem('theme', 'light');
+        }
+    });
+};
+
+// 确保 DOM 加载完后再运行
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initTheme);
+} else {
+    initTheme();
+}

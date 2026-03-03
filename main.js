@@ -101,3 +101,23 @@ document.addEventListener('DOMContentLoaded', () => {
         new OptimizedWatcher();
     }
 });
+
+const themeToggle = document.getElementById('theme-toggle');
+const body = document.body;
+
+// 1. 初始化检查本地存储
+if (localStorage.getItem('theme') === 'dark') {
+    body.classList.add('dark-mode');
+}
+
+// 2. 绑定点击事件
+themeToggle.addEventListener('click', () => {
+    body.classList.toggle('dark-mode');
+    
+    // 3. 永久保存偏好
+    if (body.classList.contains('dark-mode')) {
+        localStorage.setItem('theme', 'dark');
+    } else {
+        localStorage.setItem('theme', 'light');
+    }
+});

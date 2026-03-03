@@ -137,6 +137,15 @@ main {
     filter: brightness(1.1);
 }
 
+.nav-link {
+  transition: background-color 0.2s, box-shadow 0.2s;
+}
+.nav-link:hover {
+  background-color: #007bb8; /* 比原色稍亮的蓝色 */
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  opacity: 1;
+}
+
 #theme-toggle {
     position: fixed;
     top: 24px;

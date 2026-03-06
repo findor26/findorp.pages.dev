@@ -25,7 +25,7 @@ window.confirmPassword = function() {
 
     if (input === correctKey) {
         /* 在 JS 内部拼接秘密路径，外部源码完全不可见 */
-        const secretPath = '_storage_secret_8d2f/'; 
+        const secretPath = atob('X3N0b3JhZ2Vfc2VjcmV0XzhkMmYv'); 
         const fullUrl = secretPath + window.pendingUrl;
 
         const downloader = document.createElement('a');

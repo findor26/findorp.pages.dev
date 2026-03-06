@@ -103,34 +103,28 @@
         color: var(--md-sys-color-primary);
         text-decoration: none;
       }
-      /* 弹窗背景遮罩渐显 */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+      /* 进入动画：从小放大并上浮 */
+@keyframes md3-enter {
+  from { opacity: 0; transform: scale(0.9) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
-/* 弹窗主体：从小比例放大并淡入 */
-@keyframes zoomIn {
-  from { 
-    opacity: 0; 
-    transform: scale(0.9) translateY(10px); 
-  }
-  to { 
-    opacity: 1; 
-    transform: scale(1) translateY(0); 
-  }
+/* 退出动画：缩小并下沉 */
+@keyframes md3-exit {
+  from { opacity: 1; transform: scale(1) translateY(0); }
+  to { opacity: 0; transform: scale(0.95) translateY(10px); }
 }
 
-/* 应用于遮罩层 */
-#pw-dialog {
-  animation: fadeIn 0.3s ease-out;
-  backdrop-filter: blur(4px); /* 可选：增加毛玻璃效果，更显高级 */
-}
+/* 背景遮罩淡入淡出 */
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fade-out { from { opacity: 1; } to { opacity: 0; } }
 
-/* 应用于对话框主体 */
-#pw-dialog > div {
-  animation: zoomIn 0.4s cubic-bezier(0.05, 0.7, 0.1, 1.0);
-}
+/* 默认状态类 */
+.dialog-showing { animation: fade-in 0.2s forwards; }
+.dialog-hiding { animation: fade-out 0.2s forwards; }
+
+.dialog-content-showing { animation: md3-enter 0.3s cubic-bezier(0.05, 0.7, 0.1, 1.0) forwards; }
+.dialog-content-hiding { animation: md3-exit 0.2s ease-in forwards; }
     </style>
   </head>
   <body>

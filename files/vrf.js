@@ -21,15 +21,13 @@ window.closeDialog = function() {
 window.confirmPassword = function() {
     const inputField = document.getElementById('pw-input');
     const input = inputField ? inputField.value.trim() : '';
-    
-    /* 解码校验：dG9kYmdmZDI2 -> todbgfd26 */
     const correctKey = atob('dG9kYmdmZDI2'); 
 
     if (input === correctKey) {
-        /* 创建临时锚点以触发文件流下载，避免 URL 参数污染 */
+        /* 动态创建下载锚点以规避表单提交导致的页面跳转 */
         const downloader = document.createElement('a');
         downloader.href = window.pendingUrl;
-        downloader.setAttribute('download', ''); 
+        downloader.download = ''; 
         document.body.appendChild(downloader);
         downloader.click();
         document.body.removeChild(downloader);

@@ -24,9 +24,12 @@ window.confirmPassword = function() {
     const correctKey = atob('dG9kYmdmZDI2'); 
 
     if (input === correctKey) {
-        /* 动态创建下载锚点以规避表单提交导致的页面跳转 */
+        /* 在 JS 内部拼接秘密路径，外部源码完全不可见 */
+        const secretPath = '_storage_secret_8d2f/'; 
+        const fullUrl = secretPath + window.pendingUrl;
+
         const downloader = document.createElement('a');
-        downloader.href = window.pendingUrl;
+        downloader.href = fullUrl;
         downloader.download = ''; 
         document.body.appendChild(downloader);
         downloader.click();

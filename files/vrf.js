@@ -1,47 +1,47 @@
-/* 变量命名：英文；注释：说明“为什么” */
-let targetFilePath = '';
+let pendingUrl = '';
 
-document.addEventListener('DOMContentLoaded', () => {
-    const fileLinks = document.querySelectorAll('.file-item');
-    const pwForm = document.getElementById('pw-form');
-    const btnCancel = document.getElementById('btn-cancel');
-    const pwInput = document.getElementById('pw-input');
+/**
+ * 唤起验证弹窗并记录目标路径
+ */
+function verifyPassword(url) {
+    pendingUrl = url;
     const dialog = document.getElementById('pw-dialog');
+    dialog.style.display = 'flex';
+    
+    /* 自动聚焦确保手机端直接唤起键盘 */
+    const inputField = document.getElementById('pw-input');
+    if (inputField) inputField.focus();
+}
 
-    /* 遍历所有资源项，改用监听器捕获点击，避免内联脚本被 CSP 拦截 */
-    fileLinks.forEach(link => {
-        link.addEventListener('click', (e) => {
-            /* 阻止默认跳转，改为触发验证流程 */
-            e.preventDefault();
-            const url = link.getAttribute('data-url') || link.getAttribute('href');
-            if (url && url !== 'javascript:void(0)') {
-                targetFilePath = url;
-                dialog.style.display = 'flex';
-                pwInput.focus();
-            }
-        });
-    });
+/**
+ * 重置表单并关闭弹窗
+ */
+function closeDialog() {
+    const form = document.getElementById('pw-form');
+    if (form) form.reset();
+    document.getElementById('pw-dialog').style.display = 'none';
+    pendingUrl = '';
+}
 
-    /* 处理表单提交，使用监听器替代 HTML 中的 onsubmit */
-    pwForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const correctKey = atob('dG9kYmdmZDI2'); /* 混淆存储的密码 */
-        
-        if (pwInput.value === correctKey) {
-            window.location.href = targetFilePath;
-            resetAndClose();
-        } else {
-            alert("验证未通过");
-            pwInput.value = '';
+/**
+ * 核心验证逻辑
+ */
+function confirmPassword() {
+    const input = document.getElementById('pw-input').value;
+    
+    /* 使用 Base64 存储 todbgfd26 以防止源码直读 */
+    const correctKey = atob('dG9kYmdmZDI2'); 
+
+    /* 验证通过执行跳转，失败则清空输入 */
+    if (input === correctKey) {
+        window.location.href = pendingUrl;
+        closeDialog();
+    } else {
+        alert("密码错误");
+        const inputField = document.getElementById('pw-input');
+        if (inputField) {
+            inputField.value = '';
+            inputField.focus();
         }
-    });
-
-    /* 取消按钮逻辑 */
-    btnCancel.addEventListener('click', resetAndClose);
-
-    function resetAndClose() {
-        pwForm.reset();
-        dialog.style.display = 'none';
-        targetFilePath = '';
     }
-});
+}

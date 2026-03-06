@@ -103,6 +103,34 @@
         color: var(--md-sys-color-primary);
         text-decoration: none;
       }
+      /* 弹窗背景遮罩渐显 */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 弹窗主体：从小比例放大并淡入 */
+@keyframes zoomIn {
+  from { 
+    opacity: 0; 
+    transform: scale(0.9) translateY(10px); 
+  }
+  to { 
+    opacity: 1; 
+    transform: scale(1) translateY(0); 
+  }
+}
+
+/* 应用于遮罩层 */
+#pw-dialog {
+  animation: fadeIn 0.3s ease-out;
+  backdrop-filter: blur(4px); /* 可选：增加毛玻璃效果，更显高级 */
+}
+
+/* 应用于对话框主体 */
+#pw-dialog > div {
+  animation: zoomIn 0.4s cubic-bezier(0.05, 0.7, 0.1, 1.0);
+}
     </style>
   </head>
   <body>

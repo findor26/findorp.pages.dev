@@ -1,47 +1,58 @@
-let pendingUrl = '';
+/* 变量使用英文，注释仅说明“为什么” */
+window.pendingUrl = '';
 
 /**
- * 唤起验证弹窗并记录目标路径
+ * 外部调用的验证触发函数
  */
-function verifyPassword(url) {
-    pendingUrl = url;
+window.verifyPassword = function(url) {
+    window.pendingUrl = url;
     const dialog = document.getElementById('pw-dialog');
-    dialog.style.display = 'flex';
-    
-    /* 自动聚焦确保手机端直接唤起键盘 */
-    const inputField = document.getElementById('pw-input');
-    if (inputField) inputField.focus();
-}
+    if (dialog) {
+        dialog.style.display = 'flex';
+        /* 延迟聚焦确保移动端虚拟键盘能正常唤起 */
+        setTimeout(() => {
+            const input = document.getElementById('pw-input');
+            if (input) input.focus();
+        }, 50);
+    }
+};
 
 /**
- * 重置表单并关闭弹窗
+ * 关闭并清理状态
  */
-function closeDialog() {
+window.closeDialog = function() {
     const form = document.getElementById('pw-form');
     if (form) form.reset();
     document.getElementById('pw-dialog').style.display = 'none';
-    pendingUrl = '';
-}
+    window.pendingUrl = '';
+};
 
 /**
- * 核心验证逻辑
+ * 执行下载验证
  */
-function confirmPassword() {
-    const input = document.getElementById('pw-input').value;
+window.confirmPassword = function() {
+    const inputField = document.getElementById('pw-input');
+    /* 使用 trim() 去除输入首尾可能的空格（如手机输入法自动补全的空格） */
+    const input = inputField ? inputField.value.trim() : '';
     
-    /* 使用 Base64 存储 todbgfd26 以防止源码直读 */
+    /* 解码预设密码: dG9kYmdmZDI2 -> todbgfd26 */
     const correctKey = atob('dG9kYmdmZDI2'); 
 
-    /* 验证通过执行跳转，失败则清空输入 */
     if (input === correctKey) {
-        window.location.href = pendingUrl;
-        closeDialog();
+        /* 使用隐藏的 a 标签触发下载，以避开部分浏览器对 location.href 的拦截 */
+        const link = document.createElement('a');
+        link.href = window.pendingUrl;
+        link.download = ''; 
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        window.closeDialog();
     } else {
-        alert("密码错误");
-        const inputField = document.getElementById('pw-input');
+        alert("验证码不正确");
         if (inputField) {
             inputField.value = '';
             inputField.focus();
         }
     }
-}
+};

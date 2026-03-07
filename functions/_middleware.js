@@ -24,7 +24,6 @@ export async function onRequest(context) {
         // 如果 KV 还没配置好，打印错误但放行，防止全站崩溃
         console.error("KV 访问失败:", e);
     }
-    //
 
     return next();
 

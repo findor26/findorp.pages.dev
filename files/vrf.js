@@ -62,37 +62,42 @@ window.closeDialog = function() {
     }
 };
 
-window.confirmPassword = function() {
-    /* 二次校验 Token */
+window.confirmPassword = async function() {
     if (!window.cfToken) return;
 
     const inputField = document.getElementById('pw-input');
-    const input = inputField ? inputField.value.trim() : '';
-    const correctKey = atob('dG9kYmdmZDI2'); 
+    const password = inputField ? inputField.value.trim() : '';
 
-    if (input === correctKey) {
-        /* 秘密文件夹隔离逻辑 */
-        const secretPath = atob('X3N0b3JhZ2Vfc2VjcmV0XzhkMmYv'); 
-        const fullUrl = secretPath + window.pendingUrl;
+    try {
+        /* 向 Cloudflare Functions 发起验证请求 */
+        const response = await fetch('/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                password: password,
+                token: window.cfToken,
+                fileName: window.pendingUrl
+            })
+        });
 
-        const downloader = document.createElement('a');
-        downloader.href = fullUrl;
-        downloader.download = ''; 
-        document.body.appendChild(downloader);
-        downloader.click();
-        document.body.removeChild(downloader);
-        
-        window.closeDialog();
-    } else {
-        alert("密码错误");
-        /* 错误后强制重置验证码，要求用户重新校验 */
-        if (window.turnstile) {
-            turnstile.reset('#cf-turnstile-container');
-            window.onTurnstileSuccess(''); // 重置按钮状态
+        const data = await response.json();
+
+        if (response.ok) {
+            /* 后端返回了真实路径，执行下载 */
+            const downloader = document.createElement('a');
+            downloader.href = data.url;
+            downloader.download = '';
+            document.body.appendChild(downloader);
+            downloader.click();
+            document.body.removeChild(downloader);
+            
+            window.closeDialog();
+        } else {
+            alert(data.error || "验证失败");
+            if (window.turnstile) turnstile.reset('#cf-turnstile-container');
+            window.cfToken = '';
         }
-        if (inputField) {
-            inputField.value = '';
-            inputField.focus();
-        }
+    } catch (err) {
+        alert("网络异常，请稍后再试");
     }
 };

@@ -169,7 +169,9 @@
       
       <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
 
-      <div id="cf-turnstile-container" style="margin-bottom:20px; display:flex; justify-content:center;"></div>
+      <div id="cf-wrapper" style="margin-bottom:20px; min-height: 65px; display: flex; justify-content: center;">
+        <div id="cf-turnstile-container"></div>
+      </div>
 
       <div style="display:flex; justify-content:flex-end; gap:8px;">
         <button type="button" onclick="closeDialog()" style="background:none; border:none; color:var(--md-sys-color-primary); padding:10px 16px; font-weight:500; cursor:pointer;">取消</button>

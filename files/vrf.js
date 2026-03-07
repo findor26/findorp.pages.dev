@@ -17,25 +17,34 @@ window.onTurnstileSuccess = function(token) {
 window.verifyPassword = function(url) {
     window.pendingUrl = url;
     const dialog = document.getElementById('pw-dialog');
-    if (dialog) {
+    const wrapper = document.getElementById('cf-wrapper');
+    
+    if (dialog && wrapper) {
+        // 1. 物理清空旧容器，阻断报错递归
+        wrapper.innerHTML = '<div id="cf-turnstile-container"></div>';
+        
+        // 2. 显示弹窗（带动画）
+        dialog.className = 'dialog-showing';
         dialog.style.display = 'flex';
         
-        // 确保清理旧容器，防止重复初始化报错
-        const container = document.getElementById('cf-turnstile-container');
-        container.innerHTML = ''; 
-
-        if (window.turnstile) {
-            turnstile.render('#cf-turnstile-container', {
-                sitekey: '0x4AAAAAACnoEaLGtiIzO2nF',
-                callback: (token) => {
-                    window.onTurnstileSuccess(token);
-                },
-                'error-callback': (code) => {
-                    console.error('Turnstile 报错:', code);
-                    // 如果还报错，至少给个提示
+        // 3. 延迟显式渲染
+        setTimeout(() => {
+            if (window.turnstile) {
+                try {
+                    turnstile.render('#cf-turnstile-container', {
+                        sitekey: '0x4AAAAAACnoEaLGtiIzO2nF',
+                        theme: 'auto',
+                        callback: (token) => window.onTurnstileSuccess(token),
+                        'error-callback': (code) => {
+                             console.error('Turnstile 报错代码:', code);
+                             // 如果报错 600010，建议直接去 CF 后台删了重建一个 Key
+                        }
+                    });
+                } catch (e) {
+                    console.error("渲染组件时发生致命错误:", e);
                 }
-            });
-        }
+            }
+        }, 150);
     }
 };
 

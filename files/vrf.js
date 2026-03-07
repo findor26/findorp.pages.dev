@@ -1,1 +1,98 @@
-function _0xe142(_0x2463ff,_0xcac715){const _0x59ef69=_0x59ef();return _0xe142=function(_0xe1424b,_0xed1ba8){_0xe1424b=_0xe1424b-0x181;let _0x53946c=_0x59ef69[_0xe1424b];return _0x53946c;},_0xe142(_0x2463ff,_0xcac715);}function _0x59ef(){const _0x4e141f=['9610qqTpsA','dialog-content-hiding','none','pw-input','value','24yTcqeI','dialog-showing','div','65185OhLlTe','verifyPassword','display','4974450VRcBPH','8eHotaX','click','1333409mymiAv','createElement','dialog-hiding','117901QHMudd','download','appendChild','2iCJBBg','1451790mVztWi','closeDialog','getElementById','721384nxkkRi','className','密码错误','1404AtTtdP','reset','5ApnSNH','dG9kYmdmZDI2','pw-dialog','3uYwDce','pendingUrl','style','querySelector','href','body','trim','removeChild','flex'];_0x59ef=function(){return _0x4e141f;};return _0x59ef();}const _0x49c8f2=_0xe142;(function(_0x480534,_0xf98944){const _0x4ce3dd=_0xe142,_0x4a167c=_0x480534();while(!![]){try{const _0x12a254=parseInt(_0x4ce3dd(0x19b))/0x1*(parseInt(_0x4ce3dd(0x1a7))/0x2)+-parseInt(_0x4ce3dd(0x18a))/0x3*(parseInt(_0x4ce3dd(0x182))/0x4)+parseInt(_0x4ce3dd(0x187))/0x5*(parseInt(_0x4ce3dd(0x1a8))/0x6)+parseInt(_0x4ce3dd(0x1a4))/0x7*(parseInt(_0x4ce3dd(0x19f))/0x8)+parseInt(_0x4ce3dd(0x185))/0x9*(-parseInt(_0x4ce3dd(0x193))/0xa)+-parseInt(_0x4ce3dd(0x1a1))/0xb*(parseInt(_0x4ce3dd(0x198))/0xc)+parseInt(_0x4ce3dd(0x19e))/0xd;if(_0x12a254===_0xf98944)break;else _0x4a167c['push'](_0x4a167c['shift']());}catch(_0xb6da9e){_0x4a167c['push'](_0x4a167c['shift']());}}}(_0x59ef,0x20b37),window[_0x49c8f2(0x18b)]='',window[_0x49c8f2(0x19c)]=function(_0x220f32){const _0x5b1909=_0x49c8f2;window[_0x5b1909(0x18b)]=_0x220f32;const _0x2cc08c=document[_0x5b1909(0x181)](_0x5b1909(0x189)),_0x448561=_0x2cc08c[_0x5b1909(0x18d)](_0x5b1909(0x19a));_0x2cc08c&&(_0x2cc08c['className']=_0x5b1909(0x199),_0x448561[_0x5b1909(0x183)]='dialog-content-showing',_0x2cc08c[_0x5b1909(0x18c)][_0x5b1909(0x19d)]=_0x5b1909(0x192),setTimeout(()=>{const _0x4d2033=_0x5b1909,_0x4f0405=document[_0x4d2033(0x181)](_0x4d2033(0x196));if(_0x4f0405)_0x4f0405['focus']();},0x64));},window[_0x49c8f2(0x1a9)]=function(){const _0x181f20=_0x49c8f2,_0x2b12fa=document[_0x181f20(0x181)](_0x181f20(0x189)),_0x1df7a0=_0x2b12fa[_0x181f20(0x18d)](_0x181f20(0x19a)),_0x420b30=document[_0x181f20(0x181)]('pw-form');_0x2b12fa&&(_0x2b12fa['className']=_0x181f20(0x1a3),_0x1df7a0['className']=_0x181f20(0x194),setTimeout(()=>{const _0x588839=_0x181f20;_0x2b12fa['style'][_0x588839(0x19d)]=_0x588839(0x195);if(_0x420b30)_0x420b30[_0x588839(0x186)]();window[_0x588839(0x18b)]='';},0xc8));},window['confirmPassword']=function(){const _0x21b06c=_0x49c8f2,_0x5b5274=document['getElementById'](_0x21b06c(0x196)),_0x2d85e8=_0x5b5274?_0x5b5274['value'][_0x21b06c(0x190)]():'',_0x3ac427=atob(_0x21b06c(0x188));if(_0x2d85e8===_0x3ac427){const _0xd11ec2=atob('X3N0b3JhZ2Vfc2VjcmV0XzhkMmYv'),_0x407d18=_0xd11ec2+window[_0x21b06c(0x18b)],_0x5a0199=document[_0x21b06c(0x1a2)]('a');_0x5a0199[_0x21b06c(0x18e)]=_0x407d18,_0x5a0199[_0x21b06c(0x1a5)]='',document[_0x21b06c(0x18f)][_0x21b06c(0x1a6)](_0x5a0199),_0x5a0199[_0x21b06c(0x1a0)](),document['body'][_0x21b06c(0x191)](_0x5a0199),window[_0x21b06c(0x1a9)]();}else alert(_0x21b06c(0x184)),_0x5b5274&&(_0x5b5274[_0x21b06c(0x197)]='',_0x5b5274['focus']());});
+window.pendingUrl = '';
+window.cfToken = '';
+
+/**
+ * 验证码成功回调：激活提交按钮
+ */
+window.onTurnstileSuccess = function(token) {
+    window.cfToken = token;
+    const btn = document.getElementById('submit-btn');
+    if (btn) {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.style.pointerEvents = 'auto';
+    }
+};
+
+window.verifyPassword = function(url) {
+    window.pendingUrl = url;
+    const dialog = document.getElementById('pw-dialog');
+    const content = dialog.querySelector('div');
+    
+    if (dialog) {
+        /* 重置验证状态并播放进入动画 */
+        dialog.className = 'dialog-showing';
+        content.className = 'dialog-content-showing';
+        dialog.style.display = 'flex';
+        
+        /* 每次打开弹窗都尝试重置 Turnstile 状态 */
+        if (window.turnstile) {
+            turnstile.reset('#cf-turnstile-container');
+            window.cfToken = '';
+        }
+        
+        setTimeout(() => {
+            const input = document.getElementById('pw-input');
+            if (input) input.focus();
+        }, 100);
+    }
+};
+
+window.closeDialog = function() {
+    const dialog = document.getElementById('pw-dialog');
+    const content = dialog.querySelector('div');
+    const btn = document.getElementById('submit-btn');
+
+    if (dialog) {
+        /* 播放退场动画 */
+        dialog.className = 'dialog-hiding';
+        content.className = 'dialog-content-hiding';
+
+        setTimeout(() => {
+            dialog.style.display = 'none';
+            /* 状态彻底清理 */
+            if (btn) {
+                btn.disabled = true;
+                btn.style.opacity = '0.4';
+                btn.style.pointerEvents = 'none';
+            }
+            window.pendingUrl = '';
+            window.cfToken = '';
+        }, 200); 
+    }
+};
+
+window.confirmPassword = function() {
+    /* 二次校验 Token */
+    if (!window.cfToken) return;
+
+    const inputField = document.getElementById('pw-input');
+    const input = inputField ? inputField.value.trim() : '';
+    const correctKey = atob('dG9kYmdmZDI2'); 
+
+    if (input === correctKey) {
+        /* 秘密文件夹隔离逻辑 */
+        const secretPath = atob('X3N0b3JhZ2Vfc2VjcmV0XzhkMmYv'); 
+        const fullUrl = secretPath + window.pendingUrl;
+
+        const downloader = document.createElement('a');
+        downloader.href = fullUrl;
+        downloader.download = ''; 
+        document.body.appendChild(downloader);
+        downloader.click();
+        document.body.removeChild(downloader);
+        
+        window.closeDialog();
+    } else {
+        alert("密码错误");
+        /* 错误后强制重置验证码，要求用户重新校验 */
+        if (window.turnstile) {
+            turnstile.reset('#cf-turnstile-container');
+            window.onTurnstileSuccess(''); // 重置按钮状态
+        }
+        if (inputField) {
+            inputField.value = '';
+            inputField.focus();
+        }
+    }
+};

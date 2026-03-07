@@ -17,24 +17,25 @@ window.onTurnstileSuccess = function(token) {
 window.verifyPassword = function(url) {
     window.pendingUrl = url;
     const dialog = document.getElementById('pw-dialog');
-    const content = dialog.querySelector('div');
-    
     if (dialog) {
-        /* 重置验证状态并播放进入动画 */
-        dialog.className = 'dialog-showing';
-        content.className = 'dialog-content-showing';
         dialog.style.display = 'flex';
         
-        /* 每次打开弹窗都尝试重置 Turnstile 状态 */
+        // 确保清理旧容器，防止重复初始化报错
+        const container = document.getElementById('cf-turnstile-container');
+        container.innerHTML = ''; 
+
         if (window.turnstile) {
-            turnstile.reset('#cf-turnstile-container');
-            window.cfToken = '';
+            turnstile.render('#cf-turnstile-container', {
+                sitekey: '0x4AAAAAACnoEaLGtiIzO2nF',
+                callback: (token) => {
+                    window.onTurnstileSuccess(token);
+                },
+                'error-callback': (code) => {
+                    console.error('Turnstile 报错:', code);
+                    // 如果还报错，至少给个提示
+                }
+            });
         }
-        
-        setTimeout(() => {
-            const input = document.getElementById('pw-input');
-            if (input) input.focus();
-        }, 100);
     }
 };
 

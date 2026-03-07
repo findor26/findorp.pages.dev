@@ -5,11 +5,14 @@ window.verifyPassword = function(fileName) {
     window.pendingUrl = fileName;
     const dialog = document.getElementById('password-dialog');
     if (dialog) {
-        dialog.style.display = 'flex';
+        // 确保 CSS 中有 display: none;
+        dialog.style.display = 'flex'; 
         document.getElementById('pw-input').value = "";
         if (typeof turnstile !== 'undefined') {
             turnstile.reset();
         }
+    } else {
+        console.error("未找到 ID 为 password-dialog 的弹窗元素");
     }
 };
 
@@ -27,7 +30,10 @@ window.confirmPassword = async function() {
     const password = document.getElementById('pw-input').value.trim();
     const btn = document.getElementById('submit-btn');
 
-    if (!password || !window.cfToken) return;
+    if (!password || !window.cfToken) {
+        alert("请完成密码输入和人机验证");
+        return;
+    }
 
     btn.disabled = true;
     const originalText = btn.innerText;
@@ -52,8 +58,6 @@ window.confirmPassword = async function() {
             link.download = window.pendingUrl;
             document.body.appendChild(link);
             link.click();
-            
-            // 释放内存占用
             document.body.removeChild(link);
             window.URL.revokeObjectURL(downloadUrl);
             window.closeDialog();

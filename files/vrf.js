@@ -17,37 +17,44 @@ window.onTurnstileSuccess = function(token) {
 window.verifyPassword = function(url) {
     window.pendingUrl = url;
     const dialog = document.getElementById('pw-dialog');
-    const wrapper = document.getElementById('cf-wrapper');
+    const content = dialog.querySelector('div');
+    const container = document.getElementById('cf-turnstile-container');
     
-    if (dialog && wrapper) {
-        // 1. 物理清空旧容器，阻断报错递归
-        wrapper.innerHTML = '<div id="cf-turnstile-container"></div>';
-        
-        // 2. 显示弹窗（带动画）
+    if (dialog) {
+        // 【关键修复】：重置所有动画类名，防止旧的退出动画干扰
+        dialog.className = ''; 
+        content.className = '';
+
+        // 重新应用进入动画类
         dialog.className = 'dialog-showing';
+        content.className = 'dialog-content-showing';
         dialog.style.display = 'flex';
         
-        // 3. 延迟显式渲染
+        // 清理旧验证码实例并重置容器
+        if (window.turnstile && window.turnstileId !== null) {
+            try {
+                turnstile.remove(window.turnstileId);
+            } catch(e) {}
+        }
+        container.innerHTML = ''; 
+
+        // 延迟渲染验证码
         setTimeout(() => {
             if (window.turnstile) {
-                try {
-                    turnstile.render('#cf-turnstile-container', {
-                        sitekey: '0x4AAAAAACnoEaLGtiIzO2nF',
-                        theme: 'auto',
-                        callback: (token) => window.onTurnstileSuccess(token),
-                        'error-callback': (code) => {
-                             console.error('Turnstile 报错代码:', code);
-                             // 如果报错 600010，建议直接去 CF 后台删了重建一个 Key
-                        }
-                    });
-                } catch (e) {
-                    console.error("渲染组件时发生致命错误:", e);
-                }
+                window.turnstileId = turnstile.render('#cf-turnstile-container', {
+                    sitekey: '0x4AAAAAACnoEaLGtiIzO2nF',
+                    theme: 'auto',
+                    callback: (token) => window.onTurnstileSuccess(token)
+                });
             }
+        }, 250);
+        
+        setTimeout(() => {
+            const input = document.getElementById('pw-input');
+            if (input) input.focus();
         }, 150);
     }
 };
-
 window.closeDialog = function() {
     const dialog = document.getElementById('pw-dialog');
     const content = dialog.querySelector('div');

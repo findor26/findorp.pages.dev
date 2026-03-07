@@ -5,21 +5,15 @@ window.verifyPassword = function(fileName) {
     window.pendingUrl = fileName;
     const dialog = document.getElementById('password-dialog');
     if (dialog) {
-        // 确保 CSS 中有 display: none;
-        dialog.style.display = 'flex'; 
+        dialog.style.display = 'flex';
         document.getElementById('pw-input').value = "";
-        if (typeof turnstile !== 'undefined') {
-            turnstile.reset();
-        }
-    } else {
-        console.error("未找到 ID 为 password-dialog 的弹窗元素");
+        if (typeof turnstile !== 'undefined') turnstile.reset();
     }
 };
 
 window.closeDialog = function() {
     const dialog = document.getElementById('password-dialog');
     if (dialog) dialog.style.display = 'none';
-    window.pendingUrl = "";
 };
 
 window.onTurnstileSuccess = function(token) {
@@ -30,15 +24,9 @@ window.confirmPassword = async function() {
     const password = document.getElementById('pw-input').value.trim();
     const btn = document.getElementById('submit-btn');
 
-    if (!password || !window.cfToken) {
-        alert("请完成密码输入和人机验证");
-        return;
-    }
+    if (!password || !window.cfToken) return;
 
     btn.disabled = true;
-    const originalText = btn.innerText;
-    btn.innerText = "正在提取...";
-
     try {
         const response = await fetch('/verify', {
             method: 'POST',
@@ -51,33 +39,23 @@ window.confirmPassword = async function() {
         });
 
         if (response.ok) {
-            const blob = await response.blob();
-            const downloadUrl = window.URL.createObjectURL(blob);
+            const data = await response.json();
+            // 直接通过隐藏链接触发下载
             const link = document.createElement('a');
-            link.href = downloadUrl;
+            link.href = data.url;
             link.download = window.pendingUrl;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            window.URL.revokeObjectURL(downloadUrl);
             window.closeDialog();
         } else {
             const errorData = await response.json();
             alert(errorData.error || "验证失败");
             if (typeof turnstile !== 'undefined') turnstile.reset();
-            window.cfToken = "";
         }
     } catch (err) {
-        alert("连接异常");
+        alert("网络异常");
     } finally {
         btn.disabled = false;
-        btn.innerText = originalText;
     }
 };
-
-document.addEventListener('keydown', (e) => {
-    const dialog = document.getElementById('password-dialog');
-    if (dialog && dialog.style.display === 'flex' && e.key === 'Enter') {
-        window.confirmPassword();
-    }
-});

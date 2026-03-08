@@ -201,6 +201,7 @@
         .action-bar {
             display: flex;
             justify-content: center;
+            gap: 12px;
             margin: 24px 0;
         }
 
@@ -213,10 +214,21 @@
             cursor: pointer;
             border-radius: 20px;
             font-size: 13px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
         }
 
         .btn-text:hover {
             background-color: rgba(0, 97, 164, 0.08);
+        }
+
+        .btn-text.error {
+            color: var(--md-sys-color-error);
+        }
+
+        .btn-text.error:hover {
+            background-color: rgba(186, 26, 26, 0.08);
         }
 
         footer {
@@ -295,12 +307,8 @@
         <div id="msg-list"></div>
         <div id="load-more-trigger"></div>
 
-        <div class="action-bar">
-            <button class="btn-text" onclick="showModal('admin-modal')">
-                <span class="material-symbols-outlined" style="font-size: 16px; vertical-align: middle;">admin_panel_settings</span>
-                进入管理模式
-            </button>
-        </div>
+        <div class="action-bar" id="action-bar">
+            </div>
     </div>
 
     <div id="admin-modal" class="modal-overlay">
@@ -339,7 +347,7 @@
     </div>
 
     <footer>
-        &copy; 2026 FINDOR &bull; POWERED BY CLOUDFLARE D1
+        &copy; 2026 Findor &bull; Powered By Cloudflare D1
     </footer>
 
     <script>
@@ -368,6 +376,25 @@
             document.getElementById('alert-title').textContent = title;
             document.getElementById('alert-body').textContent = body;
             showModal('alert-modal');
+        }
+
+        function updateActionBar() {
+            const bar = document.getElementById('action-bar');
+            if (isAdmin) {
+                bar.innerHTML = `
+                    <button class="btn-text error" onclick="exitAdminMode()">
+                        <span class="material-symbols-outlined" style="font-size: 16px;">logout</span>
+                        退出管理模式
+                    </button>
+                `;
+            } else {
+                bar.innerHTML = `
+                    <button class="btn-text" onclick="showModal('admin-modal')">
+                        <span class="material-symbols-outlined" style="font-size: 16px;">admin_panel_settings</span>
+                        进入管理模式
+                    </button>
+                `;
+            }
         }
 
         async function loadMessages(isRefresh = false) {
@@ -483,21 +510,29 @@
             if (res.ok) {
                 loadMessages(true);
             } else {
-                isAdmin = false;
-                localStorage.removeItem('admin_token');
+                exitAdminMode();
                 showAlert("校验失败", "令牌已失效，请重新进入管理模式");
-                loadMessages(true);
             }
         };
 
         function submitAdminToken() {
-            const pwd = document.getElementById('admin-token-input').value.trim();
+            const pwdInput = document.getElementById('admin-token-input');
+            const pwd = pwdInput.value.trim();
             if (pwd) {
                 localStorage.setItem('admin_token', pwd);
                 isAdmin = true;
+                pwdInput.value = '';
+                updateActionBar();
                 loadMessages(true);
                 hideModal('admin-modal');
             }
+        }
+
+        function exitAdminMode() {
+            localStorage.removeItem('admin_token');
+            isAdmin = false;
+            updateActionBar();
+            loadMessages(true);
         }
 
         function escapeHtml(str) {
@@ -510,6 +545,10 @@
             const d = new Date(dateStr);
             return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
         }
+
+        // 初始化
+        updateActionBar();
+        loadMessages();
     </script>
 </body>
 </html>

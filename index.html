@@ -1,444 +1,154 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh-CN">
-  <head>
+<head>
     <title>Findor | 3D坦克玩家空间</title>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="stylesheet" href="style.css" />
-    <meta
-      http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://tankionline.com; connect-src 'self' https://tanki-proxy.findor.workers.dev;"
-    />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap"
-      rel="stylesheet"
-    />
+    
+    <link rel="stylesheet" href="https://unpkg.com/mdui@2/mdui.css" />
+    <script type="module" src="https://unpkg.com/mdui@2/mdui.global.js"></script>
+
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" />
+
     <style>
-      :root {
-        /* MD3 标准色彩 */
-        --md-sys-color-primary: #006495;
-        --md-sys-color-on-primary: #ffffff;
-        --md-sys-color-primary-container: #cbe6ff;
-        --md-sys-color-surface: #fcfcff;
-        --md-sys-color-on-surface: #191c1e;
-        --md-sys-color-surface-variant: #dee3eb;
-        --md-sys-color-on-surface-variant: #42474e;
-        --md-sys-color-outline: #72777f;
-      }
+        :root {
+            /* 使用 MDUI 2 的设计令牌，确保背景色符合 M3 标准 */
+            background-color: var(--mdui-color-surface-container-low);
+            color: var(--mdui-color-on-surface);
+        }
 
-      body {
-        background-color: var(--md-sys-color-surface);
-        color: var(--md-sys-color-on-surface);
-        font-family: "Roboto", sans-serif;
-        margin: 0;
-        padding: 0;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        min-height: 100vh;
-      }
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
 
-      /* 顶部栏 */
-      header {
-        width: 100%;
-        padding: 48px 24px;
-        background-color: var(--md-sys-color-primary-container);
-        text-align: center;
-        border-bottom-left-radius: 32px;
-        border-bottom-right-radius: 32px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-      }
+        /* 布局容器 */
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 16px;
+            width: 100%;
+            box-sizing: border-box;
+            flex: 1;
+        }
 
-      h1 {
-        margin: 0;
-        font-size: 2.5rem;
-        color: var(--md-sys-color-primary);
-        font-weight: 700;
-      }
+        /* 顶部横幅 */
+        .header-banner {
+            background-color: var(--mdui-color-primary-container);
+            color: var(--mdui-color-on-primary-container);
+            padding: 64px 24px;
+            text-align: center;
+            border-radius: 0 0 32px 32px;
+            margin-bottom: 24px;
+        }
 
-      .subtitle {
-        margin-top: 12px;
-        font-size: 1.1rem;
-        color: var(--md-sys-color-on-surface-variant);
-      }
+        /* 实时在线人数大卡片 */
+        .online-stats-card {
+            background-color: var(--mdui-color-secondary-container);
+            color: var(--mdui-color-on-secondary-container);
+            margin-bottom: 24px;
+        }
 
-      /* 内容容器 */
-      main {
-        width: 90%;
-        max-width: 800px;
-        margin: 24px 0;
-        /* 关键修改：自动撑开空间，将 footer 推向底部 */
-        flex: 1;
-      }
+        .online-number {
+            font-size: 4.5rem;
+            font-weight: 800;
+            letter-spacing: -2px;
+            line-height: 1.1;
+            margin: 16px 0;
+        }
 
-      /* MD3 卡片样式 */
-      .card {
-        background-color: var(--md-sys-color-surface);
-        border: 1px solid var(--md-sys-color-outline);
-        border-radius: 24px;
-        padding: 24px;
-        margin-bottom: 24px;
-        transition:
-          transform 0.2s,
-          box-shadow 0.2s;
-      }
+        /* 列表微调 */
+        mdui-list {
+            background: transparent;
+        }
 
-      .card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
-        background-color: #f0f4f8;
-      }
+        footer {
+            padding: 32px 16px;
+            text-align: center;
+            opacity: 0.7;
+        }
 
-      .card-title {
-        font-size: 1.25rem;
-        font-weight: 500;
-        margin-bottom: 12px;
-        color: var(--md-sys-color-primary);
-      }
-
-      /* 列表容器 */
-.nav-list {
-  list-style: none;
-  padding: 0;
-  margin: 16px 0 0 0;
-  border-top: 1px solid var(--md-sys-color-surface-variant);
-}
-
-.nav-list li {
-  border-bottom: 1px solid var(--md-sys-color-surface-variant);
-}
-
-/* 列表项主体 */
-.list-item {
-  display: flex;
-  align-items: center;
-  padding: 16px 8px;
-  text-decoration: none;
-  transition: background-color 0.2s;
-  color: var(--md-sys-color-on-surface);
-}
-
-/* 修正图标字体的渲染方式 */
-.material-symbols-rounded {
-  display: inline-block;
-  vertical-align: middle;
-  line-height: 1;
-}
-
-.item-arrow {
-  color: var(--md-sys-color-outline);
-  /* 确保向右箭头的视觉中心与文字一致 */
-  font-size: 24px;
-}
-
-.list-item:hover {
-  background-color: rgba(0, 100, 149, 0.08); /* 使用 Primary 色的淡化版 */
-  text-decoration: none;
-}
-
-/* 图标部分 */
-.item-icon {
-  width: 40px;
-  font-size: 1.2rem;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-/* 文字部分 */
-.item-text {
-  flex: 1;
-  font-size: 1rem;
-  font-weight: 500;
-  margin-left: 12px;
-}
-
-/* 右侧箭头提示 */
-.item-arrow {
-  color: var(--md-sys-color-outline);
-  font-family: monospace;
-  font-weight: bold;
-  opacity: 0.5;
-  transition: transform 0.2s, opacity 0.2s;
-}
-
-.list-item:hover .item-arrow {
-  transform: translateX(4px);
-  opacity: 1;
-  color: var(--md-sys-color-primary);
-}
-
-      footer {
-        margin-top: auto;
-        padding: 24px;
-        font-size: 0.8rem;
-        color: var(--md-sys-color-outline);
-      }
-
-      a {
-        color: var(--md-sys-color-primary);
-        text-decoration: none;
-      }
-      a:hover {
-        text-decoration: underline;
-      }
+        /* 悬浮切换按钮位置 */
+        #theme-toggle {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            z-index: 100;
+        }
     </style>
-  </head>
-  <body>
-    <button id="theme-toggle" title="切换模式" aria-label="切换暗黑模式">
-      <svg
-        class="sun-icon"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-      >
-        <circle cx="12" cy="12" r="5"></circle>
-        <line x1="12" y1="1" x2="12" y2="3"></line>
-        <line x1="12" y1="21" x2="12" y2="23"></line>
-        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-        <line x1="1" y1="12" x2="3" y2="12"></line>
-        <line x1="21" y1="12" x2="23" y2="12"></line>
-        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-      </svg>
-      <svg
-        class="moon-icon"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        style="display: none"
-      >
-        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-      </svg>
-    </button>
-    <header>
-      <h1>Findor 的空间</h1>
-      <p class="subtitle">3D坦克 (Tanki Online) 技术玩家</p>
+</head>
+
+<body class="mdui-theme-light"> <mdui-button-icon id="theme-toggle" icon="light_mode" variant="filled-tonal"></mdui-button-icon>
+
+    <header class="header-banner mdui-shadow-1">
+        <mdui-typography variant="display-medium">Findor 的空间</mdui-typography>
+        <mdui-typography variant="title-medium" style="opacity: 0.8; margin-top: 8px;">
+            3D坦克 (Tanki Online) 技术玩家
+        </mdui-typography>
     </header>
 
-    <main>
-      <section class="card">
-        <div class="card-title">关于我</div>
-        <p>
-          欢迎来到我的个人主页。我是一名热爱
-          <strong>3D坦克</strong> 的玩家，专注于游戏机制研究和测试服动态监测。
-        </p>
-        <p>
-          你可以在
-          <a href="https://space.bilibili.com/1863175083" target="_blank"
-            >Bilibili</a
-          >
-          找到我的日常分享。
-        </p>
-      </section>
-
-      <section
-        class="card"
-        style="
-          background-color: var(--md-sys-color-primary-container);
-          border: none;
-        "
-      >
-        <div
-          class="card-title"
-          style="
-            color: var(--md-sys-color-primary);
-            font-size: 0.9rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-          "
-        >
-          全服实时在线
-        </div>
-
-        <div
-          id="v_online"
-          style="
-            font-size: 4rem;
-            font-weight: 700;
-            margin: 8px 0;
-            color: var(--md-sys-color-on-primary-container);
-            font-family: &quot;Roboto&quot;, sans-serif;
-            letter-spacing: -0.02em;
-          "
-        >
-          ---
-        </div>
-
-        <div
-          style="
-            display: flex;
-            gap: 16px;
-            justify-content: flex-start;
-            margin-top: 8px;
-          "
-        >
-          <div
-            style="
-              background: rgba(255, 255, 255, 0.3);
-              padding: 8px 16px;
-              border-radius: 12px;
-            "
-          >
-            <span
-              style="
-                color: var(--md-sys-color-on-surface-variant);
-                font-size: 0.8rem;
-                font-weight: 500;
-              "
-              >战斗中</span
-            >
-            <div
-              id="v_battle"
-              style="
-                color: var(--md-sys-color-primary);
-                font-size: 1.1rem;
-                font-weight: 700;
-              "
-            >
-              ---
+    <main class="container">
+        
+        <mdui-card style="padding: 24px; margin-bottom: 24px;" variant="elevated">
+            <mdui-typography variant="title-large" style="color: var(--mdui-color-primary); margin-bottom: 12px;">关于我</mdui-typography>
+            <mdui-typography variant="body-large">
+                欢迎来到我的个人主页。我是一名热爱 <strong>3D坦克</strong> 的玩家，专注于游戏机制研究和测试服动态监测。
+            </mdui-typography>
+            <div style="margin-top: 16px;">
+                <mdui-button href="https://space.bilibili.com/1863175083" target="_blank" variant="text" icon="play_circle">
+                    Bilibili 日常分享
+                </mdui-button>
             </div>
-          </div>
+        </mdui-card>
 
-          <div
-            style="
-              background: rgba(255, 255, 255, 0.3);
-              padding: 8px 16px;
-              border-radius: 12px;
-            "
-          >
-            <span
-              style="
-                color: var(--md-sys-color-on-surface-variant);
-                font-size: 0.8rem;
-                font-weight: 500;
-              "
-              >4399 渠道</span
-            >
-            <div
-              id="v_4399"
-              style="
-                color: var(--md-sys-color-primary);
-                font-size: 1.1rem;
-                font-weight: 700;
-              "
-            >
-              ---
+        <mdui-card class="online-stats-card" style="padding: 24px;" variant="filled">
+            <mdui-typography variant="label-large" style="letter-spacing: 2px;">全服实时在线</mdui-typography>
+            
+            <div id="v_online" class="online-number">---</div>
+            
+            <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                <mdui-chip variant="filled" icon="fireplace">战斗中: <span id="v_battle">---</span></mdui-chip>
+                <mdui-chip variant="filled" icon="bolt">4399 渠道: <span id="v_4399">---</span></mdui-chip>
             </div>
-          </div>
-        </div>
-      </section>
+        </mdui-card>
 
-      <section class="card">
-  <div class="card-title">3D坦克 快捷导航</div>
-  <ul class="nav-list">
-    <li>
-      <a href="https://tankionline.com" target="_blank" class="list-item">
-        <span class="material-symbols-rounded item-icon">language</span>
-        <span class="item-text">官方网站</span>
-        <span class="material-symbols-rounded item-arrow">subdirectory_arrow_right</span>
-      </a>
-    </li>
-    <li>
-      <a href="https://3dtank.com" target="_blank" class="list-item">
-        <span class="material-symbols-rounded item-icon">public</span>
-        <span class="item-text">国服官网</span>
-        <span class="material-symbols-rounded item-arrow">subdirectory_arrow_right</span>
-      </a>
-    </li>
-    <li>
-      <a href="files" target="_blank" class="list-item">
-        <span class="material-symbols-rounded item-icon">folder_open</span>
-        <span class="item-text">文件中心</span>
-        <span class="material-symbols-rounded item-arrow">subdirectory_arrow_right</span>
-      </a>
-    </li>
-    <li>
-      <a href="test.html" target="_blank" class="list-item">
-        <span class="material-symbols-rounded item-icon">build</span>
-        <span class="item-text">测试服动态</span>
-        <span class="material-symbols-rounded item-arrow">subdirectory_arrow_right</span>
-      </a>
-    </li>
-    <li>
-      <a href="chat" target="_blank" class="list-item">
-        <span class="material-symbols-rounded item-icon">forum</span>
-        <span class="item-text">聊天房</span>
-        <span class="material-symbols-rounded item-arrow">subdirectory_arrow_right</span>
-      </a>
-    </li>
-    <li>
-      <a href="comments" target="_blank" class="list-item">
-        <span class="material-symbols-rounded item-icon">chat</span>
-        <span class="item-text">留言区</span>
-        <span class="material-symbols-rounded item-arrow">subdirectory_arrow_right</span>
-      </a>
-    </li>
-    <li>
-      <a href="https://en.tankiwiki.com" target="_blank" class="list-item">
-        <span class="material-symbols-rounded item-icon">menu_book</span>
-        <span class="item-text">游戏维基</span>
-        <span class="material-symbols-rounded item-arrow">subdirectory_arrow_right</span>
-      </a>
-    </li>
-  </ul>
-</section>
-      <section class="card">
-        <div class="card-title">当前项目</div>
-        <p>
-          • <strong>Findor's Monitor</strong>:
-          实时监测测试服版本更新（开发中）。
-        </p>
-        <!-- <p>• <strong>P2P 工具集</strong>: 基于 WebRTC 的高效文件传输方案。</p> -->
-      </section>
+        <mdui-card variant="outlined" style="padding: 8px; margin-bottom: 24px;">
+            <mdui-list>
+                <mdui-list-item icon="language" href="https://tankionline.com" target="_blank" end-icon="arrow_forward">官方网站</mdui-list-item>
+                <mdui-list-item icon="public" href="https://3dtank.com" target="_blank" end-icon="arrow_forward">国服官网</mdui-list-item>
+                <mdui-divider></mdui-divider>
+                <mdui-list-item icon="folder_open" href="files" target="_blank" end-icon="arrow_forward">文件中心</mdui-list-item>
+                <mdui-list-item icon="build" href="test.html" target="_blank" end-icon="arrow_forward">测试服动态</mdui-list-item>
+                <mdui-list-item icon="forum" href="chat" target="_blank" end-icon="arrow_forward">聊天房</mdui-list-item>
+                <mdui-list-item icon="chat" href="comments" target="_blank" end-icon="arrow_forward">留言区</mdui-list-item>
+                <mdui-divider></mdui-divider>
+                <mdui-list-item icon="menu_book" href="https://en.tankiwiki.com" target="_blank" end-icon="arrow_forward">游戏维基</mdui-list-item>
+            </mdui-list>
+        </mdui-card>
+
+        <mdui-card variant="filled" style="padding: 24px; background-color: var(--mdui-color-surface-container-high);">
+            <mdui-typography variant="title-medium" style="margin-bottom: 12px;">当前项目</mdui-typography>
+            <mdui-list style="padding: 0;">
+                <mdui-list-item nonclickable>
+                    <mdui-icon slot="icon" name="monitor"></mdui-icon>
+                    Findor's Monitor
+                    <span slot="description">实时监测测试服版本更新（开发中）</span>
+                </mdui-list-item>
+            </mdui-list>
+        </mdui-card>
+
     </main>
 
-    <footer
-      style="
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 12px;
-        padding: 32px 24px;
-        color: var(--md-sys-color-outline);
-      "
-    >
-      <a
-        href="https://github.com/findor26/findorp.pages.dev"
-        target="_blank"
-        title="查看 GitHub 仓库"
-        style="
-          color: var(--md-sys-color-outline);
-          transition: color 0.2s;
-          display: flex;
-        "
-        onmouseover="this.style.color = 'var(--md-sys-color-primary)'"
-        onmouseout="this.style.color = 'var(--md-sys-color-outline)'"
-      >
-        <svg
-          height="24"
-          aria-hidden="true"
-          viewBox="0 0 16 16"
-          version="1.1"
-          width="24"
-          fill="currentColor"
-        >
-          <path
-            d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 3.58-8Z"
-          ></path>
-        </svg>
-      </a>
-
-      <div style="font-size: 0.8rem; text-align: center">
-        &copy; 2026 Findor. 基于 Cloudflare Pages 托管.
-      </div>
+    <footer>
+        <mdui-button-icon href="https://github.com/findor26/findorp.pages.dev" target="_blank" icon="code"></mdui-button-icon>
+        <mdui-typography variant="label-medium" style="display: block; margin-top: 12px;">
+            &copy; 2026 Findor. 基于 Cloudflare Pages 托管.
+        </mdui-typography>
     </footer>
 
-    <script src="main.js"></script>
-  </body>
+    <script src="main.js">
+    </script>
+</body>
 </html>

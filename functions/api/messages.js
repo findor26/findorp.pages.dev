@@ -24,7 +24,7 @@ export async function onRequest(context) {
   // --- 删除逻辑 (DELETE) ---
   if (request.method === "DELETE") {
     const adminPassword = request.headers.get("Admin-Token");
-    const SECRET = env.ADMIN_PASSWORD || "mypassword"; 
+    const SECRET = env.ADMIN_PASSWORD; 
 
     if (adminPassword !== SECRET) {
       return new Response("未授权", { status: 401 });

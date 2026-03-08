@@ -159,61 +159,78 @@ function initMobileControls() {
 // --- 5. 核心循环与物理同步 ---
 function gameLoop() {
     requestAnimationFrame(gameLoop);
-    const delta = Math.min(clock.getDelta(), 0.1);
-
-    // 模拟物理世界步进，确保帧率无关的碰撞计算
-    physicsWorld.step(1/60, delta, 3);
-
-    updateMovement(delta);
-    updateRemotePlayers(delta);
-    updateBullets(delta);
-
-    // 将物理引擎坐标映射到渲染引擎，实现视觉一致性
-    myTankGroup.position.copy(tankBody.position);
-    myTankGroup.quaternion.copy(tankBody.quaternion);
     
-    myPos.x = tankBody.position.x;
-    myPos.y = tankBody.position.y;
-    myPos.z = tankBody.position.z;
-    myPos.angle = myTankGroup.rotation.y;
+    // 使用 fixedTimeStep 确保物理计算稳定
+    const timeStep = 1 / 60;
+    const deltaTime = clock.getDelta();
+    
+    if (physicsWorld) {
+        // 参数说明：步长, 自上一帧的时间, 最大子步数
+        physicsWorld.step(timeStep, deltaTime, 10);
+    }
 
-    camera.position.lerp(new THREE.Vector3(myPos.x, 45, myPos.z + 35), 0.1);
-    camera.lookAt(myPos.x, 0, myPos.z);
+    updateMovement(deltaTime);
+
+    // 同步渲染
+    if (myTankGroup && tankBody) {
+        myTankGroup.position.copy(tankBody.position);
+        myTankGroup.quaternion.copy(tankBody.quaternion);
+        
+        // 更新同步用的逻辑坐标
+        myPos.x = tankBody.position.x;
+        myPos.z = tankBody.position.z;
+        myPos.angle = myTankGroup.rotation.y;
+    }
 
     renderer.render(scene, camera);
 }
 
 function updateMovement(delta) {
-    const moveSpeed = myPos.speedUp ? 4000 : 2500;
-    const moveForce = 15000;  // 增加到 1.5万 左右
-    const rotateTorque = 8000; // 使用扭矩或直接控制角速度
+    const moveSpeed = myPos.speedUp ? 15 : 10; // 直接定义速度数值
+    const rotateSpeed = 2.5;
 
-    // 键盘控制逻辑
+    // 获取坦克的当前朝向（四元数转向量）
+    const quaternion = new CANNON.Quaternion();
+    quaternion.copy(tankBody.quaternion);
+    const forward = new CANNON.Vec3(0, 0, 1);
+    const direction = quaternion.vmult(forward);
+
+    // 1. 前后移动：直接修改线性速度
     if (keys['w']) {
-        // 向坦克的局部前方施力
-        const force = new CANNON.Vec3(0, 0, moveForce);
-        tankBody.applyLocalForce(force, new CANNON.Vec3(0, 0, 0));
-    }
-    if (keys['s']) {
-        const force = new CANNON.Vec3(0, 0, -moveForce);
-        tankBody.applyLocalForce(force, new CANNON.Vec3(0, 0, 0));
+        tankBody.velocity.set(
+            direction.x * moveSpeed,
+            tankBody.velocity.y, // 保留重力带来的垂直速度
+            direction.z * moveSpeed
+        );
+    } else if (keys['s']) {
+        tankBody.velocity.set(
+            -direction.x * moveSpeed,
+            tankBody.velocity.y,
+            -direction.z * moveSpeed
+        );
+    } else if (!isJoystickActive) {
+        // 惯性停止
+        tankBody.velocity.x *= 0.9;
+        tankBody.velocity.z *= 0.9;
     }
 
-    // 转向逻辑：建议直接改角速度，手感更像《3D坦克》
+    // 2. 左右转向：直接修改角速度
     if (keys['a']) {
-        tankBody.angularVelocity.y = 2.5; 
+        tankBody.angularVelocity.y = rotateSpeed;
     } else if (keys['d']) {
-        tankBody.angularVelocity.y = -2.5;
+        tankBody.angularVelocity.y = -rotateSpeed;
     } else if (!isJoystickActive) {
-        // 松手即停，防止像冰面一样打转
-        tankBody.angularVelocity.y *= 0.9; 
+        tankBody.angularVelocity.y *= 0.5; // 快速停止旋转
     }
-    
-    // 摇杆控制 (移动端)
+
+    // 3. 移动端摇杆适配
     if (isJoystickActive) {
-        const joyForce = new CANNON.Vec3(0, 0, -joystickVector.y * moveForce);
-        tankBody.applyLocalForce(joyForce, new CANNON.Vec3(0, 0, 0));
-        tankBody.angularVelocity.y = -joystickVector.x * 3.0;
+        tankBody.velocity.set(
+            direction.x * (-joystickVector.y * moveSpeed * 1.5),
+            tankBody.velocity.y,
+            direction.z * (-joystickVector.y * moveSpeed * 1.5)
+        );
+        tankBody.angularVelocity.y = -joystickVector.x * rotateSpeed * 1.5;
     }
 
     // 炮塔指向更新

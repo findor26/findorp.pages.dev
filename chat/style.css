@@ -79,6 +79,39 @@ body {
     transform: scale(1.05);
 }
 
+.action-icon-btn {
+    /* 移除按钮默认边框和背景 */
+    background: transparent;
+    border: none;
+    
+    /* 容器必须是正方形以保证圆角均匀 */
+    width: 40px;
+    height: 40px;
+    
+    /* 核心：确保图标在容器内绝对居中 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
+    /* 设置圆角 */
+    border-radius: 50%;
+    
+    /* 图标颜色与交互色 */
+    color: var(--md-sys-color-on-surface-variant);
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+/* 状态反馈：Hover 时产生浅色圆形遮罩 */
+.action-icon-btn:hover {
+    background-color: rgba(0, 0, 0, 0.08);
+}
+
+/* 确保图标字体大小适中（MD3 标准通常为 24px） */
+.action-icon-btn .material-symbols-rounded {
+    font-size: 24px;
+}
+
 /* 导航项 */
 .nav-destinations {
     flex: 1;
@@ -349,4 +382,77 @@ body {
     text-align: center;
     padding: 40px;
     color: var(--md-sys-color-outline);
+}
+
+/* 移动端适配逻辑 */
+@media (max-width: 600px) {
+    /* 1. 将侧边栏转为底部导航栏 */
+    .app-shell {
+        flex-direction: column-reverse; /* 导航栏移至底部 */
+    }
+
+    .nav-rail {
+        width: 100%;
+        height: 80px;
+        flex-direction: row; /* 横向排列 */
+        padding: 0;
+        border-right: none;
+        border-top: 1px solid var(--md-sys-color-outline);
+        justify-content: space-around;
+    }
+
+    /* 隐藏移动端不常用的创建按钮或将其移入导航 */
+    .nav-rail-top {
+        display: none; 
+    }
+
+    .nav-destinations {
+        flex-direction: row;
+        gap: 0;
+        height: 100%;
+    }
+
+    .nav-item {
+        flex: 1;
+        justify-content: center;
+        height: 100%;
+    }
+
+    /* 2. 优化顶部标题栏 */
+    .app-bar {
+        padding: 0 16px;
+        height: 56px; /* 遵循 MD3 移动端标准高度 */
+    }
+
+    .title-group h1 {
+        font-size: 18px;
+    }
+
+    /* 3. 增大移动端按钮的点击热区 */
+    .action-icon-btn {
+        width: 48px; /* 增加到 48px 以符合触摸标准，防止出现“小方块”感 */
+        height: 48px;
+    }
+
+    /* 4. 调整输入区域间距 */
+    .input-area {
+        padding: 8px 12px 16px;
+    }
+
+    .input-container {
+        padding: 2px 4px 2px 16px;
+    }
+
+    /* 5. 调整消息气泡最大宽度 */
+    .msg-wrapper {
+        max-width: 85%; /* 移动端屏幕窄，允许气泡占更宽空间 */
+    }
+}
+
+/* 针对 iOS 底部安全区域的适配 */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+    .nav-rail {
+        padding-bottom: env(safe-area-inset-bottom);
+        height: calc(80px + env(safe-area-inset-bottom));
+    }
 }

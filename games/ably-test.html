@@ -2,98 +2,149 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>Ably 多人游戏测试</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Findor's Multiplayer Tank | 暴力联机版</title>
     <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
     <style>
-        #game { width: 600px; height: 400px; border: 2px solid #333; position: relative; background: #eee; }
-        .tank { width: 30px; height: 30px; position: absolute; background: #0061a4; transition: 0.1s; }
+        body { margin: 0; background: #202124; color: white; overflow: hidden; font-family: sans-serif; }
+        #game-container { position: relative; width: 100vw; height: 100vh; background: #1a1a1b; }
+        .tank { 
+            position: absolute; width: 40px; height: 40px; 
+            background: #0061a4; border-radius: 4px; 
+            transition: transform 0.1s linear, left 0.1s linear, top 0.1s linear;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 10px; font-weight: bold; color: white;
+        }
+        .tank::after { /* 炮管 */
+            content: ''; position: absolute; top: -10px; left: 18px; 
+            width: 4px; height: 15px; background: #333; 
+        }
         .remote { background: #ba1a1a; }
+        #ui { position: fixed; top: 10px; left: 10px; z-index: 100; pointer-events: none; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px; }
     </style>
 </head>
 <body>
-    <h1>联机坦克 (WASD 移动)</h1>
-    <div id="game"></div>
 
-    <script>
-        let channel;
-        const myId = 'player-' + Math.random().toString(36).substring(7);
-        const tanks = {};
+<div id="ui">
+    <div>状态: <span id="status">正在获取秘钥...</span></div>
+    <div>我的 ID: <span id="my-id">-</span></div>
+    <div>在线坦克: <span id="count">1</span></div>
+</div>
 
-        async function start() {
-            // 强制修正模式：通过回调函数手动控制数据进入 SDK 的格式
-    const ably = new Ably.Realtime({ 
-        clientId: myId,
-        authCallback: async (tokenParams, callback) => {
-            try {
-                const response = await fetch('/api/auth');
-                const data = await response.json();
+<div id="game-container"></div>
 
-                // 核心修复逻辑：Ably SDK 对 timestamp 类型极其挑剔
-                // 如果后端返回的是字符串，这里强制转为 Number
-                if (data.timestamp) {
-                    data.timestamp = Number(data.timestamp);
+<script>
+    const container = document.getElementById('game-container');
+    const statusEl = document.getElementById('status');
+    const myIdEl = document.getElementById('my-id');
+    const countEl = document.getElementById('count');
+
+    const myId = 'Tank-' + Math.random().toString(36).substring(7);
+    const players = {}; 
+    let channel;
+    let myPos = { x: 100, y: 100, angle: 0 };
+    let myTankEl;
+
+    // 1. 初始化并暴力获取 Key
+    async function init() {
+        try {
+            const response = await fetch('/api/auth');
+            const apiKey = await response.text();
+
+            if (!apiKey.includes(':')) throw new Error("Key 格式错误");
+
+            const ably = new Ably.Realtime({ 
+                key: apiKey.trim(),
+                clientId: myId 
+            });
+
+            await ably.connection.once('connected');
+            statusEl.textContent = "✅ 已联机";
+            myIdEl.textContent = myId;
+
+            channel = ably.channels.get('game-room');
+
+            // 2. 订阅位置更新
+            await channel.subscribe('m', (msg) => {
+                if (msg.clientId === myId) return;
+                updateRemotePlayer(msg.clientId, msg.data);
+            });
+
+            // 3. 订阅在场信息 (处理玩家离开)
+            channel.presence.subscribe('leave', (member) => {
+                if (players[member.clientId]) {
+                    players[member.clientId].remove();
+                    delete players[member.clientId];
+                    updateCount();
                 }
+            });
+            await channel.presence.enter();
+            updateCount();
 
-                // 如果返回的对象里套了层 "error"，说明后端报错了，透传给 SDK
-                if (data.error) {
-                    console.error("后端认证失败:", data.error);
-                    callback(data.error, null);
-                    return;
-                }
+            createMyTank();
+            startLoop();
 
-                // 成功：将纯净的、类型正确的 TokenRequest 交给 Ably
-                callback(null, data);
-            } catch (err) {
-                console.error("网络请求异常:", err);
-                callback(err, null);
+        } catch (err) {
+            statusEl.textContent = "❌ 连接失败: " + err.message;
+        }
+    }
+
+    function createMyTank() {
+        myTankEl = document.createElement('div');
+        myTankEl.className = 'tank';
+        myTankEl.innerText = 'ME';
+        container.appendChild(myTankEl);
+        syncPos(myTankEl, myPos);
+    }
+
+    function updateRemotePlayer(id, data) {
+        if (!players[id]) {
+            const el = document.createElement('div');
+            el.className = 'tank remote';
+            el.innerText = id.substring(5, 9);
+            container.appendChild(el);
+            players[id] = el;
+            updateCount();
+        }
+        syncPos(players[id], data);
+    }
+
+    function syncPos(el, data) {
+        el.style.left = data.x + 'px';
+        el.style.top = data.y + 'px';
+        el.style.transform = `rotate(${data.angle}deg)`;
+    }
+
+    function updateCount() {
+        channel.presence.get((err, members) => {
+            if (!err) countEl.textContent = members.length;
+        });
+    }
+
+    // 4. 控制与同步循环
+    function startLoop() {
+        const keys = {};
+        window.onkeydown = (e) => keys[e.key.toLowerCase()] = true;
+        window.onkeyup = (e) => keys[e.key.toLowerCase()] = false;
+
+        setInterval(() => {
+            let moved = false;
+            const step = 5;
+            if (keys['w']) { myPos.y -= step; myPos.angle = 0; moved = true; }
+            if (keys['s']) { myPos.y += step; myPos.angle = 180; moved = true; }
+            if (keys['a']) { myPos.x -= step; myPos.angle = 270; moved = true; }
+            if (keys['d']) { myPos.x += step; myPos.angle = 90; moved = true; }
+
+            if (moved) {
+                syncPos(myTankEl, myPos);
+                // 使用简写 'm' (move) 节省流量
+                channel.publish('m', myPos);
             }
-        }
-    });
+        }, 30); // 约 33 FPS 同步率
+    }
 
-    // 监听连接状态
-    ably.connection.on('connected', () => {
-        console.log("✅ 坦克已上线！ID:", myId);
-    });
+    init();
+</script>
 
-    await ably.connection.once('connected');
-
-    channel = ably.channels.get('game-room');
-
-    // 订阅逻辑... (保持不变)
-    await channel.subscribe('move', (msg) => {
-        if (msg.clientId === myId) return;
-        updateTank(msg.clientId, msg.data, true);
-    });
-            // 自己移动
-            window.onkeydown = (e) => {
-                const pos = { x: parseInt(myTank.style.left || 0), y: parseInt(myTank.style.top || 0) };
-                if (e.key === 'w') pos.y -= 10;
-                if (e.key === 's') pos.y += 10;
-                if (e.key === 'a') pos.x -= 10;
-                if (e.key === 'd') pos.x += 10;
-                
-                myTank.style.left = pos.x + 'px';
-                myTank.style.top = pos.y + 'px';
-                channel.publish('move', pos);
-            };
-        }
-
-        const myTank = document.createElement('div');
-        myTank.className = 'tank';
-        document.getElementById('game').appendChild(myTank);
-
-        function updateTank(id, pos, isRemote) {
-            if (!tanks[id]) {
-                const el = document.createElement('div');
-                el.className = 'tank' + (isRemote ? ' remote' : '');
-                document.getElementById('game').appendChild(el);
-                tanks[id] = el;
-            }
-            tanks[id].style.left = pos.x + 'px';
-            tanks[id].style.top = pos.y + 'px';
-        }
-
-        start();
-    </script>
 </body>
 </html>

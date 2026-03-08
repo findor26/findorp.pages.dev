@@ -174,7 +174,6 @@
             background-color: rgba(186, 26, 26, 0.1);
         }
 
-        /* 空状态样式 */
         .empty-state {
             display: flex;
             flex-direction: column;
@@ -190,7 +189,6 @@
             opacity: 0.5;
         }
 
-        /* 加载指示器 */
         #load-more-trigger {
             height: 48px;
             display: flex;
@@ -295,7 +293,6 @@
         </div>
 
         <div id="msg-list"></div>
-        
         <div id="load-more-trigger"></div>
 
         <div class="action-bar">
@@ -311,7 +308,7 @@
             <div class="modal-title">身份验证</div>
             <div class="modal-body">请输入管理令牌以启用删除功能。</div>
             <form onsubmit="return false;">
-                <input type="password" id="admin-token-input" class="input-field" placeholder="令牌">
+                <input type="password" id="admin-token-input" class="input-field" placeholder="令牌" autocomplete="new-password">
             </form>
             <div class="modal-actions">
                 <button class="btn-text" onclick="hideModal('admin-modal')">取消</button>
@@ -348,14 +345,11 @@
     <script>
         let isAdmin = !!localStorage.getItem('admin_token');
         let pendingDeleteId = null;
-        
-        // 分页变量
         let currentPage = 1;
         const pageSize = 10;
         let isLoading = false;
         let hasMore = true;
 
-        // 初始化字数统计
         const nicknameInput = document.getElementById('nickname');
         const contentInput = document.getElementById('content');
         
@@ -376,7 +370,6 @@
             showModal('alert-modal');
         }
 
-        // 加载留言（支持分页）
         async function loadMessages(isRefresh = false) {
             if (isLoading || (!hasMore && !isRefresh)) return;
             
@@ -391,10 +384,8 @@
             trigger.textContent = '正在加载中...';
 
             try {
-                // 后端需要支持 ?page=1&size=10
                 const res = await fetch(`/api/messages?page=${currentPage}&size=${pageSize}`);
                 const data = await res.json();
-                
                 const list = document.getElementById('msg-list');
                 
                 if (data.length === 0 && currentPage === 1) {
@@ -439,7 +430,6 @@
             }
         }
 
-        // 滚动加载监听
         const observer = new IntersectionObserver((entries) => {
             if (entries[0].isIntersecting && hasMore && !isLoading) {
                 loadMessages();
@@ -453,7 +443,6 @@
             const content = contentInput.value.trim();
             const sendBtn = document.getElementById('send-btn');
 
-            // 严格验证
             if (!nickname || nickname.length > 20) return showAlert("提示", "称呼需要在1-20字之间");
             if (!content || content.length > 500) return showAlert("提示", "内容需要在1-500字之间");
 
@@ -468,7 +457,7 @@
                 if (res.ok) {
                     contentInput.value = '';
                     document.getElementById('content-count').textContent = '0';
-                    loadMessages(true); // 发布成功后重置列表
+                    loadMessages(true); 
                 }
             } catch (e) {
                 showAlert("错误", "发送失败，请稍后再试");
@@ -477,7 +466,6 @@
             }
         }
 
-        // 以下功能保持逻辑一致
         function requestDelete(id) {
             pendingDeleteId = id;
             showModal('confirm-modal');
@@ -503,7 +491,7 @@
         };
 
         function submitAdminToken() {
-            const pwd = document.getElementById('admin-token-input').value;
+            const pwd = document.getElementById('admin-token-input').value.trim();
             if (pwd) {
                 localStorage.setItem('admin_token', pwd);
                 isAdmin = true;

@@ -3,150 +3,101 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Findor's Tank | 完整版</title>
+    <title>Findor's Tank | Canvas 引擎版</title>
     <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
     <style>
-        body { margin: 0; background: #202124; color: white; overflow: hidden; font-family: sans-serif; touch-action: none; }
-        #game-container { position: relative; width: 100vw; height: 100vh; background: #1a1a1b; }
-        
-        /* 坦克容器：不再直接旋转，只负责位移 */
-        .tank-wrapper {
-            position: absolute; width: 40px; height: 40px;
-            transition: left 0.06s linear, top 0.06s linear;
-            z-index: 5;
-        }
-
-        /* 坦克本体：仅此处负责旋转 */
-        .tank-body { 
-            width: 40px; height: 40px; 
-            background: #0061a4; border-radius: 4px; 
-            display: flex; align-items: center; justify-content: center;
-            font-size: 10px; font-weight: bold; color: white;
-            transition: transform 0.06s linear;
-        }
-        .tank-body::after { 
-            content: ''; position: absolute; top: -10px; left: 18px; 
-            width: 4px; height: 15px; background: #ccc; 
-        }
-        .remote .tank-body { background: #ba1a1a; }
-        
-        /* 血条：在 wrapper 内绝对定位，不随 body 旋转 */
-        .health-bar-container {
-            position: absolute; top: -15px; left: 0;
-            width: 40px; height: 4px; background: #444; border-radius: 2px;
-            z-index: 6;
-        }
-        .health-bar-fill {
-            width: 100%; height: 100%; background: #00ff00;
-            transition: width 0.2s ease-out;
-        }
-
-        /* 其它元素 */.item
-        .bullet { position: absolute; width: 8px; height: 8px; background: #ffff00; border-radius: 50%; z-index: 10; box-shadow: 0 0 8px #ffff00; }
-        .item { z-index: 999 !important; border: 2px solid white; } /* 强制显示在最上层 */
-        .item-heal { background: #4caf50; box-shadow: 0 0 10px #4caf50; }
-        .item-speed { background: #2196f3; box-shadow: 0 0 10px #2196f3; }
-        @keyframes pulse { from { transform: scale(0.9); } to { transform: scale(1.1); } }
-
-        /* UI */
-        #ui { position: fixed; top: 10px; left: 10px; z-index: 100; pointer-events: none; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px; }
-        #joystick-container { position: fixed; bottom: 40px; left: 40px; width: 120px; height: 120px; background: rgba(255,255,255,0.1); border-radius: 50%; z-index: 1000; }
-        #joystick-knob { position: absolute; width: 50px; height: 50px; background: rgba(255,255,255,0.3); border-radius: 50%; left: 35px; top: 35px; }
-        #fire-btn { position: fixed; bottom: 60px; right: 40px; width: 80px; height: 80px; background: rgba(186, 26, 26, 0.6); border-radius: 50%; z-index: 1000; display: flex; align-items: center; justify-content: center; font-weight: bold; user-select: none; }
+        body { margin: 0; background: #1a1a1b; color: white; overflow: hidden; font-family: sans-serif; touch-action: none; }
+        #game-canvas { display: block; background: #202124; }
+        #ui { position: fixed; top: 10px; left: 10px; z-index: 100; pointer-events: none; background: rgba(0,0,0,0.6); padding: 10px; border-radius: 8px; font-size: 14px; }
+        #ctrl { position: fixed; bottom: 40px; left: 40px; right: 40px; display: flex; justify-content: space-between; align-items: flex-end; }
+        #joystick-container { width: 120px; height: 120px; background: rgba(255,255,255,0.1); border-radius: 50%; position: relative; }
+        #joystick-knob { width: 50px; height: 50px; background: rgba(255,255,255,0.3); border-radius: 50%; position: absolute; left: 35px; top: 35px; }
+        #fire-btn { width: 80px; height: 80px; background: rgba(186, 26, 26, 0.6); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; pointer-events: auto; }
     </style>
 </head>
 <body>
 
 <div id="ui">
-    <div>状态: <span id="status">连接中...</span></div>
+    <div>状态: <span id="status">初始化...</span></div>
     <div>ID: <span id="my-id">-</span></div>
-    <div>在线: <span id="count">1</span></div>
+    <div>在线: <span id="count">0</span></div>
+    <div style="color: #ffeb3b;">提示: 房主负责生成道具</div>
 </div>
 
-<div id="game-container"></div>
-<div id="joystick-container"><div id="joystick-knob"></div></div>
-<div id="fire-btn">FIRE</div>
+<canvas id="game-canvas"></canvas>
+
+<div id="ctrl">
+    <div id="joystick-container"><div id="joystick-knob"></div></div>
+    <div id="fire-btn">FIRE</div>
+</div>
 
 <script>
-    const container = document.getElementById('game-container');
+    const canvas = document.getElementById('game-canvas');
+    const ctx = canvas.getContext('2d');
     const statusEl = document.getElementById('status');
     const myIdEl = document.getElementById('my-id');
     const countEl = document.getElementById('count');
     const knob = document.getElementById('joystick-knob');
-    const fireBtn = document.getElementById('fire-btn');
 
+    // 基础配置
     const myId = 'Tank-' + Math.random().toString(36).substring(7);
-    const players = {}; 
-    const items = {}; 
     let channel;
-    let myPos = { x: 100, y: 100, angle: 0 };
-    let lastSentPos = { x: 0, y: 0, angle: 0 };
-    let myHealth = 100;
-    let mySpeed = 5;
-    let myTankWrapper;
     let isHost = false;
-    let joystickActive = false;
+    let myPos = { x: 200, y: 200, angle: 0, hp: 100 };
+    let lastSent = { x: 0, y: 0, angle: 0 };
+    let mySpeed = 4;
+    
+    const players = {}; 
+    const bullets = [];
+    const items = {};
+    
+    // 输入状态
+    const keys = {};
     let joystickVector = { x: 0, y: 0 };
+    let joystickActive = false;
 
-    function checkHost() {
-        channel.presence.get((err, members) => {
-            if (!err && members.length > 0) {
-                // 增加日志方便你调试
-                console.log("当前房间人数:", members.length);
-                const sorted = members.sort((a, b) => a.timestamp - b.timestamp);
-                const oldHost = isHost;
-                isHost = (sorted[0].clientId === myId);
-                
-                if (isHost && !oldHost) {
-                    console.log("你已成为房主，开始监管道具生成");
-                }
-                countEl.textContent = members.length;
-            } else if (err) {
-                console.error("获取 Presence 失败:", err);
-            }
-        });
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
     }
+    window.addEventListener('resize', resize);
+    resize();
 
     async function init() {
         try {
             const response = await fetch('/api/auth');
             const apiKey = await response.text();
             const ably = new Ably.Realtime({ key: apiKey.trim(), clientId: myId });
-            await ably.connection.once('connected');
             
-            
-            statusEl.textContent = "✅ 已联机";
-            myIdEl.textContent = myId;
-            channel = ably.channels.get('game-room');
-
-            channel.subscribe('m', (msg) => { if (msg.clientId !== myId) updateRemotePlayer(msg.clientId, msg.data); });
-            channel.subscribe('f', (msg) => { if (msg.clientId !== myId) createBullet(msg.data, false); });
-            channel.subscribe('h', (msg) => handleHit(msg.data.targetId));
-            channel.subscribe('i', (msg) => spawnItem(msg.data));
-            channel.subscribe('d', (msg) => removeItem(msg.data.itemId));
-
-            channel.presence.subscribe('enter', () => checkHost());
-            channel.presence.subscribe('leave', (m) => {
-                if (players[m.clientId]) { players[m.clientId].remove(); delete players[m.clientId]; }
+            ably.connection.on('connected', () => {
+                statusEl.textContent = "✅ 已联机";
                 checkHost();
             });
 
+            channel = ably.channels.get('game-room');
+            myIdEl.textContent = myId;
+
+            // 消息订阅
+            channel.subscribe('m', (m) => { if(m.clientId !== myId) players[m.clientId] = m.data; });
+            channel.subscribe('f', (m) => { if(m.clientId !== myId) spawnBullet(m.data, false); });
+            channel.subscribe('h', (m) => { if(m.data.targetId === myId) takeDamage(); });
+            channel.subscribe('i', (m) => { items[m.data.id] = m.data; });
+            channel.subscribe('d', (m) => { delete items[m.data.id]; });
+
+            // 玩家进出
+            channel.presence.subscribe('enter', checkHost);
+            channel.presence.subscribe('leave', (m) => { delete players[m.clientId]; checkHost(); });
+
             await channel.presence.enter();
-            
-            // 关键：连接成功后立即强制检测一次
             checkHost();
+
+            // 启动核心循环
+            requestAnimationFrame(gameLoop);
             
-            // 如果我是房主，立刻生成第一个道具，不要等 8 秒
-            if (isHost) generateItem();
-            checkHost();
-            createMyTank();
-            initJoystick();
-            startLoop();
+            // 房主生成道具循环
+            setInterval(() => { if(isHost) broadcastItem(); }, 8000);
 
-            fireBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); triggerFire(); });
-            setInterval(() => { if (isHost) generateItem(); }, 8000);
-
-        } catch (err) { statusEl.textContent = "❌ 失败: " + err.message; }
+        } catch (err) { statusEl.textContent = "❌ 连接失败"; }
     }
 
     function checkHost() {
@@ -155,187 +106,206 @@
                 const sorted = members.sort((a, b) => a.timestamp - b.timestamp);
                 isHost = (sorted[0].clientId === myId);
                 countEl.textContent = members.length;
+                if(isHost) console.log("你现在是房主，负责生成道具");
             }
         });
     }
 
-    function createMyTank() {
-        myTankWrapper = document.createElement('div');
-        myTankWrapper.className = 'tank-wrapper';
-        myTankWrapper.innerHTML = `
-            <div class="health-bar-container"><div id="my-hp" class="health-bar-fill"></div></div>
-            <div class="tank-body" id="my-body">ME</div>
-        `;
-        container.appendChild(myTankWrapper);
-        updateVisuals(myTankWrapper, myPos);
-    }
+    // --- 逻辑处理 ---
 
-    function updateRemotePlayer(id, data) {
-        if (!players[id]) {
-            const wrapper = document.createElement('div');
-            wrapper.className = 'tank-wrapper remote';
-            wrapper.innerHTML = `
-                <div class="health-bar-container"><div id="hp-${id}" class="health-bar-fill"></div></div>
-                <div class="tank-body">${id.substring(5, 9)}</div>
-            `;
-            container.appendChild(wrapper);
-            players[id] = wrapper;
-        }
-        updateVisuals(players[id], data);
-        if (data.hp !== undefined) updateHPUI(id, data.hp);
-    }
-
-    function updateVisuals(wrapper, data) {
-        // Wrapper 只管移动
-        wrapper.style.left = data.x + 'px';
-        wrapper.style.top = data.y + 'px';
-        // 内部 Body 管旋转
-        const body = wrapper.querySelector('.tank-body');
-        if (body) body.style.transform = `rotate(${data.angle}deg)`;
-    }
-
-    function updateHPUI(id, hp) {
-        const fill = (id === myId) ? document.getElementById('my-hp') : document.getElementById(`hp-${id}`);
-        if (fill) {
-            fill.style.width = hp + '%';
-            fill.style.background = hp < 30 ? '#f44336' : (hp < 60 ? '#ffeb3b' : '#4caf50');
-        }
-    }
-
-    function triggerFire() {
-        const bData = { x: myPos.x + 16, y: myPos.y + 16, angle: myPos.angle };
-        createBullet(bData, true);
-        channel.publish('f', bData);
-    }
-
-    function createBullet(data, isMine) {
-        const b = document.createElement('div');
-        b.className = 'bullet';
-        container.appendChild(b);
-        let curX = data.x, curY = data.y, dist = 0;
-        const rad = (data.angle - 90) * Math.PI / 180;
-        const bLoop = setInterval(() => {
-            curX += Math.cos(rad) * 15; curY += Math.sin(rad) * 15;
-            b.style.left = curX + 'px'; b.style.top = curY + 'px';
-            dist += 15;
-            if (isMine) {
-                for (let id in players) {
-                    const p = players[id];
-                    const tx = parseFloat(p.style.left), ty = parseFloat(p.style.top);
-                    if (Math.hypot(curX - (tx + 20), curY - (ty + 20)) < 25) {
-                        channel.publish('h', { targetId: id });
-                        clearInterval(bLoop); b.remove(); return;
-                    }
-                }
-            }
-            if (dist > 600) { clearInterval(bLoop); b.remove(); }
-        }, 20);
-    }
-
-    function handleHit(targetId) {
-        if (targetId === myId) {
-            myHealth -= 10;
-            if (myHealth <= 0) {
-                myHealth = 100;
-                myPos = { x: Math.random() * (window.innerWidth-40), y: Math.random() * (window.innerHeight-40), angle: 0 };
-            }
-            updateHPUI(myId, myHealth);
-            channel.publish('m', { ...myPos, hp: myHealth });
-        }
-        flashEffect(targetId);
-    }
-
-    function flashEffect(id) {
-        const wrapper = (id === myId) ? myTankWrapper : players[id];
-        if (wrapper && !wrapper.dataset.flashing) {
-            const body = wrapper.querySelector('.tank-body');
-            wrapper.dataset.flashing = 'true';
-            body.style.filter = 'brightness(3)';
-            setTimeout(() => { body.style.filter = ''; delete wrapper.dataset.flashing; }, 100);
-        }
-    }
-
-    function generateItem() {
-    // 限制在屏幕中心 80% 的区域内生成
-    const margin = 100;
-    const spawnX = Math.random() * (window.innerWidth - margin * 2) + margin;
-    const spawnY = Math.random() * (window.innerHeight - margin * 2) + margin;
-
-    const data = {
-        itemId: 'it-' + Math.random().toString(36).substring(7),
-        x: spawnX,
-        y: spawnY,
-        type: Math.random() > 0.5 ? 'heal' : 'speed'
-    };
-    
-    console.log(`[房主同步] 尝试在坐标 (${Math.round(spawnX)}, ${Math.round(spawnY)}) 生成道具`);
-    channel.publish('i', data);
-}
-
-    function spawnItem(data) {
-        const el = document.createElement('div');
-        el.className = `item item-${data.type}`;
-        el.innerText = data.type === 'heal' ? '✚' : '⚡';
-        el.style.left = data.x + 'px'; el.style.top = data.y + 'px';
-        container.appendChild(el);
-        items[data.itemId] = { el, ...data };
-    }
-
-    function removeItem(itemId) {
-        if (items[itemId]) { items[itemId].el.remove(); delete items[itemId]; }
-    }
-
-    function initJoystick() {
-        const joy = document.getElementById('joystick-container');
-        const move = (e) => {
-            if (!joystickActive) return;
-            const t = e.touches ? e.touches[0] : e;
-            const r = joy.getBoundingClientRect();
-            const dx = t.clientX - (r.left + 60), dy = t.clientY - (r.top + 60);
-            const d = Math.min(Math.sqrt(dx*dx + dy*dy), 50);
-            const a = Math.atan2(dy, dx);
-            knob.style.transform = `translate(${Math.cos(a)*d}px, ${Math.sin(a)*d}px)`;
-            joystickVector = { x: (Math.cos(a)*d)/50, y: (Math.sin(a)*d)/50 };
+    function broadcastItem() {
+        const margin = 100;
+        const itemData = {
+            id: 'it-' + Math.random().toString(36).substring(7),
+            x: margin + Math.random() * (canvas.width - margin * 2),
+            y: margin + Math.random() * (canvas.height - margin * 2),
+            type: Math.random() > 0.5 ? 'heal' : 'speed'
         };
-        joy.addEventListener('pointerdown', () => joystickActive = true);
-        window.addEventListener('pointermove', move);
-        window.addEventListener('pointerup', () => { joystickActive = false; knob.style.transform = 'translate(0,0)'; joystickVector = {x:0,y:0}; });
+        channel.publish('i', itemData);
     }
 
-    function startLoop() {
-        const keys = {};
-        window.onkeydown = (e) => keys[e.key.toLowerCase()] = true;
-        window.onkeyup = (e) => { if (e.key === ' ') triggerFire(); keys[e.key.toLowerCase()] = false; };
+    function spawnBullet(data, isMine) {
+        bullets.push({
+            x: data.x, y: data.y, angle: data.angle,
+            dist: 0, isMine: isMine, active: true
+        });
+    }
 
-        setInterval(() => {
-            let moved = false;
-            if (keys['w']) { myPos.y -= mySpeed; myPos.angle = 0; moved = true; }
-            else if (keys['s']) { myPos.y += mySpeed; myPos.angle = 180; moved = true; }
-            else if (keys['a']) { myPos.x -= mySpeed; myPos.angle = 270; moved = true; }
-            else if (keys['d']) { myPos.x += mySpeed; myPos.angle = 90; moved = true; }
-            else if (joystickVector.x !== 0 || joystickVector.y !== 0) {
-                myPos.x += joystickVector.x * mySpeed; myPos.y += joystickVector.y * mySpeed;
-                const deg = Math.atan2(joystickVector.y, joystickVector.x) * 180 / Math.PI + 90;
-                myPos.angle = Math.round(deg/90)*90; moved = true;
+    function takeDamage() {
+        myPos.hp -= 10;
+        if(myPos.hp <= 0) {
+            myPos.hp = 100;
+            myPos.x = Math.random() * (canvas.width - 40);
+            myPos.y = Math.random() * (canvas.height - 40);
+        }
+        channel.publish('m', myPos);
+    }
+
+    // --- 渲染引擎 ---
+
+    function drawTank(ctx, x, y, angle, label, hp, color) {
+        ctx.save();
+        ctx.translate(x + 20, y + 20);
+
+        // 1. 绘制血条（不随坦克旋转，固定在头顶）
+        ctx.save();
+        ctx.fillStyle = "#444";
+        ctx.fillRect(-20, -35, 40, 5);
+        ctx.fillStyle = hp > 30 ? "#4caf50" : "#f44336";
+        ctx.fillRect(-20, -35, 40 * (hp / 100), 5);
+        ctx.restore();
+
+        // 2. 绘制名称
+        ctx.fillStyle = "white";
+        ctx.font = "10px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText(label, 0, -40);
+
+        // 3. 绘制坦克主体（应用旋转）
+        ctx.rotate(angle * Math.PI / 180);
+        ctx.fillStyle = color;
+        ctx.fillRect(-20, -20, 40, 40);
+        // 炮管
+        ctx.fillStyle = "#ccc";
+        ctx.fillRect(-2, -30, 4, 15);
+        
+        ctx.restore();
+    }
+
+    function gameLoop() {
+        update();
+        render();
+        requestAnimationFrame(gameLoop);
+    }
+
+    function update() {
+        let moved = false;
+        let vx = 0, vy = 0;
+
+        // 键盘输入
+        if (keys['w']) { vy = -mySpeed; myPos.angle = 0; moved = true; }
+        else if (keys['s']) { vy = mySpeed; myPos.angle = 180; moved = true; }
+        else if (keys['a']) { vx = -mySpeed; myPos.angle = 270; moved = true; }
+        else if (keys['d']) { vx = mySpeed; myPos.angle = 90; moved = true; }
+        // 摇杆输入
+        else if (joystickVector.x !== 0 || joystickVector.y !== 0) {
+            vx = joystickVector.x * mySpeed;
+            vy = joystickVector.y * mySpeed;
+            const deg = Math.atan2(joystickVector.y, joystickVector.x) * 180 / Math.PI + 90;
+            myPos.angle = Math.round(deg / 90) * 90;
+            moved = true;
+        }
+
+        if (moved) {
+            myPos.x = Math.max(0, Math.min(canvas.width - 40, myPos.x + vx));
+            myPos.y = Math.max(0, Math.min(canvas.height - 40, myPos.y + vy));
+
+            // 碰撞道具
+            for (let id in items) {
+                const it = items[id];
+                if (Math.hypot(myPos.x + 20 - it.x, myPos.y + 20 - it.y) < 30) {
+                    if (it.type === 'heal') myPos.hp = Math.min(100, myPos.hp + 30);
+                    else { mySpeed = 8; setTimeout(() => mySpeed = 4, 5000); }
+                    channel.publish('d', { id: id });
+                    delete items[id];
+                }
             }
 
-            if (moved) {
-                updateVisuals(myTankWrapper, myPos);
-                for (let id in items) {
-                    const it = items[id];
-                    if (Math.hypot(myPos.x + 20 - (it.x + 12), myPos.y + 20 - (it.y + 12)) < 30) {
-                        if (it.type === 'heal') { myHealth = Math.min(100, myHealth + 30); updateHPUI(myId, myHealth); }
-                        else { mySpeed = 10; setTimeout(() => mySpeed = 5, 5000); }
-                        channel.publish('d', { itemId: id });
+            // 网络同步频率优化
+            if (Math.hypot(myPos.x - lastSent.x, myPos.y - lastSent.y) > 2 || myPos.angle !== lastSent.angle) {
+                channel.publish('m', myPos);
+                lastSent = { ...myPos };
+            }
+        }
+
+        // 更新子弹
+        for (let i = bullets.length - 1; i >= 0; i--) {
+            const b = bullets[i];
+            const rad = (b.angle - 90) * Math.PI / 180;
+            b.x += Math.cos(rad) * 12;
+            b.y += Math.sin(rad) * 12;
+            b.dist += 12;
+
+            if (b.isMine) {
+                for (let pid in players) {
+                    const p = players[pid];
+                    if (Math.hypot(b.x - (p.x + 20), b.y - (p.y + 20)) < 25) {
+                        channel.publish('h', { targetId: pid });
+                        b.active = false;
                     }
                 }
-                if (Math.hypot(myPos.x - lastSentPos.x, myPos.y - lastSentPos.y) > 2 || myPos.angle !== lastSentPos.angle) {
-                    channel.publish('m', { ...myPos, hp: myHealth });
-                    lastSentPos = { ...myPos };
-                }
             }
-        }, 64); // 约 15Hz，防止 Ably 429
+
+            if (b.dist > 800 || !b.active) bullets.splice(i, 1);
+        }
     }
+
+    function render() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 绘图层级：1. 道具 -> 2. 子弹 -> 3. 坦克
+
+        // 1. 道具
+        for (let id in items) {
+            const it = items[id];
+            ctx.beginPath();
+            ctx.arc(it.x, it.y, 12, 0, Math.PI * 2);
+            ctx.fillStyle = it.type === 'heal' ? '#4caf50' : '#2196f3';
+            ctx.fill();
+            ctx.fillStyle = "white";
+            ctx.textAlign = "center";
+            ctx.fillText(it.type === 'heal' ? '+' : '⚡', it.x, it.y + 4);
+        }
+
+        // 2. 子弹
+        for (const b of bullets) {
+            ctx.beginPath();
+            ctx.arc(b.x, b.y, 4, 0, Math.PI * 2);
+            ctx.fillStyle = "#ffff00";
+            ctx.fill();
+        }
+
+        // 3. 坦克
+        drawTank(ctx, myPos.x, myPos.y, myPos.angle, "ME", myPos.hp, "#0061a4");
+        for (let id in players) {
+            const p = players[id];
+            drawTank(ctx, p.x, p.y, p.angle, id.substring(5, 9), p.hp || 100, "#ba1a1a");
+        }
+    }
+
+    // --- 输入控制 ---
+
+    window.onkeydown = (e) => keys[e.key.toLowerCase()] = true;
+    window.onkeyup = (e) => { 
+        if (e.key === ' ') fire();
+        keys[e.key.toLowerCase()] = false; 
+    };
+
+    function fire() {
+        const data = { x: myPos.x + 20, y: myPos.y + 20, angle: myPos.angle };
+        spawnBullet(data, true);
+        channel.publish('f', data);
+    }
+
+    document.getElementById('fire-btn').addEventListener('pointerdown', (e) => { e.preventDefault(); fire(); });
+
+    const joy = document.getElementById('joystick-container');
+    joy.addEventListener('pointerdown', () => joystickActive = true);
+    window.addEventListener('pointermove', (e) => {
+        if (!joystickActive) return;
+        const r = joy.getBoundingClientRect();
+        const center = { x: r.left + 60, y: r.top + 60 };
+        const dx = e.clientX - center.x, dy = e.clientY - center.y;
+        const dist = Math.min(Math.sqrt(dx*dx + dy*dy), 50);
+        const angle = Math.atan2(dy, dx);
+        knob.style.transform = `translate(${Math.cos(angle)*dist}px, ${Math.sin(angle)*dist}px)`;
+        joystickVector = { x: (Math.cos(angle)*dist)/50, y: (Math.sin(angle)*dist)/50 };
+    });
+    window.addEventListener('pointerup', () => {
+        joystickActive = false;
+        knob.style.transform = 'translate(0,0)';
+        joystickVector = { x: 0, y: 0 };
+    });
 
     init();
 </script>

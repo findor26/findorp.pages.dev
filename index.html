@@ -32,11 +32,16 @@
         --md-sys-color-surface-variant: #dee3eb;
         --md-sys-color-on-surface-variant: #42474e;
         --md-sys-color-outline: #72777f;
+        --primary-color: var(--mdui-color-primary);
+        --surface-color: var(--mdui-color-surface);
+        --on-surface-color: var(--mdui-color-on-surface);
+        --outline-color: var(--mdui-color-outline);
       }
 
       body {
-        background-color: var(--md-sys-color-surface);
-        color: var(--md-sys-color-on-surface);
+        background-color: var(--mdui-color-surface-container-low);
+        color: var(--mdui-color-on-surface);
+        transition: background-color 0.3s, color 0.3s;
         font-family: "Roboto", sans-serif;
         margin: 0;
         padding: 0;
@@ -50,7 +55,8 @@
       header {
         width: 100%;
         padding: 48px 24px;
-        background-color: var(--md-sys-color-primary-container);
+        background-color: var(--mdui-color-primary-container);
+        color: var(--mdui-color-on-primary-container);
         text-align: center;
         border-bottom-left-radius: 32px;
         border-bottom-right-radius: 32px;
@@ -81,8 +87,9 @@
 
       /* MD3 卡片样式 */
       .card {
-        background-color: var(--md-sys-color-surface);
-        border: 1px solid var(--md-sys-color-outline);
+        background-color: var(--mdui-color-surface-container);
+        border: 1px solid var(--mdui-color-outline-variant);
+        color: var(--mdui-color-on-surface);
         border-radius: 24px;
         padding: 24px;
         margin-bottom: 24px;
@@ -94,7 +101,7 @@
       .card:hover {
         transform: translateY(-4px);
         box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
-        background-color: #f0f4f8;
+        background-color: var(--mdui-color-surface-container-high);
       }
 
       .card-title {

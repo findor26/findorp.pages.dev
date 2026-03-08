@@ -116,39 +116,35 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-/**
- * 暗黑模式切换核心逻辑
- */
-const initTheme = () => {
-    const themeToggle = document.getElementById('theme-toggle');
-    const body = document.body;
+const themeToggle = document.getElementById('theme-toggle');
+const sunIcon = document.querySelector('.sun-icon');
+const moonIcon = document.querySelector('.moon-icon');
+const body = document.body;
 
-    if (!themeToggle) return; // 避免页面未找到按钮报错
+// 检查本地存储
+const currentTheme = localStorage.getItem('theme') || 'light';
+applyTheme(currentTheme);
 
-    // 初始化：优先读取本地存储，其次读取系统偏好
-    const savedTheme = localStorage.getItem('theme');
-    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+themeToggle.addEventListener('click', () => {
+    const newTheme = body.classList.contains('mdui-theme-light') ? 'dark' : 'light';
+    applyTheme(newTheme);
+});
 
-    if (savedTheme === 'dark' || (!savedTheme && systemPrefersDark)) {
-        body.classList.add('dark-mode');
-    }
-
-    // 绑定点击事件
-    themeToggle.addEventListener('click', () => {
-        body.classList.toggle('dark-mode');
+function applyTheme(theme) {
+    if (theme === 'dark') {
+        body.classList.replace('mdui-theme-light', 'mdui-theme-dark');
+        // 如果初始没有类名，则添加
+        if (!body.classList.contains('mdui-theme-dark')) body.classList.add('mdui-theme-dark');
         
-        // 记录状态
-        if (body.classList.contains('dark-mode')) {
-            localStorage.setItem('theme', 'dark');
-        } else {
-            localStorage.setItem('theme', 'light');
-        }
-    });
-};
+        sunIcon.style.display = 'none';
+        moonIcon.style.display = 'block';
+        localStorage.setItem('theme', 'dark');
+    } else {
+        body.classList.replace('mdui-theme-dark', 'mdui-theme-light');
+        if (!body.classList.contains('mdui-theme-light')) body.classList.add('mdui-theme-light');
 
-// 确保 DOM 加载完后再运行
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initTheme);
-} else {
-    initTheme();
+        sunIcon.style.display = 'block';
+        moonIcon.style.display = 'none';
+        localStorage.setItem('theme', 'light');
+    }
 }

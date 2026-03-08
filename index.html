@@ -119,6 +119,19 @@
   color: var(--md-sys-color-on-surface);
 }
 
+/* 修正图标字体的渲染方式 */
+.material-symbols-rounded {
+  display: inline-block;
+  vertical-align: middle;
+  line-height: 1;
+}
+
+.item-arrow {
+  color: var(--md-sys-color-outline);
+  /* 确保向右箭头的视觉中心与文字一致 */
+  font-size: 24px;
+}
+
 .list-item:hover {
   background-color: rgba(0, 100, 149, 0.08); /* 使用 Primary 色的淡化版 */
   text-decoration: none;
@@ -328,49 +341,49 @@
       <a href="https://tankionline.com" target="_blank" class="list-item">
         <span class="material-symbols-rounded item-icon">language</span>
         <span class="item-text">官方网站</span>
-        <span class="material-symbols-rounded item-arrow">chevron_right</span>
+        <span class="material-symbols-rounded item-arrow">navigate_next</span>
       </a>
     </li>
     <li>
       <a href="https://3dtank.com" target="_blank" class="list-item">
         <span class="material-symbols-rounded item-icon">public</span>
         <span class="item-text">国服官网</span>
-        <span class="material-symbols-rounded item-arrow">chevron_right</span>
+        <span class="material-symbols-rounded item-arrow">navigate_next</span>
       </a>
     </li>
     <li>
       <a href="files" target="_blank" class="list-item">
         <span class="material-symbols-rounded item-icon">folder_open</span>
         <span class="item-text">文件中心</span>
-        <span class="material-symbols-rounded item-arrow">chevron_right</span>
+        <span class="material-symbols-rounded item-arrow">navigate_next</span>
       </a>
     </li>
     <li>
       <a href="test.html" target="_blank" class="list-item">
         <span class="material-symbols-rounded item-icon">build</span>
         <span class="item-text">测试服动态</span>
-        <span class="material-symbols-rounded item-arrow">chevron_right</span>
+        <span class="material-symbols-rounded item-arrow">navigate_next</span>
       </a>
     </li>
     <li>
       <a href="chat" target="_blank" class="list-item">
-        <span class="material-symbols-rounded item-icon">chat</span>
+        <span class="material-symbols-rounded item-icon">forum</span>
         <span class="item-text">聊天房</span>
-        <span class="material-symbols-rounded item-arrow">chevron_right</span>
+        <span class="material-symbols-rounded item-arrow">navigate_next</span>
       </a>
     </li>
     <li>
       <a href="comments" target="_blank" class="list-item">
         <span class="material-symbols-rounded item-icon">chat</span>
         <span class="item-text">留言区</span>
-        <span class="material-symbols-rounded item-arrow">chevron_right</span>
+        <span class="material-symbols-rounded item-arrow">navigate_next</span>
       </a>
     </li>
     <li>
       <a href="https://en.tankiwiki.com" target="_blank" class="list-item">
         <span class="material-symbols-rounded item-icon">menu_book</span>
         <span class="item-text">游戏维基</span>
-        <span class="material-symbols-rounded item-arrow">chevron_right</span>
+        <span class="material-symbols-rounded item-arrow">navigate_next</span>
       </a>
     </li>
   </ul>

@@ -6,6 +6,8 @@ const myIdEl = document.getElementById('my-id');
 const countEl = document.getElementById('count');
 const knob = document.getElementById('joystick-knob');
 const fireBtn = document.getElementById('fire-btn');
+const chatInput = document.getElementById('chat-input');
+const chatMessages = document.getElementById('chat-messages');
 
 const myId = 'Tank-' + Math.random().toString(36).substring(7);
 let channel;
@@ -37,6 +39,8 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
+
+
 async function init() {
     try {
         const response = await fetch('/api/auth');
@@ -54,28 +58,70 @@ async function init() {
 
         // 核心同步订阅
         channel.subscribe('m', (m) => { 
-            if (m.clientId !== myId) {
-                if (!players[m.clientId]) {
-                    players[m.clientId] = m.data;
-                } else {
-                    // 记录目标位置用于插值平滑
-                    const p = players[m.clientId];
-                    p.targetX = m.data.x;
-                    p.targetY = m.data.y;
-                    p.targetAngle = m.data.angle;
-                    p.hp = m.data.hp;
-                    p.shield = m.data.shield;
-                    p.ghost = m.data.ghost;
-                    p.power = m.data.power;
-                    p.lastUpdate = Date.now();
-                }
-            }
-        });
-
+    if (m.clientId !== myId) {
+        if (!players[m.clientId]) {
+            // 第一次出现的玩家，直接初始化位置
+            players[m.clientId] = m.data;
+            players[m.clientId].lastUpdate = Date.now();
+        } else {
+            const p = players[m.clientId];
+            // 核心变化：将收到的坐标存为“目标点”
+            p.targetX = m.data.x;
+            p.targetY = m.data.y;
+            p.targetAngle = m.data.angle;
+            
+            // 同步其他状态属性
+            p.hp = m.data.hp;
+            p.shield = m.data.shield;
+            p.ghost = m.data.ghost;
+            p.power = m.data.power;
+            p.lastUpdate = Date.now();
+        }
+    }
+});
         channel.subscribe('f', (m) => { if (m.clientId !== myId) spawnBullet(m.data, false); });
         channel.subscribe('h', (m) => { if (m.data.targetId === myId) takeDamage(); });
         channel.subscribe('i', (m) => { items[m.data.id] = m.data; });
         channel.subscribe('d', (m) => { delete items[m.data.id]; });
+        // 在 init 函数的 channel.subscribe 区域添加
+channel.subscribe('chat', (m) => {
+    const msgDiv = document.createElement('div');
+    msgDiv.className = 'chat-msg';
+    // 截取 ID 前四位以保持简洁
+    const sender = m.clientId === myId ? "我" : m.clientId.substring(5, 9);
+    msgDiv.innerHTML = `<span class="chat-msg-id">${sender}:</span>${m.data.text}`;
+    
+    chatMessages.appendChild(msgDiv);
+    // 自动滚动到底部
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+});
+        // 聊天发送逻辑
+chatInput.onkeydown = (e) => {
+    // 防止聊天输入时坦克还在移动
+    e.stopPropagation(); 
+    
+    if (e.key === 'Enter' && chatInput.value.trim() !== "") {
+        const text = chatInput.value.trim();
+        
+        // 发布到 Ably 频道
+        channel.publish('chat', { text: text });
+        
+        chatInput.value = "";
+        chatInput.blur(); // 发送后失去焦点，恢复游戏控制
+    }
+};
+
+// 修改原有的 window.onkeydown，防止输入文字时坦克乱跑
+const originalKeyDown = window.onkeydown;
+window.onkeydown = (e) => {
+    if (document.activeElement === chatInput) return;
+    if (e.key === 'Enter') {
+        chatInput.focus();
+        return;
+    }
+    // 调用原有的按键逻辑
+    keys[e.key.toLowerCase()] = true;
+};
 
         // 全局事件订阅
         channel.subscribe('sys_env', (m) => {
@@ -203,6 +249,21 @@ function gameLoop() {
 function update() {
     // EMP 事件下无法开火和移动
     const canAction = currentWeather !== 'emp';
+
+    for (let id in players) {
+        const p = players[id];
+        if (p.targetX !== undefined) {
+            // 插值系数 0.15：数值越小越丝滑但延迟感略重，数值越大跟随越快但可能抖动
+            // 公式：当前位置 += (目标位置 - 当前位置) * 系数
+            p.x += (p.targetX - p.x) * 0.15;
+            p.y += (p.targetY - p.y) * 0.15;
+
+            // 角度处理：如果角度变化大则直接跳变，防止坦克原地慢动作旋转
+            if (Math.abs(p.angle - p.targetAngle) > 10) {
+                p.angle = p.targetAngle;
+            }
+        }
+    }
 
     if (canAction) {
         let vx = 0, vy = 0;

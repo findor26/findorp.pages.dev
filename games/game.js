@@ -338,7 +338,7 @@ window.addEventListener('mousemove', (e) => { lastMouseX = e.clientX; lastMouseY
 window.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
 window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
 
-init3D();
 initPhysics();
+init3D();
 initNetwork();
 gameLoop();

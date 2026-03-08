@@ -38,11 +38,13 @@
     const myIdEl = document.getElementById('my-id');
     const countEl = document.getElementById('count');
     const knob = document.getElementById('joystick-knob');
+    const fireBtn = document.getElementById('fire-btn');
 
-    // 基础配置
     const myId = 'Tank-' + Math.random().toString(36).substring(7);
     let channel;
     let isHost = false;
+    
+    // 初始状态
     let myPos = { x: 200, y: 200, angle: 0, hp: 100 };
     let lastSent = { x: 0, y: 0, angle: 0 };
     let mySpeed = 4;
@@ -51,11 +53,11 @@
     const bullets = [];
     const items = {};
     
-    // 输入状态
     const keys = {};
     let joystickVector = { x: 0, y: 0 };
     let joystickActive = false;
 
+    // 窗口自适应
     function resize() {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
@@ -65,8 +67,11 @@
 
     async function init() {
         try {
+            // 获取身份认证
             const response = await fetch('/api/auth');
             const apiKey = await response.text();
+            
+            // 初始化实时通讯
             const ably = new Ably.Realtime({ key: apiKey.trim(), clientId: myId });
             
             ably.connection.on('connected', () => {
@@ -74,94 +79,88 @@
                 checkHost();
             });
 
+            ably.connection.on('disconnected', () => {
+                statusEl.textContent = "❌ 连接断开";
+            });
+
             channel = ably.channels.get('game-room');
             myIdEl.textContent = myId;
 
-            // 消息订阅
-            channel.subscribe('m', (m) => { if(m.clientId !== myId) players[m.clientId] = m.data; });
-            channel.subscribe('f', (m) => { if(m.clientId !== myId) spawnBullet(m.data, false); });
-            channel.subscribe('h', (m) => { if(m.data.targetId === myId) takeDamage(); });
-            channel.subscribe('i', (m) => { items[m.data.id] = m.data; });
-            channel.subscribe('d', (m) => { delete items[m.data.id]; });
+            // 监听玩家移动
+            channel.subscribe('m', (m) => { 
+                if (m.clientId !== myId) players[m.clientId] = m.data; 
+            });
 
-            // 玩家进出
+            // 监听开火事件
+            channel.subscribe('f', (m) => { 
+                if (m.clientId !== myId) spawnBullet(m.data, false); 
+            });
+
+            // 监听受击反馈
+            channel.subscribe('h', (m) => { 
+                if (m.data.targetId === myId) takeDamage(); 
+            });
+
+            // 监听道具生成
+            channel.subscribe('i', (m) => { 
+                items[m.data.id] = m.data; 
+            });
+
+            // 监听道具销毁
+            channel.subscribe('d', (m) => { 
+                delete items[m.data.id]; 
+            });
+
+            // 成员状态变更
             channel.presence.subscribe('enter', checkHost);
-            channel.presence.subscribe('leave', (m) => { delete players[m.clientId]; checkHost(); });
+            channel.presence.subscribe('leave', (m) => { 
+                delete players[m.clientId]; 
+                checkHost(); 
+            });
 
             await channel.presence.enter();
             checkHost();
 
-            // 启动核心循环
+            // 启动渲染循环
             requestAnimationFrame(gameLoop);
             
-            // 房主生成道具循环
-            setInterval(() => { if(isHost) broadcastItem(); }, 8000);
+            // 定时生成道具
+            setInterval(() => { 
+                if (isHost) broadcastItem(); 
+            }, 8000);
 
-        } catch (err) { statusEl.textContent = "❌ 连接失败"; }
-    }
-
-    // --- 增强版房主逻辑 ---
-async function checkHost() {
-    try {
-        // 等待 Presence 列表同步
-        const members = await channel.presence.get();
-        if (members && members.length > 0) {
-            const sorted = members.sort((a, b) => a.timestamp - b.timestamp);
-            const hostId = sorted[0].clientId;
-            isHost = (hostId === myId);
-            
-            countEl.textContent = members.length;
-            statusEl.textContent = isHost ? "✅ 已联机 (房主)" : "✅ 已联机 (从机)";
-        } else {
-            // 如果列表为空（常见于刚连接时），则暂时认为自己是房主以维持逻辑
-            isHost = true; 
-            statusEl.textContent = "⏳ 正在同步房主...";
+        } catch (err) { 
+            statusEl.textContent = "❌ 初始化失败"; 
         }
-    } catch (e) {
-        console.error("无法获取房主状态:", e);
     }
-}
 
-// --- 坐标校准版道具生成 ---
-function broadcastItem() {
-    // 使用 0.1 到 0.9 的比例，确保道具不会贴边
-    const itemData = {
-        id: 'it-' + Math.random().toString(36).substring(7),
-        ratioX: 0.1 + Math.random() * 0.8, 
-        ratioY: 0.1 + Math.random() * 0.8,
-        type: Math.random() > 0.5 ? 'heal' : 'speed'
-    };
-    
-    // 房主直接发布
-    channel.publish('i', itemData);
-    console.log("房主已发布新道具:", itemData.id);
-}
-
-    // --- 碰撞检测适配 ---
-function checkItemCollision() {
-    for (let id in items) {
-        const it = items[id];
-        const realX = it.ratioX * canvas.width;
-        const realY = it.ratioY * canvas.height;
-        
-        // 坦克中心点对比道具中心点
-        const dist = Math.hypot((myPos.x + 20) - realX, (myPos.y + 20) - realY);
-        
-        if (dist < 35) { // 碰撞半径
-            if (it.type === 'heal') {
-                myPos.hp = Math.min(100, myPos.hp + 20);
-                console.log("吃到加血道具");
-            } else {
-                mySpeed = 7;
-                setTimeout(() => mySpeed = 4, 5000);
-                console.log("吃到加速道具");
+    // 房主判定：第一个进入房间的人负责逻辑计算
+    function checkHost() {
+        channel.presence.get((err, members) => {
+            if (!err && members.length > 0) {
+                const sorted = members.sort((a, b) => a.timestamp - b.timestamp);
+                const currentHost = (sorted[0].clientId === myId);
+                
+                // 仅在身份切换时打印日志
+                if (currentHost && !isHost) {
+                    console.log("获得房主权限，开始管理道具生成");
+                }
+                isHost = currentHost;
+                countEl.textContent = members.length;
             }
-            // 通知频道删除该道具
-            channel.publish('d', { id: id });
-            delete items[id];
-        }
+        });
     }
-}
+
+    // 道具生成：基于比例，解决不同分辨率下的位置偏移
+    function broadcastItem() {
+        const itemData = {
+            id: 'it-' + Math.random().toString(36).substring(7),
+            ratioX: 0.1 + Math.random() * 0.8, 
+            ratioY: 0.1 + Math.random() * 0.8,
+            type: Math.random() > 0.5 ? 'heal' : 'speed'
+        };
+        channel.publish('i', itemData);
+    }
 
     function spawnBullet(data, isMine) {
         bullets.push({
@@ -172,7 +171,8 @@ function checkItemCollision() {
 
     function takeDamage() {
         myPos.hp -= 10;
-        if(myPos.hp <= 0) {
+        // 死亡重生逻辑
+        if (myPos.hp <= 0) {
             myPos.hp = 100;
             myPos.x = Math.random() * (canvas.width - 40);
             myPos.y = Math.random() * (canvas.height - 40);
@@ -180,31 +180,33 @@ function checkItemCollision() {
         channel.publish('m', myPos);
     }
 
-    // --- 渲染引擎 ---
-
+    // 核心渲染函数：血条脱离旋转矩阵
     function drawTank(ctx, x, y, angle, label, hp, color) {
         ctx.save();
         ctx.translate(x + 20, y + 20);
 
-        // 1. 绘制血条（不随坦克旋转，固定在头顶）
+        // 绘制血条和名字：在 rotate 之前绘制，保证永远水平
         ctx.save();
+        // 绘制血条背景
         ctx.fillStyle = "#444";
         ctx.fillRect(-20, -35, 40, 5);
+        // 根据血量改变颜色
         ctx.fillStyle = hp > 30 ? "#4caf50" : "#f44336";
         ctx.fillRect(-20, -35, 40 * (hp / 100), 5);
+        
+        // 绘制文本
+        ctx.fillStyle = "white";
+        ctx.font = "12px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText(label, 0, -42);
         ctx.restore();
 
-        // 2. 绘制名称
-        ctx.fillStyle = "white";
-        ctx.font = "10px Arial";
-        ctx.textAlign = "center";
-        ctx.fillText(label, 0, -40);
-
-        // 3. 绘制坦克主体（应用旋转）
+        // 绘制坦克本体：应用旋转
         ctx.rotate(angle * Math.PI / 180);
         ctx.fillStyle = color;
         ctx.fillRect(-20, -20, 40, 40);
-        // 炮管
+        
+        // 绘制炮管
         ctx.fillStyle = "#ccc";
         ctx.fillRect(-2, -30, 4, 15);
         
@@ -221,43 +223,54 @@ function checkItemCollision() {
         let moved = false;
         let vx = 0, vy = 0;
 
-        // 键盘输入
+        // 处理键盘输入
         if (keys['w']) { vy = -mySpeed; myPos.angle = 0; moved = true; }
         else if (keys['s']) { vy = mySpeed; myPos.angle = 180; moved = true; }
         else if (keys['a']) { vx = -mySpeed; myPos.angle = 270; moved = true; }
         else if (keys['d']) { vx = mySpeed; myPos.angle = 90; moved = true; }
-        // 摇杆输入
+        
+        // 处理摇杆输入
         else if (joystickVector.x !== 0 || joystickVector.y !== 0) {
             vx = joystickVector.x * mySpeed;
             vy = joystickVector.y * mySpeed;
             const deg = Math.atan2(joystickVector.y, joystickVector.x) * 180 / Math.PI + 90;
+            // 限制为 90 度步进旋转，模拟传统坦克操作
             myPos.angle = Math.round(deg / 90) * 90;
             moved = true;
         }
 
         if (moved) {
+            // 边界检查
             myPos.x = Math.max(0, Math.min(canvas.width - 40, myPos.x + vx));
             myPos.y = Math.max(0, Math.min(canvas.height - 40, myPos.y + vy));
 
-            // 碰撞道具
+            // 检查道具碰撞
             for (let id in items) {
                 const it = items[id];
-                if (Math.hypot(myPos.x + 20 - it.x, myPos.y + 20 - it.y) < 30) {
-                    if (it.type === 'heal') myPos.hp = Math.min(100, myPos.hp + 30);
-                    else { mySpeed = 8; setTimeout(() => mySpeed = 4, 5000); }
+                const realX = it.ratioX * canvas.width;
+                const realY = it.ratioY * canvas.height;
+                
+                if (Math.hypot(myPos.x + 20 - realX, myPos.y + 20 - realY) < 30) {
+                    if (it.type === 'heal') {
+                        myPos.hp = Math.min(100, myPos.hp + 30);
+                    } else if (it.type === 'speed') {
+                        mySpeed = 8;
+                        setTimeout(() => mySpeed = 4, 5000);
+                    }
+                    // 广播删除道具
                     channel.publish('d', { id: id });
                     delete items[id];
                 }
             }
 
-            // 网络同步频率优化
-            if (Math.hypot(myPos.x - lastSent.x, myPos.y - lastSent.y) > 2 || myPos.angle !== lastSent.angle) {
+            // 降低数据发送频率：仅在位移超过阈值或角度变化时发送
+            if (Math.hypot(myPos.x - lastSent.x, myPos.y - lastSent.y) > 1.5 || myPos.angle !== lastSent.angle) {
                 channel.publish('m', myPos);
                 lastSent = { ...myPos };
             }
         }
 
-        // 更新子弹
+        // 更新所有子弹位置
         for (let i = bullets.length - 1; i >= 0; i--) {
             const b = bullets[i];
             const rad = (b.angle - 90) * Math.PI / 180;
@@ -265,6 +278,7 @@ function checkItemCollision() {
             b.y += Math.sin(rad) * 12;
             b.dist += 12;
 
+            // 仅对自己的子弹进行伤害判定
             if (b.isMine) {
                 for (let pid in players) {
                     const p = players[pid];
@@ -275,50 +289,33 @@ function checkItemCollision() {
                 }
             }
 
+            // 射程限制或已命中则移除
             if (b.dist > 800 || !b.active) bullets.splice(i, 1);
         }
     }
 
     function render() {
-       ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // 清理上一帧
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 1. 绘制道具 (使用比例还原坐标)
-    for (let id in items) {
-        const it = items[id];
-        const realX = it.ratioX * canvas.width;
-        const realY = it.ratioY * canvas.height;
-        
-        ctx.beginPath();
-        ctx.arc(realX, realY, 15, 0, Math.PI * 2);
-        ctx.fillStyle = it.type === 'heal' ? '#4caf50' : '#2196f3';
-        ctx.fill();
-        
-        // 发光效果
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = ctx.fillStyle;
-        
-        ctx.fillStyle = "white";
-        ctx.font = "bold 14px Arial";
-        ctx.textAlign = "center";
-        ctx.fillText(it.type === 'heal' ? '+' : 'S', realX, realY + 5);
-        ctx.shadowBlur = 0; // 重置阴影
-    }
-
-        // 绘图层级：1. 道具 -> 2. 子弹 -> 3. 坦克
-
-        // 1. 道具
+        // 1. 绘制道具
         for (let id in items) {
             const it = items[id];
+            const rx = it.ratioX * canvas.width;
+            const ry = it.ratioY * canvas.height;
+            
             ctx.beginPath();
-            ctx.arc(it.x, it.y, 12, 0, Math.PI * 2);
+            ctx.arc(rx, ry, 12, 0, Math.PI * 2);
             ctx.fillStyle = it.type === 'heal' ? '#4caf50' : '#2196f3';
             ctx.fill();
+            
             ctx.fillStyle = "white";
+            ctx.font = "bold 14px Arial";
             ctx.textAlign = "center";
-            ctx.fillText(it.type === 'heal' ? '+' : '⚡', it.x, it.y + 4);
+            ctx.fillText(it.type === 'heal' ? '+' : '⚡', rx, ry + 5);
         }
 
-        // 2. 子弹
+        // 2. 绘制子弹
         for (const b of bullets) {
             ctx.beginPath();
             ctx.arc(b.x, b.y, 4, 0, Math.PI * 2);
@@ -326,16 +323,15 @@ function checkItemCollision() {
             ctx.fill();
         }
 
-        // 3. 坦克
-        drawTank(ctx, myPos.x, myPos.y, myPos.angle, "ME", myPos.hp, "#0061a4");
+        // 3. 绘制玩家
+        drawTank(ctx, myPos.x, myPos.y, myPos.angle, "我", myPos.hp, "#0061a4");
         for (let id in players) {
             const p = players[id];
             drawTank(ctx, p.x, p.y, p.angle, id.substring(5, 9), p.hp || 100, "#ba1a1a");
         }
     }
 
-    // --- 输入控制 ---
-
+    // 事件绑定
     window.onkeydown = (e) => keys[e.key.toLowerCase()] = true;
     window.onkeyup = (e) => { 
         if (e.key === ' ') fire();
@@ -348,26 +344,41 @@ function checkItemCollision() {
         channel.publish('f', data);
     }
 
-    document.getElementById('fire-btn').addEventListener('pointerdown', (e) => { e.preventDefault(); fire(); });
+    fireBtn.addEventListener('pointerdown', (e) => { 
+        e.preventDefault(); 
+        fire(); 
+    });
 
+    // 虚拟摇杆交互逻辑
     const joy = document.getElementById('joystick-container');
-    joy.addEventListener('pointerdown', () => joystickActive = true);
+    joy.addEventListener('pointerdown', (e) => {
+        joystickActive = true;
+    });
+
     window.addEventListener('pointermove', (e) => {
         if (!joystickActive) return;
         const r = joy.getBoundingClientRect();
-        const center = { x: r.left + 60, y: r.top + 60 };
-        const dx = e.clientX - center.x, dy = e.clientY - center.y;
-        const dist = Math.min(Math.sqrt(dx*dx + dy*dy), 50);
+        const centerX = r.left + 60;
+        const centerY = r.top + 60;
+        const dx = e.clientX - centerX;
+        const dy = e.clientY - centerY;
+        const distance = Math.min(Math.sqrt(dx*dx + dy*dy), 50);
         const angle = Math.atan2(dy, dx);
-        knob.style.transform = `translate(${Math.cos(angle)*dist}px, ${Math.sin(angle)*dist}px)`;
-        joystickVector = { x: (Math.cos(angle)*dist)/50, y: (Math.sin(angle)*dist)/50 };
+        
+        knob.style.transform = `translate(${Math.cos(angle)*distance}px, ${Math.sin(angle)*distance}px)`;
+        joystickVector = { 
+            x: (Math.cos(angle)*distance) / 50, 
+            y: (Math.sin(angle)*distance) / 50 
+        };
     });
+
     window.addEventListener('pointerup', () => {
         joystickActive = false;
         knob.style.transform = 'translate(0,0)';
         joystickVector = { x: 0, y: 0 };
     });
 
+    // 启动初始化
     init();
 </script>
 </body>

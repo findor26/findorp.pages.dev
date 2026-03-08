@@ -405,46 +405,46 @@
         }
 
         function buildMessageHTML(m) {
-    const pinned = m.is_pinned === 1;
-    const hidden = m.is_hidden === 1;
-    const myVote = userVotes[m.id]; // 获取当前用户对该条留言的投票状态
+            const pinned = m.is_pinned === 1;
+            const hidden = m.is_hidden === 1;
+            const myVote = userVotes[m.id]; 
 
-    return `
-        <div class="card msg-item ${pinned ? 'pinned' : ''} ${hidden ? 'hidden' : ''}" id="msg-card-${m.id}">
-            ${pinned ? '<div class="pin-badge"><span class="material-symbols-outlined">push_pin</span>已置顶</div>' : ''}
-            <div class="msg-header">
-                <span class="nickname">${safeText(m.nickname)}</span>
-                <span class="time">${prettyDate(m.created_at)}</span>
-            </div>
-            <div class="content">${safeText(m.content)}</div>
-            
-            <div class="interaction-bar">
-                <div class="vote-chip ${myVote === 'up' ? 'active-up voted' : ''}" 
-                     onclick="submitVote(${m.id}, 'upvote')">
-                    <span class="material-symbols-outlined">${myVote === 'up' ? 'thumb_up_filled' : 'thumb_up'}</span>
-                    <span class="vote-count">${m.upvotes || 0}</span>
-                </div>
-                <div class="vote-chip ${myVote === 'down' ? 'active-down voted' : ''}" 
-                     onclick="submitVote(${m.id}, 'downvote')">
-                    <span class="material-symbols-outlined">${myVote === 'down' ? 'thumb_down_filled' : 'thumb_down'}</span>
-                    <span class="vote-count">${m.downvotes || 0}</span>
-                </div>
-            </div>
+            return `
+                <div class="card msg-item ${pinned ? 'pinned' : ''} ${hidden ? 'hidden' : ''}" id="msg-card-${m.id}">
+                    ${pinned ? '<div class="pin-badge"><span class="material-symbols-outlined">push_pin</span>已置顶</div>' : ''}
+                    <div class="msg-header">
+                        <span class="nickname">${safeText(m.nickname)}</span>
+                        <span class="time">${prettyDate(m.created_at)}</span>
+                    </div>
+                    <div class="content">${safeText(m.content)}</div>
+                    
+                    <div class="interaction-bar">
+                        <div class="vote-chip ${myVote === 'up' ? 'active-up voted' : (myVote ? 'voted' : '')}" 
+                             onclick="handleVote(${m.id}, 'up')">
+                            <span class="material-symbols-outlined">${myVote === 'up' ? 'thumb_up_filled' : 'thumb_up'}</span>
+                            <span class="vote-count">${m.upvotes || 0}</span>
+                        </div>
+                        <div class="vote-chip ${myVote === 'down' ? 'active-down voted' : (myVote ? 'voted' : '')}" 
+                             onclick="handleVote(${m.id}, 'down')">
+                            <span class="material-symbols-outlined">${myVote === 'down' ? 'thumb_down_filled' : 'thumb_down'}</span>
+                            <span class="vote-count">${m.downvotes || 0}</span>
+                        </div>
+                    </div>
 
-            ${isAdmin ? `
-                <div class="admin-tools">
-                    <span class="material-symbols-outlined tool-icon ${pinned ? 'active' : ''}" 
-                          onclick="handlePatch(${m.id}, 'pin')">push_pin</span>
-                    <span class="material-symbols-outlined tool-icon ${hidden ? 'active' : ''}" 
-                          onclick="handlePatch(${m.id}, 'hide')">${hidden ? 'visibility_off' : 'visibility'}</span>
-                    <span class="material-symbols-outlined tool-icon danger" 
-                          onclick="handleDelete(${m.id})">delete</span>
-                    <span class="ip-info">IP: ${m.ip_address || 'Unknown'}</span>
+                    ${isAdmin ? `
+                        <div class="admin-tools">
+                            <span class="material-symbols-outlined tool-icon ${pinned ? 'active' : ''}" 
+                                  onclick="handlePatch(${m.id}, 'pin')">push_pin</span>
+                            <span class="material-symbols-outlined tool-icon ${hidden ? 'active' : ''}" 
+                                  onclick="handlePatch(${m.id}, 'hide')">${hidden ? 'visibility_off' : 'visibility'}</span>
+                            <span class="material-symbols-outlined tool-icon danger" 
+                                  onclick="handleDelete(${m.id})">delete</span>
+                            <span class="ip-info">IP: ${m.ip_address || 'Unknown'}</span>
+                        </div>
+                    ` : ''}
                 </div>
-            ` : ''}
-        </div>
-    `;
-}
+            `;
+        }
         // --- 管理动作逻辑 ---
         async function handlePatch(id, action) {
             const res = await fetch('/api/messages', {
@@ -458,45 +458,63 @@
             if (res.ok) fetchMessages(true);
         }
 
-        async function submitVote(id, action) {
-    // 如果已经投过票（无论点赞还是踩），禁止重复操作
-    if (userVotes[id]) return;
+        async function handleVote(id, type) {
+            // type 为 'up' 或 'down'
+            const currentVote = userVotes[id];
+            let action = "";
 
-    try {
-        const res = await fetch('/api/messages', {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id, action })
-        });
+            if (currentVote === type) {
+                // 如果点击已激活的按钮 -> 执行取消动作
+                action = type === 'up' ? 'un_upvote' : 'un_downvote';
+            } else if (!currentVote) {
+                // 如果从未投过票 -> 执行正常投票
+                action = type === 'up' ? 'upvote' : 'downvote';
+            } else {
+                // 如果已经投了赞想换成踩（或反之），引导用户先取消
+                return; 
+            }
 
-        if (res.ok) {
-            // 1. 更新本地存储状态
-            const voteType = action === 'upvote' ? 'up' : 'down';
-            userVotes[id] = voteType;
-            localStorage.setItem('user_votes', JSON.stringify(userVotes));
+            try {
+                const res = await fetch('/api/messages', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id, action })
+                });
 
-            // 2. 局部 UI 更新（无需刷新列表）
-            const card = document.getElementById(`msg-card-${id}`);
-            const chips = card.querySelectorAll('.vote-chip');
-            const targetIndex = action === 'upvote' ? 0 : 1;
-            const targetChip = chips[targetIndex];
-            
-            // 增加数字
-            const countEl = targetChip.querySelector('.vote-count');
-            countEl.textContent = parseInt(countEl.textContent) + 1;
-            
-            // 切换样式和图标
-            targetChip.classList.add(voteType === 'up' ? 'active-up' : 'active-down', 'voted');
-            targetChip.querySelector('.material-symbols-outlined').textContent = 
-                voteType === 'up' ? 'thumb_up_filled' : 'thumb_down_filled';
-            
-            // 禁用另一个按钮
-            chips[1 - targetIndex].classList.add('voted');
+                if (res.ok) {
+                    const card = document.getElementById(`msg-card-${id}`);
+                    const chips = card.querySelectorAll('.vote-chip');
+                    const chip = type === 'up' ? chips[0] : chips[1];
+                    const countEl = chip.querySelector('.vote-count');
+                    const iconEl = chip.querySelector('.material-symbols-outlined');
+
+                    if (action.startsWith('un_')) {
+                        // --- 执行取消逻辑 ---
+                        delete userVotes[id];
+                        chip.classList.remove(type === 'up' ? 'active-up' : 'active-down', 'voted');
+                        // 移除禁用状态（让用户可以重新选另一个）
+                        chips.forEach(c => c.classList.remove('voted'));
+                        // 还原图标
+                        iconEl.textContent = type === 'up' ? 'thumb_up' : 'thumb_down';
+                        // 数字递减，最小为0
+                        countEl.textContent = Math.max(0, parseInt(countEl.textContent) - 1);
+                    } else {
+                        // --- 执行投票逻辑 ---
+                        userVotes[id] = type;
+                        chip.classList.add(type === 'up' ? 'active-up' : 'active-down', 'voted');
+                        // 切换至实心图标
+                        iconEl.textContent = type === 'up' ? 'thumb_up_filled' : 'thumb_down_filled';
+                        // 数字递增
+                        countEl.textContent = parseInt(countEl.textContent) + 1;
+                        // 禁用未选中的那个按钮（视觉上）
+                        chips[type === 'up' ? 1 : 0].classList.add('voted');
+                    }
+                    localStorage.setItem('user_votes', JSON.stringify(userVotes));
+                }
+            } catch (err) {
+                console.error("互动操作失败", err);
+            }
         }
-    } catch (err) {
-        console.error("投票请求异常", err);
-    }
-}
 
         async function handleDelete(id) {
             if (!confirm("此操作不可逆，确定删除该留言吗？")) return;

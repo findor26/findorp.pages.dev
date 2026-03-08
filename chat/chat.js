@@ -180,6 +180,73 @@ document.getElementById('chat-input').onkeydown = (e) => {
     if (e.key === 'Enter') sendMessage();
 };
 
+// --- 逻辑扩充 ---
+
+/**
+ * 返回大厅视图：展示所有房间列表
+ */
+function showLobbyView() {
+    // 切换 UI 状态
+    document.querySelector('.title-large').textContent = "频道大厅";
+    const container = document.getElementById('message-container');
+    container.innerHTML = ''; // 清空消息，准备渲染房间卡片
+    
+    // 更新导航栏激活状态
+    document.querySelectorAll('.nav-icons span').forEach(el => el.classList.remove('active'));
+    document.getElementById('nav-lobby').classList.add('active');
+
+    fetchAndRenderRooms(); // 触发房间列表渲染
+}
+
+/**
+ * 彻底退出应用
+ */
+function logoutApp() {
+    if (confirm("确定要退出并断开连接吗？")) {
+        if (ably) {
+            ably.close(); // 断开实时连接
+            showToast("已断开连接");
+            setTimeout(() => {
+                window.location.reload(); // 刷新页面回到初始状态
+            }, 1000);
+        }
+    }
+}
+
+// --- 事件绑定更新 ---
+
+// 绑定大厅按钮
+document.getElementById('nav-lobby').onclick = showLobbyView;
+
+// 绑定退出按钮
+document.getElementById('nav-logout').onclick = logoutApp;
+
+// 修改原有 joinRoom 逻辑，确保切换到聊天时更新图标状态
+async function joinRoom(id, name) {
+    if (currentChatChannel) {
+        currentChatChannel.unsubscribe();
+    }
+
+    await lobbyChannel.presence.update({ 
+        currentRoom: id,
+        roomTitle: name
+    });
+
+    currentChatChannel = ably.channels.get(`chat:${id}`);
+    currentChatChannel.subscribe('chat-msg', (msg) => {
+        renderMessage(msg, false);
+    });
+
+    // 切换到聊天视图的 UI 处理
+    document.getElementById('message-container').innerHTML = '';
+    document.querySelector('.title-large').textContent = name;
+    
+    document.querySelectorAll('.nav-icons span').forEach(el => el.classList.remove('active'));
+    document.getElementById('nav-chat').classList.add('active');
+    
+    showToast(`已进入: ${name}`);
+}
+
 // 创建房间 FAB
 document.querySelector('.fab-btn').onclick = async () => {
     const name = prompt("请输入新房间名称:");

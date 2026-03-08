@@ -10,42 +10,41 @@ export async function onRequest(context) {
     }
 
     const [keyId, keySecret] = ABLY_KEY.split(':');
-
-    // 生成 TokenRequest 的参数
     const clientId = "user_" + Math.random().toString(36).substring(7);
 
     try {
-        // 直接向 Ably 请求 TokenRequest 对象
-        // 注意：Ably 官方推荐在 Server 端直接返回生成的 TokenRequest 给 SDK
+        // 请求 Ably 生成 TokenRequest
         const response = await fetch(`https://rest.ably.io/keys/${keyId}/requestToken`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                // 使用 Basic Auth 认证
                 'Authorization': 'Basic ' + btoa(ABLY_KEY)
             },
             body: JSON.stringify({
                 clientId: clientId,
+                // 移除手动 timestamp，交给 Ably 服务端处理
                 capability: { "game-*": ["subscribe", "publish", "presence"] },
-                ttl: 3600000 // 有效期 1 小时
+                ttl: 3600000 
             })
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
-            return new Response(JSON.stringify({ error: "Ably 请求失败", detail: errorText }), { status: 500 });
+            const errorInfo = await response.json();
+            return new Response(JSON.stringify({ error: "Ably 拒绝了请求", detail: errorInfo }), { 
+                status: response.status,
+                headers: { 'Content-Type': 'application/json' }
+            });
         }
 
         const tokenRequest = await response.json();
         
-        // 关键：必须直接返回这个 JSON 对象，不要包裹在其他 Key 下
         return new Response(JSON.stringify(tokenRequest), {
             headers: { 
                 'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*' // 防止跨域问题
+                'Access-Control-Allow-Origin': '*' 
             }
         });
     } catch (err) {
-        return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+        return new Response(JSON.stringify({ error: "服务器内部错误", message: err.message }), { status: 500 });
     }
 }

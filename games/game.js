@@ -50,11 +50,11 @@ function initPhysics() {
     // 创建坦克物理刚体
     const boxShape = new CANNON.Box(new CANNON.Vec3(2, 0.75, 2.75));
     tankBody = new CANNON.Body({ 
-        mass: 1500, // 模拟坦克重型手感
-        material: new CANNON.Material("tankMaterial"),
-        linearDamping: 0.9, // 模拟履带摩擦力导致的减速
-        angularDamping: 0.99
-    });
+    mass: 1500, 
+    material: new CANNON.Material("tankMaterial"),
+    linearDamping: 0.5,  // 降低线性阻尼，让移动更顺滑
+    angularDamping: 0.5  // 必须大幅调低！0.99 会导致无法转向
+});
     tankBody.addShape(boxShape);
     tankBody.position.set(0, 5, 0);
     physicsWorld.addBody(tankBody);
@@ -185,20 +185,35 @@ function gameLoop() {
 
 function updateMovement(delta) {
     const moveSpeed = myPos.speedUp ? 4000 : 2500;
-    const rotateForce = 1500;
+    const moveForce = 15000;  // 增加到 1.5万 左右
+    const rotateTorque = 8000; // 使用扭矩或直接控制角速度
 
-    // 键盘控制
-    if (keys['w']) tankBody.applyLocalForce(new CANNON.Vec3(0, 0, moveSpeed), new CANNON.Vec3(0,0,0));
-    if (keys['s']) tankBody.applyLocalForce(new CANNON.Vec3(0, 0, -moveSpeed), new CANNON.Vec3(0,0,0));
-    if (keys['a']) tankBody.angularVelocity.y = 2.5;
-    else if (keys['d']) tankBody.angularVelocity.y = -2.5;
-    else if (!isJoystickActive) tankBody.angularVelocity.y *= 0.9;
+    // 键盘控制逻辑
+    if (keys['w']) {
+        // 向坦克的局部前方施力
+        const force = new CANNON.Vec3(0, 0, moveForce);
+        tankBody.applyLocalForce(force, new CANNON.Vec3(0, 0, 0));
+    }
+    if (keys['s']) {
+        const force = new CANNON.Vec3(0, 0, -moveForce);
+        tankBody.applyLocalForce(force, new CANNON.Vec3(0, 0, 0));
+    }
 
-    // 摇杆控制修复（支持 360 度平滑转向）
+    // 转向逻辑：建议直接改角速度，手感更像《3D坦克》
+    if (keys['a']) {
+        tankBody.angularVelocity.y = 2.5; 
+    } else if (keys['d']) {
+        tankBody.angularVelocity.y = -2.5;
+    } else if (!isJoystickActive) {
+        // 松手即停，防止像冰面一样打转
+        tankBody.angularVelocity.y *= 0.9; 
+    }
+    
+    // 摇杆控制 (移动端)
     if (isJoystickActive) {
-        const force = new CANNON.Vec3(0, 0, -joystickVector.y * moveSpeed);
-        tankBody.applyLocalForce(force, new CANNON.Vec3(0,0,0));
-        tankBody.angularVelocity.y = -joystickVector.x * 3.5;
+        const joyForce = new CANNON.Vec3(0, 0, -joystickVector.y * moveForce);
+        tankBody.applyLocalForce(joyForce, new CANNON.Vec3(0, 0, 0));
+        tankBody.angularVelocity.y = -joystickVector.x * 3.0;
     }
 
     // 炮塔指向更新

@@ -100,29 +100,68 @@
         } catch (err) { statusEl.textContent = "❌ 连接失败"; }
     }
 
-    function checkHost() {
-        channel.presence.get((err, members) => {
-            if (!err && members.length > 0) {
-                const sorted = members.sort((a, b) => a.timestamp - b.timestamp);
-                isHost = (sorted[0].clientId === myId);
-                countEl.textContent = members.length;
-                if(isHost) console.log("你现在是房主，负责生成道具");
+    // --- 增强版房主逻辑 ---
+async function checkHost() {
+    try {
+        // 等待 Presence 列表同步
+        const members = await channel.presence.get();
+        if (members && members.length > 0) {
+            const sorted = members.sort((a, b) => a.timestamp - b.timestamp);
+            const hostId = sorted[0].clientId;
+            isHost = (hostId === myId);
+            
+            countEl.textContent = members.length;
+            statusEl.textContent = isHost ? "✅ 已联机 (房主)" : "✅ 已联机 (从机)";
+        } else {
+            // 如果列表为空（常见于刚连接时），则暂时认为自己是房主以维持逻辑
+            isHost = true; 
+            statusEl.textContent = "⏳ 正在同步房主...";
+        }
+    } catch (e) {
+        console.error("无法获取房主状态:", e);
+    }
+}
+
+// --- 坐标校准版道具生成 ---
+function broadcastItem() {
+    // 使用 0.1 到 0.9 的比例，确保道具不会贴边
+    const itemData = {
+        id: 'it-' + Math.random().toString(36).substring(7),
+        ratioX: 0.1 + Math.random() * 0.8, 
+        ratioY: 0.1 + Math.random() * 0.8,
+        type: Math.random() > 0.5 ? 'heal' : 'speed'
+    };
+    
+    // 房主直接发布
+    channel.publish('i', itemData);
+    console.log("房主已发布新道具:", itemData.id);
+}
+
+    // --- 碰撞检测适配 ---
+function checkItemCollision() {
+    for (let id in items) {
+        const it = items[id];
+        const realX = it.ratioX * canvas.width;
+        const realY = it.ratioY * canvas.height;
+        
+        // 坦克中心点对比道具中心点
+        const dist = Math.hypot((myPos.x + 20) - realX, (myPos.y + 20) - realY);
+        
+        if (dist < 35) { // 碰撞半径
+            if (it.type === 'heal') {
+                myPos.hp = Math.min(100, myPos.hp + 20);
+                console.log("吃到加血道具");
+            } else {
+                mySpeed = 7;
+                setTimeout(() => mySpeed = 4, 5000);
+                console.log("吃到加速道具");
             }
-        });
+            // 通知频道删除该道具
+            channel.publish('d', { id: id });
+            delete items[id];
+        }
     }
-
-    // --- 逻辑处理 ---
-
-    function broadcastItem() {
-        const margin = 100;
-        const itemData = {
-            id: 'it-' + Math.random().toString(36).substring(7),
-            x: margin + Math.random() * (canvas.width - margin * 2),
-            y: margin + Math.random() * (canvas.height - margin * 2),
-            type: Math.random() > 0.5 ? 'heal' : 'speed'
-        };
-        channel.publish('i', itemData);
-    }
+}
 
     function spawnBullet(data, isMine) {
         bullets.push({
@@ -241,7 +280,29 @@
     }
 
     function render() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+       ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 1. 绘制道具 (使用比例还原坐标)
+    for (let id in items) {
+        const it = items[id];
+        const realX = it.ratioX * canvas.width;
+        const realY = it.ratioY * canvas.height;
+        
+        ctx.beginPath();
+        ctx.arc(realX, realY, 15, 0, Math.PI * 2);
+        ctx.fillStyle = it.type === 'heal' ? '#4caf50' : '#2196f3';
+        ctx.fill();
+        
+        // 发光效果
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = ctx.fillStyle;
+        
+        ctx.fillStyle = "white";
+        ctx.font = "bold 14px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText(it.type === 'heal' ? '+' : 'S', realX, realY + 5);
+        ctx.shadowBlur = 0; // 重置阴影
+    }
 
         // 绘图层级：1. 道具 -> 2. 子弹 -> 3. 坦克
 

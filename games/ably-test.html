@@ -88,12 +88,32 @@
     let joystickActive = false;
     let joystickVector = { x: 0, y: 0 };
 
+    function checkHost() {
+        channel.presence.get((err, members) => {
+            if (!err && members.length > 0) {
+                // 增加日志方便你调试
+                console.log("当前房间人数:", members.length);
+                const sorted = members.sort((a, b) => a.timestamp - b.timestamp);
+                const oldHost = isHost;
+                isHost = (sorted[0].clientId === myId);
+                
+                if (isHost && !oldHost) {
+                    console.log("你已成为房主，开始监管道具生成");
+                }
+                countEl.textContent = members.length;
+            } else if (err) {
+                console.error("获取 Presence 失败:", err);
+            }
+        });
+    }
+
     async function init() {
         try {
             const response = await fetch('/api/auth');
             const apiKey = await response.text();
             const ably = new Ably.Realtime({ key: apiKey.trim(), clientId: myId });
             await ably.connection.once('connected');
+            
             
             statusEl.textContent = "✅ 已联机";
             myIdEl.textContent = myId;
@@ -112,6 +132,12 @@
             });
 
             await channel.presence.enter();
+            
+            // 关键：连接成功后立即强制检测一次
+            checkHost();
+            
+            // 如果我是房主，立刻生成第一个道具，不要等 8 秒
+            if (isHost) generateItem();
             checkHost();
             createMyTank();
             initJoystick();

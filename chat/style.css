@@ -1,139 +1,115 @@
 /* ==========================================
-   1. 核心变量与重置 (MD3 调色板)
+   1. 核心变量与 Material Design 3 调色板
    ========================================== */
 :root {
-    /* 主色调与背景 */
     --md-sys-color-primary: #0061a4;
     --md-sys-color-on-primary: #ffffff;
+    --md-sys-color-primary-container: #d1e4ff;
+    --md-sys-color-on-primary-container: #001d36;
     --md-sys-color-surface: #fdfbff;
     --md-sys-color-surface-variant: #e0e2ec;
     --md-sys-color-on-surface: #1a1c1e;
     --md-sys-color-on-surface-variant: #44474e;
-    
-    /* 容器色调 */
     --md-sys-color-secondary-container: #d1e4ff;
     --md-sys-color-on-secondary-container: #001d36;
     --md-sys-color-error: #ba1a1a;
     --md-sys-color-outline: #74777f;
     
-    /* 阴影与圆角 */
+    /* 圆角与阴影规范 */
+    --md-sys-radius-small: 8px;
+    --md-sys-radius-medium: 12px;
     --md-sys-radius-large: 16px;
     --md-sys-radius-extra-large: 28px;
-    --md-sys-elevation-1: 0 1px 3px rgba(0,0,0,0.12);
-}
-
-* {
-    box-sizing: border-box;
-    -webkit-tap-highlight-color: transparent;
-}
-
-body {
-    margin: 0;
-    padding: 0;
-    font-family: 'Roboto', 'Segoe UI', Tahoma, sans-serif;
-    background-color: var(--md-sys-color-surface);
-    color: var(--md-sys-color-on-surface);
-    height: 100vh;
-    overflow: hidden; /* 防止页面整体滚动，仅内容区滚动 */
+    --md-sys-elevation-1: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
 }
 
 /* ==========================================
-   2. 整体布局架构 (App Shell)
+   2. 全局基础样式
    ========================================== */
-.app-shell {
-    display: flex;
-    width: 100vw;
+* { 
+    box-sizing: border-box; 
+    -webkit-tap-highlight-color: transparent; 
+}
+
+body {
+    margin: 0; 
+    padding: 0;
+    font-family: 'Roboto', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background-color: var(--md-sys-color-surface);
+    color: var(--md-sys-color-on-surface);
+    /* 解决移动端工具栏遮挡的核心：使用 dvh */
     height: 100vh;
+    height: 100dvh; 
+    overflow: hidden;
 }
 
-/* 侧边导航栏：固定宽度且内容居中 */
+.app-shell { 
+    display: flex; 
+    width: 100vw; 
+    height: 100%; 
+}
+
+/* ==========================================
+   3. 侧边导航栏 (PC端布局)
+   ========================================== */
 .nav-rail {
-    width: 80px;
+    width: 80px; 
     background-color: var(--md-sys-color-surface-variant);
-    display: flex;
-    flex-direction: column;
+    display: flex; 
+    flex-direction: column; 
     align-items: center;
-    padding: 16px 0;
-    flex-shrink: 0;
+    padding: 16px 0; 
+    flex-shrink: 0; 
     border-right: 1px solid var(--md-sys-color-outline);
+    transition: all 0.3s ease;
 }
 
-/* FAB 悬浮按钮 */
+.nav-rail-top {
+    margin-bottom: 32px;
+}
+
+/* 浮动操作按钮 FAB */
 .fab {
-    width: 56px;
-    height: 56px;
+    width: 56px; 
+    height: 56px; 
     border-radius: var(--md-sys-radius-large);
     background-color: var(--md-sys-color-secondary-container);
     color: var(--md-sys-color-on-secondary-container);
-    border: none;
-    cursor: pointer;
-    display: flex;
+    border: none; 
+    cursor: pointer; 
+    display: flex; 
     align-items: center;
-    justify-content: center;
-    margin-bottom: 32px;
+    justify-content: center; 
     box-shadow: var(--md-sys-elevation-1);
-    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: box-shadow 0.2s;
 }
 
 .fab:hover {
-    transform: scale(1.05);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
 }
 
-.action-icon-btn {
-    /* 移除按钮默认边框和背景 */
-    background: transparent;
-    border: none;
-    
-    /* 容器必须是正方形以保证圆角均匀 */
-    width: 40px;
-    height: 40px;
-    
-    /* 核心：确保图标在容器内绝对居中 */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    
-    /* 设置圆角 */
-    border-radius: 50%;
-    
-    /* 图标颜色与交互色 */
-    color: var(--md-sys-color-on-surface-variant);
-    cursor: pointer;
-    transition: background-color 0.2s;
-}
-
-/* 状态反馈：Hover 时产生浅色圆形遮罩 */
-.action-icon-btn:hover {
-    background-color: rgba(0, 0, 0, 0.08);
-}
-
-/* 确保图标字体大小适中（MD3 标准通常为 24px） */
-.action-icon-btn .material-symbols-rounded {
-    font-size: 24px;
-}
-
-/* 导航项 */
-.nav-destinations {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
-    width: 100%;
+.nav-destinations { 
+    flex: 1; 
+    display: flex; 
+    flex-direction: column; 
+    gap: 24px; 
+    width: 100%; 
 }
 
 .nav-item {
-    display: flex;
-    flex-direction: column;
+    display: flex; 
+    flex-direction: column; 
     align-items: center;
-    cursor: pointer;
-    width: 100%;
+    cursor: pointer; 
+    width: 100%; 
     color: var(--md-sys-color-on-surface-variant);
+    text-decoration: none;
 }
 
 .nav-item .material-symbols-rounded {
-    padding: 4px 20px;
-    border-radius: 20px;
-    transition: background-color 0.3s;
+    padding: 4px 20px; 
+    border-radius: 20px; 
+    transition: background-color 0.3s, color 0.3s;
 }
 
 .nav-item.active .material-symbols-rounded {
@@ -141,15 +117,16 @@ body {
     color: var(--md-sys-color-on-secondary-container);
 }
 
-.nav-label {
-    font-size: 12px;
-    margin-top: 4px;
-    font-weight: 500;
+.nav-label { 
+    font-size: 12px; 
+    margin-top: 4px; 
+    font-weight: 500; 
 }
 
-.nav-bottom {
-    margin-top: auto;
-    padding-bottom: 16px;
+.nav-bottom { 
+    margin-top: auto; 
+    padding-bottom: 16px; 
+    width: 100%;
 }
 
 .logout-item {
@@ -157,355 +134,298 @@ body {
 }
 
 /* ==========================================
-   3. 主内容区与顶部栏
+   4. 主内容区域与 AppBar
    ========================================== */
-.content-main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-width: 0; /* 修复 flex 子元素溢出问题 */
+.content-main { 
+    flex: 1; 
+    display: flex; 
+    flex-direction: column; 
+    min-width: 0; 
+    background-color: var(--md-sys-color-surface);
 }
 
 .app-bar {
-    height: 64px;
-    padding: 0 24px;
-    display: flex;
+    height: 64px; 
+    padding: 0 24px; 
+    display: flex; 
     align-items: center;
-    justify-content: space-between;
-    background-color: var(--md-sys-color-surface);
+    justify-content: space-between; 
     border-bottom: 1px solid var(--md-sys-color-surface-variant);
+    flex-shrink: 0;
 }
 
-.title-group h1 {
-    font-size: 22px;
-    margin: 0;
-    font-weight: 400;
+.title-group {
+    display: flex;
+    flex-direction: column;
 }
 
-.status-chip {
+.title-group h1 { 
+    font-size: 20px; 
+    margin: 0; 
+    font-weight: 400; 
+}
+
+.status-chip { 
+    display: flex; 
+    align-items: center; 
+    gap: 8px; 
+    font-size: 13px; 
+    margin-top: 4px; 
+}
+
+.status-dot { 
+    width: 8px; 
+    height: 8px; 
+    background-color: #34a853; 
+    border-radius: 50%; 
+}
+
+/* 顶部操作按钮修复（解决灰色方块） */
+.action-icon-btn { 
+    background: transparent; 
+    border: none; 
+    cursor: pointer; 
+    padding: 0; 
+    width: 40px;
+    height: 40px;
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    background-color: #e8f0fe;
-    padding: 4px 12px;
-    border-radius: 8px;
-    margin-top: 2px;
+    justify-content: center;
+    border-radius: 50%; 
+    color: var(--md-sys-color-on-surface);
+    transition: background-color 0.2s;
 }
 
-.status-dot {
-    width: 8px;
-    height: 8px;
-    background-color: #34a853;
-    border-radius: 50%;
-    box-shadow: 0 0 4px #34a853;
+.action-icon-btn:hover { 
+    background-color: rgba(0,0,0,0.08); 
+}
+
+.action-icon-btn .material-symbols-rounded {
+    font-size: 24px;
 }
 
 /* ==========================================
-   4. 消息滚动区与气泡逻辑 (核心修正点)
+   5. 消息流区域样式 (修复 9c575f 的一言难尽)
    ========================================== */
 .message-view {
-    flex: 1;
-    overflow-y: auto;
-    /* 核心：启用移动端流畅的“原生感”滚动 */
-    -webkit-overflow-scrolling: touch; 
-    
-    /* 强制显示滚动条轨道（如果需要视觉提示） */
-    scrollbar-width: thin; /* Firefox */
-    scrollbar-color: var(--md-sys-color-outline) transparent; /* Firefox */
+    flex: 1; 
+    overflow-y: auto; 
+    padding: 24px; 
+    display: flex;
+    flex-direction: column; 
+    gap: 4px; /* 紧凑排列 */
+    -webkit-overflow-scrolling: touch;
 }
 
-/* 2. WebKit 内核（Chrome/Safari）滚动条美化 */
-.message-view::-webkit-scrollbar {
-    width: 4px; /* 设置极细滚动条，避免占用过多屏幕空间 */
-}
-
-.message-view::-webkit-scrollbar-track {
-    background: transparent; /* 轨道透明 */
-}
-
-.message-view::-webkit-scrollbar-thumb {
-    background-color: rgba(0, 0, 0, 0.2); /* 半透明滑块 */
-    border-radius: 10px;
-}
-
-/* 消息气泡容器 - 修复拉伸与对齐 */
+/* 消息包装器 */
 .msg-wrapper {
     display: flex;
     flex-direction: column;
-    margin-bottom: 16px;
-    max-width: 70%; /* 限制宽度，防止长消息铺满全屏 */
-    min-width: 60px; /* 防止超短消息缩成圆点 */
+    margin-bottom: 12px;
+    max-width: 75%; /* 宽屏下不铺满 */
+    min-width: 80px; /* 防止超短消息缩成点 */
     align-self: flex-start;
 }
 
-/* 自己的消息靠右 */
 .msg-wrapper.is-me {
     align-self: flex-end;
     align-items: flex-end;
 }
 
-/* 气泡主体样式 */
+/* 气泡主体 */
 .msg-bubble {
-    padding: 12px 16px;
+    padding: 10px 16px;
     font-size: 15px;
     line-height: 1.5;
     word-break: break-word;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-    
-    /* 默认消息：淡紫色/灰色矩形 */
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     background-color: var(--md-sys-color-surface-variant);
     color: var(--md-sys-color-on-surface-variant);
-    /* 经典的 MD3 不对称圆角 */
-    border-radius: 4px 20px 20px 20px; 
+    /* MD3 不对称圆角：左侧消息 */
+    border-radius: 4px 18px 18px 18px; 
 }
 
-/* 自己的消息气泡：改为更柔和的 MD3 Primary 颜色 */
 .is-me .msg-bubble {
-    background-color: #D1E4FF; /* 使用浅蓝色，保护视力 */
-    color: #001D36;
-    border-radius: 20px 4px 20px 20px;
+    /* 修复 9c575f：使用明亮的 Primary Container 配色 */
+    background-color: var(--md-sys-color-primary-container);
+    color: var(--md-sys-color-on-primary-container);
+    /* MD3 不对称圆角：右侧消息 */
+    border-radius: 18px 4px 18px 18px;
 }
 
-/* 发送者昵称优化 */
-.msg-wrapper .sender-name {
-    font-size: 12px;
-    color: var(--md-sys-color-on-surface-variant);
+/* 消息元信息（昵称等） */
+.sender-info {
+    font-size: 11px;
     margin-bottom: 4px;
-    margin-left: 4px;
-    opacity: 0.8;
-}
-
-.is-me .sender-name {
-    margin-left: 0;
-    margin-right: 4px;
-}
-
-/* 撤回按钮样式优化 - 仅在 Hover 时显现更美观 */
-.recall-btn {
-    opacity: 0;
-    transition: opacity 0.2s;
-    background: none;
-    border: none;
-    color: var(--md-sys-color-primary);
-    font-size: 12px;
-    cursor: pointer;
-    margin-top: 4px;
-}
-
-.msg-wrapper:hover .recall-btn {
+    color: var(--md-sys-color-on-surface-variant);
     opacity: 0.7;
 }
 
-/* 撤回后的占位提示 */
-.recall-notice {
-    font-size: 12px;
-    font-style: italic;
-    color: var(--md-sys-color-on-surface-variant);
-    background-color: #f1f3f4;
-    padding: 8px 16px;
-    border-radius: 16px;
-    align-self: center; /* 居中显示 */
-    margin: 8px 0;
-    opacity: 0.6;
+.is-me .sender-info {
+    text-align: right;
 }
 
-/* ==========================================
-   5. 大厅房间卡片与成员卡片
-   ========================================== */
-.room-card, .member-item {
-    display: flex;
-    align-items: center;
-    padding: 16px;
-    background-color: #f8f9fa;
-    border-radius: var(--md-sys-radius-large);
+/* 撤回按钮修复 */
+.recall-btn {
+    background: none;
+    border: none;
+    color: var(--md-sys-color-primary);
+    font-size: 11px;
     cursor: pointer;
-    transition: background-color 0.2s, transform 0.1s;
-    border: 1px solid transparent;
+    margin-top: 4px;
+    padding: 2px 4px;
+    opacity: 0; /* 默认隐藏，交互后显示 */
+    transition: opacity 0.2s;
 }
 
-.room-card:hover {
-    background-color: #f1f3f4;
-    border-color: var(--md-sys-color-primary);
-}
-
-.room-card:active {
-    transform: scale(0.98);
+.msg-wrapper:hover .recall-btn {
+    opacity: 0.8;
 }
 
 /* ==========================================
-   6. 底部输入栏系统
+   6. 底部输入区域
    ========================================== */
-.input-area {
-    padding: 16px 24px 32px 24px;
+.input-area { 
+    padding: 16px 24px 24px; 
     background-color: var(--md-sys-color-surface);
+    flex-shrink: 0;
 }
 
 .input-container {
-    background-color: #f1f3f4;
+    background-color: var(--md-sys-color-surface-variant);
     border-radius: var(--md-sys-radius-extra-large);
-    display: flex;
-    align-items: center;
+    display: flex; 
+    align-items: center; 
     padding: 4px 8px 4px 20px;
-    transition: background-color 0.3s;
-}
-
-.input-container:focus-within {
-    background-color: #e8eaed;
 }
 
 #chat-input {
-    flex: 1;
-    border: none;
-    background: transparent;
+    flex: 1; 
+    border: none; 
+    background: transparent; 
     padding: 12px 0;
-    font-size: 16px;
+    font-size: 16px; 
     outline: none;
     color: var(--md-sys-color-on-surface);
 }
 
 .send-button {
-    width: 48px;
-    height: 48px;
+    width: 48px; 
+    height: 48px; 
     border-radius: 50%;
-    background-color: var(--md-sys-color-primary);
+    background-color: var(--md-sys-color-primary); 
     color: white;
-    border: none;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
+    border: none; 
+    cursor: pointer; 
+    display: flex; 
+    align-items: center; 
     justify-content: center;
-    transition: opacity 0.2s;
+    transition: transform 0.2s;
 }
 
-.send-button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+.send-button:active {
+    transform: scale(0.9);
 }
 
 /* ==========================================
-   7. 其它组件 (Toast & Loading)
+   7. 移动端响应式深度适配 (包含 Edge 修复)
    ========================================== */
-#md3-toast {
-    position: fixed;
-    bottom: 100px;
-    left: 50%;
-    transform: translateX(-50%);
-    background-color: #313033;
-    color: #f4eff4;
-    padding: 12px 24px;
-    border-radius: 4px;
-    font-size: 14px;
-    z-index: 9999;
-    box-shadow: 0 3px 5px rgba(0,0,0,0.2);
-    display: none;
-}
-
-.loading-placeholder {
-    text-align: center;
-    padding: 40px;
-    color: var(--md-sys-color-outline);
-}
-
-/* 1. 修复全局高度定义，确保不超出 Edge 视口 */
-body, .app-shell {
-    /* 使用 dvh 自动排除浏览器工具栏高度 */
-    height: 100vh; 
-    height: 100dvh; 
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-}
-
-/* 针对移动端的深度布局修复 */
 @media (max-width: 600px) {
-    /* 1. 将容器改为上下布局，防止侧边栏横向遮挡 */
+    /* 整体布局转为上下结构 */
     .app-shell {
-        flex-direction: column-reverse; 
+        flex-direction: column-reverse;
     }
 
-    /* 2. 增强底部导航栏的间距，防止被 Edge 按钮挡住 */
+    /* 侧边栏转底部导航栏 */
     .nav-rail {
-        flex-direction: row;
         width: 100%;
+        height: auto;
+        flex-direction: row;
+        padding: 0;
+        border-right: none;
+        border-top: 1px solid var(--md-sys-color-outline);
         background-color: var(--md-sys-color-surface);
-        border-top: 1px solid var(--md-sys-color-surface-variant);
-        
-        /* 核心修复：增加底部内边距 */
-        /* safe-area-inset-bottom 处理全面屏黑条 */
-        /* 额外增加 12px 避开 Edge 的操作按钮敏感区 */
-        padding-bottom: calc(env(safe-area-inset-bottom) + 12px); 
-        
-        position: relative;
-        z-index: 100;
+        /* 核心：避开 Edge 按钮挡住的部分 */
+        padding-bottom: calc(env(safe-area-inset-bottom) + 12px);
     }
 
-    /* 3. 确保主内容区域高度自适应 */
-    .content-main {
-        flex: 1;
-        height: 0; /* 强制 flex 容器计算高度而非撑开 */
-        display: flex;
-        flex-direction: column;
-    }
-
-    /* 4. 如果是在对话界面，输入框也需要避让 */
-    .input-area {
-        /* 如果导航栏在底部，输入框上方需要留空，或者导航栏在输入框下方时增加底边距 */
-        padding-bottom: 8px; 
-    }
-
-    /* 移动端隐藏 FAB 或调整位置 */
     .nav-rail-top {
-        display: none; 
+        display: none; /* 移动端 FAB 另行处理或隐藏 */
     }
 
     .nav-destinations {
-        flex-direction: row; /* 菜单项横向铺开 */
-        width: 100%;
+        flex-direction: row;
         gap: 0;
     }
 
     .nav-item {
         flex: 1;
-        padding: 4px 0;
+        padding: 8px 0;
     }
 
-    .nav-item .material-symbols-rounded {
-        padding: 4px 16px; /* 缩小背景色块，适应窄屏 */
-    }
-
-    /* 4. 优化顶部状态栏，防止状态碎片重叠 */
+    /* 顶部 AppBar 紧凑化 */
     .app-bar {
-        padding: 0 12px;
+        padding: 0 16px;
+        height: 56px;
     }
 
-    .status-chip {
-        max-width: 200px;
-        overflow: hidden;
-        white-space: nowrap;
-        text-overflow: ellipsis;
-        font-size: 11px;
+    .action-icon-btn {
+        width: 48px; /* 增大触点 */
+        height: 48px;
     }
 
-    /* 5. 调整消息容器，确保气泡有呼吸空间 */
+    /* 消息区域适配 */
     .message-view {
         padding: 12px;
-        padding-bottom: 20px;
     }
 
     .msg-wrapper {
-        max-width: 90%; /* 移动端气泡可以更宽一些 */
+        max-width: 85%; /* 手机端气泡可以更宽 */
     }
 
-    /* 6. 处理 iOS 底部安全区 */
-    .nav-rail {
-        padding-bottom: env(safe-area-inset-bottom);
+    /* 输入栏适配 */
+    .input-area {
+        padding: 8px 12px 12px;
     }
 }
 
-/* 处理全面屏手势黑条遮挡（iOS/Android） */
-@supports (padding-bottom: env(safe-area-inset-bottom)) {
-    .input-area {
-        padding-bottom: calc(12px + env(safe-area-inset-bottom));
-    }
+/* ==========================================
+   8. 动画与交互
+   ========================================== */
+.loading-placeholder {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    opacity: 0.6;
+}
+
+#md3-toast {
+    position: fixed; 
+    bottom: 100px; 
+    left: 50%; 
+    transform: translateX(-50%);
+    background-color: #313033; 
+    color: white; 
+    padding: 12px 24px;
+    border-radius: 4px; 
+    font-size: 14px; 
+    display: none; 
+    z-index: 200;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+}
+
+.room-card {
+    display: flex; 
+    align-items: center; 
+    padding: 16px; 
+    margin-bottom: 12px;
+    background: var(--md-sys-color-surface-variant); 
+    border-radius: var(--md-sys-radius-medium); 
+    cursor: pointer; 
+    transition: background 0.2s;
+}
+
+.room-card:hover { 
+    background: #e0e2ec; 
 }

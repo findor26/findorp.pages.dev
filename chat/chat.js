@@ -1,6 +1,6 @@
 /**
  * ==========================================
- * 1. 核心状态与全局变量 (绝不精简)
+ * 1. 核心状态与全局变量
  * ==========================================
  */
 
@@ -17,7 +17,7 @@ let lobbyChannel = null;
 let currentChatChannel = null;
 
 // 视图状态控制
-let currentView = 'lobby'; // 'lobby' | 'chat' | 'group'
+let currentView = 'lobby'; // 可选值: 'lobby' | 'chat' | 'group'
 let currentRoomId = 'Lobby';
 let currentRoomTitle = '公共大厅';
 
@@ -32,6 +32,7 @@ function showToast(message) {
     if (toast) {
         toast.textContent = message;
         toast.style.display = 'block';
+        // 3秒后自动隐藏
         setTimeout(function() {
             toast.style.display = 'none';
         }, 3000);
@@ -60,14 +61,14 @@ function updateNavUI(activeId) {
 
 async function initApp() {
     try {
-        // 获取 API 密钥
+        // 获取 API 密钥（假设后端提供 /api/auth 接口）
         const response = await fetch('/api/auth');
         if (response.ok === false) {
-            throw new Error("API 认证失败");
+            throw new Error("API 认证失败，请检查后端配置");
         }
         const apiKey = await response.text();
 
-        // 连接 Ably
+        // 实例化 Ably
         ably = new Ably.Realtime({
             key: apiKey.trim(),
             clientId: myId,
@@ -79,12 +80,12 @@ async function initApp() {
 
         // 监听全局在线状态，驱动大厅和成员列表实时更新
         lobbyChannel.presence.subscribe(['enter', 'leave', 'update'], function(member) {
-            console.log("在线状态变更: ", member.action);
+            console.log("在线状态变更动作: ", member.action);
             
-            // 每次有人变动，更新全局人数
+            // 每次有人变动，更新全局人数计数器
             updateOnlineCounter();
 
-            // 根据当前视图刷新列表内容
+            // 根据当前视图实时刷新列表内容
             if (currentView === 'lobby') {
                 renderRoomsFromPresence();
             } else if (currentView === 'group') {
@@ -92,32 +93,38 @@ async function initApp() {
             }
         });
 
-        // 首次进入：上报我的状态
+        // 首次进入：上报我的当前状态
         await lobbyChannel.presence.enter({
             currentRoom: currentRoomId,
             roomTitle: currentRoomTitle,
             nickname: myNickname
         });
 
-        showToast("在线连接已建立");
+        showToast("在线连接已成功建立");
         switchToLobbyView();
 
     } catch (err) {
-        console.error("初始化错误: ", err);
-        showToast("连接异常，请刷新重试");
+        console.error("初始化过程中发生错误: ", err);
+        showToast("连接异常，请尝试刷新页面");
     }
 }
 
 /**
  * ==========================================
- * 4. 大厅与成员列表逻辑 (大厅内容核心)
+ * 4. 大厅视图逻辑
  * ==========================================
  */
 
 function switchToLobbyView() {
     currentView = 'lobby';
     document.getElementById('current-view-title').textContent = "频道大厅";
-    document.getElementById('current-view-subtitle').textContent = "发现活跃的讨论组";
+    
+    // 确保 subtitle 元素存在
+    const subtitle = document.getElementById('current-view-subtitle');
+    if (subtitle) {
+        subtitle.textContent = "发现活跃的讨论组";
+    }
+    
     document.getElementById('chat-input-zone').style.display = 'none';
     
     updateNavUI('btn-nav-lobby');
@@ -136,12 +143,12 @@ async function renderRoomsFromPresence() {
         }
 
         const container = document.getElementById('message-container');
-        container.innerHTML = ''; // 清空加载状态
+        container.innerHTML = ''; // 清除加载占位符
 
-        // 逻辑：通过 Presence 数据动态聚类房间
+        // 逻辑：通过 Presence 数据动态聚类房间信息
         const roomsMap = new Map();
 
-        // 强制加入一个默认公共大厅，确保大厅不为空
+        // 强制加入一个默认公共大厅，确保列表不为空
         roomsMap.set('Lobby', {
             id: 'Lobby',
             title: '公共大厅',
@@ -164,12 +171,12 @@ async function renderRoomsFromPresence() {
             roomObj.count = roomObj.count + 1;
         }
 
-        // 渲染 HTML
+        // 渲染 HTML 卡片
         roomsMap.forEach(function(room) {
             const roomCard = document.createElement('div');
             roomCard.className = 'room-card';
-            roomCard.style.cssText = "display: flex; align-items: center; padding: 16px; margin-bottom: 12px; background: #f1f3f4; border-radius: 12px; cursor: pointer;";
             
+            // 点击进入聊天室
             roomCard.onclick = function() {
                 enterChatRoom(room.id, room.title);
             };
@@ -189,10 +196,21 @@ async function renderRoomsFromPresence() {
     });
 }
 
+/**
+ * ==========================================
+ * 5. 成员列表视图逻辑
+ * ==========================================
+ */
+
 function switchToGroupView() {
     currentView = 'group';
     document.getElementById('current-view-title').textContent = "在线成员";
-    document.getElementById('current-view-subtitle').textContent = "所有连接到服务器的用户";
+    
+    const subtitle = document.getElementById('current-view-subtitle');
+    if (subtitle) {
+        subtitle.textContent = "所有已连接的用户";
+    }
+    
     document.getElementById('chat-input-zone').style.display = 'none';
 
     updateNavUI('btn-nav-group');
@@ -212,7 +230,7 @@ function renderFullMemberList() {
             const m = members[i];
             const data = m.data || {};
             const nickname = data.nickname || m.clientId;
-            const location = data.roomTitle || "大厅";
+            const location = data.roomTitle || "正在切换...";
 
             const item = document.createElement('div');
             item.className = 'member-item';
@@ -224,7 +242,7 @@ function renderFullMemberList() {
                 </div>
                 <div style="flex: 1;">
                     <div style="font-weight: 500;">${nickname} ${m.clientId === myId ? '(我)' : ''}</div>
-                    <div style="font-size: 12px; opacity: 0.6;">所在频道: ${location}</div>
+                    <div style="font-size: 12px; opacity: 0.6;">当前位置: ${location}</div>
                 </div>
                 <div style="width: 8px; height: 8px; background: #34a853; border-radius: 50%;"></div>
             `;
@@ -235,7 +253,7 @@ function renderFullMemberList() {
 
 /**
  * ==========================================
- * 5. 聊天室核心逻辑 (撤回、历史、发送)
+ * 6. 聊天室核心逻辑 (撤回、历史回溯、发送)
  * ==========================================
  */
 
@@ -250,33 +268,33 @@ async function enterChatRoom(roomId, roomTitle) {
     }
     currentChatChannel = ably.channels.get(`chat:${roomId}`);
 
-    // 更新 Presence 状态，同步位置
+    // 更新 Presence 状态，让全网知道我换了地方
     await lobbyChannel.presence.update({
         currentRoom: roomId,
         roomTitle: roomTitle,
         nickname: myNickname
     });
 
-    // UI 清理
+    // UI 状态切换
     document.getElementById('current-view-title').textContent = roomTitle;
     document.getElementById('message-container').innerHTML = '';
     document.getElementById('chat-input-zone').style.display = 'block';
     updateNavUI('btn-nav-chat');
 
-    // 1. 回溯加载历史记录
+    // 1. 加载频道历史记录
     loadChatHistory();
 
-    // 2. 订阅实时聊天消息
+    // 2. 订阅实时聊天消息流
     currentChatChannel.subscribe('chat-msg', function(msg) {
         renderSingleMessage(msg, false);
     });
 
-    // 3. 订阅撤回指令
+    // 3. 订阅撤回指令流
     currentChatChannel.subscribe('recall-msg', function(msg) {
         applyRecallToUI(msg.data.msgId, msg.data.nickname);
     });
 
-    showToast(`欢迎来到 ${roomTitle}`);
+    showToast(`欢迎进入 ${roomTitle}`);
 }
 
 function loadChatHistory() {
@@ -284,10 +302,11 @@ function loadChatHistory() {
 
     currentChatChannel.history({ limit: 50 }, function(err, resultPage) {
         if (err) {
-            console.warn("历史回溯受限: ", err);
+            console.warn("历史消息加载受限: ", err);
             return;
         }
 
+        // Ably 历史默认由新到旧，需要反转以符合阅读顺序
         const historyItems = resultPage.items.reverse();
         for (let i = 0; i < historyItems.length; i++) {
             const item = historyItems[i];
@@ -307,7 +326,7 @@ async function handleSendMessage() {
         return;
     }
 
-    // 生成消息唯一识别符用于撤回
+    // 生成唯一识别符用于撤回控制
     const uniqueMsgId = 'msg-' + Date.now() + '-' + Math.random().toString(36).substring(7);
 
     const payload = {
@@ -319,11 +338,11 @@ async function handleSendMessage() {
 
     try {
         await currentChatChannel.publish('chat-msg', payload);
-        // 本地立即渲染（因为 echoMessages 为 false）
+        // 本地渲染自己的消息（由于 echoMessages 为 false，需手动执行一次）
         renderSingleMessage({ data: payload, clientId: myId }, true);
         input.value = '';
     } catch (e) {
-        showToast("消息发送失败");
+        showToast("消息发送失败，请检查网络");
     }
 }
 
@@ -333,7 +352,7 @@ function renderSingleMessage(msgObj, isMe) {
     const container = document.getElementById('message-container');
     const data = msgObj.data;
 
-    // 防止历史记录与实时消息冲突导致的重复渲染
+    // 防止历史回溯与实时推送重复渲染
     if (document.querySelector(`[data-msg-id="${data.msgId}"]`)) {
         return;
     }
@@ -341,39 +360,34 @@ function renderSingleMessage(msgObj, isMe) {
     const wrapper = document.createElement('div');
     wrapper.className = isMe ? 'msg-wrapper is-me' : 'msg-wrapper';
     wrapper.setAttribute('data-msg-id', data.msgId);
+    
+    // 手动指定布局样式确保对齐正确
     wrapper.style.cssText = `display: flex; flex-direction: column; margin-bottom: 12px; ${isMe ? 'align-items: flex-end;' : 'align-items: flex-start;'}`;
 
     const senderLabel = isMe ? "你" : data.nickname;
 
     wrapper.innerHTML = `
         <div style="font-size: 11px; opacity: 0.6; margin-bottom: 4px;">${senderLabel}</div>
-        <div class="msg-bubble" style="
-            max-width: 80%;
-            padding: 10px 14px;
-            border-radius: 12px;
-            font-size: 15px;
-            line-height: 1.4;
-            background: ${isMe ? 'var(--md-sys-color-primary)' : '#e0e2ec'};
-            color: ${isMe ? 'white' : 'black'};
-        ">
+        <div class="msg-bubble">
             ${data.text}
         </div>
-        ${isMe ? `<button class="recall-btn" style="border:none; background:none; color:blue; font-size:10px; cursor:pointer; margin-top:4px;" onclick="sendRecallRequest('${data.msgId}')">撤回</button>` : ''}
+        ${isMe ? `<button class="recall-btn" onclick="sendRecallRequest('${data.msgId}')">撤回</button>` : ''}
     `;
 
     container.appendChild(wrapper);
+    // 自动滚动到底部
     container.scrollTop = container.scrollHeight;
 }
 
 /**
  * ==========================================
- * 6. 撤回指令执行逻辑
+ * 7. 撤回业务逻辑
  * ==========================================
  */
 
 async function sendRecallRequest(msgId) {
     if (currentChatChannel === null) return;
-    if (confirm("撤回此消息？")) {
+    if (confirm("确定要撤回这条消息吗？")) {
         await currentChatChannel.publish('recall-msg', {
             msgId: msgId,
             nickname: myNickname
@@ -387,23 +401,27 @@ function applyRecallToUI(msgId, nickname) {
         const recallText = document.createElement('div');
         recallText.style.cssText = "font-size: 12px; font-style: italic; opacity: 0.5; padding: 8px; text-align: center; width: 100%;";
         recallText.textContent = nickname + " 撤回了一条消息";
-        msgElement.parentNode.replaceChild(recallText, msgElement);
+        
+        // 用撤回提示替换原始消息节点
+        if (msgElement.parentNode) {
+            msgElement.parentNode.replaceChild(recallText, msgElement);
+        }
     }
 }
 
 /**
  * ==========================================
- * 7. 设置、退出与事件监听
+ * 8. 系统设置、退出与事件绑定
  * ==========================================
  */
 
 async function changeNickname() {
-    const n = prompt("输入新昵称:", myNickname);
+    const n = prompt("请输入新的昵称:", myNickname);
     if (n && n.trim() !== "") {
         myNickname = n.trim();
         localStorage.setItem('chat-nickname', myNickname);
         
-        // 同步到 Presence
+        // 实时同步更新到 Presence 状态
         if (lobbyChannel) {
             await lobbyChannel.presence.update({
                 currentRoom: currentRoomId,
@@ -411,43 +429,63 @@ async function changeNickname() {
                 nickname: myNickname
             });
         }
-        showToast("昵称已更新");
-        if (currentView === 'group') renderFullMemberList();
+        showToast("昵称更新成功");
+        
+        // 如果在成员列表视图，立即局部刷新
+        if (currentView === 'group') {
+            renderFullMemberList();
+        }
     }
 }
 
 function updateOnlineCounter() {
     if (lobbyChannel) {
-        lobbyChannel.presence.get(function(err, m) {
-            if (!err) document.getElementById('online-count').textContent = m.length;
+        lobbyChannel.presence.get(function(err, members) {
+            if (!err) {
+                document.getElementById('online-count').textContent = members.length;
+            }
         });
     }
 }
 
-// 事件绑定
+// 侧边栏视图切换绑定
 document.getElementById('btn-nav-lobby').onclick = switchToLobbyView;
 document.getElementById('btn-nav-group').onclick = switchToGroupView;
+
+// 发送逻辑绑定
 document.getElementById('send-btn').onclick = handleSendMessage;
-document.getElementById('set-name-btn').onclick = changeNickname;
-
 document.getElementById('chat-input').onkeydown = function(e) {
-    if (e.key === 'Enter') handleSendMessage();
-};
-
-document.getElementById('create-room-fab').onclick = function() {
-    const roomName = prompt("新房间名称:");
-    if (roomName) {
-        enterChatRoom('r-' + Date.now(), roomName);
+    if (e.key === 'Enter') {
+        handleSendMessage();
     }
 };
 
+// 昵称修改绑定
+document.getElementById('set-name-btn').onclick = changeNickname;
+
+// 创建房间逻辑绑定
+document.getElementById('create-room-fab').onclick = function() {
+    const roomName = prompt("请输入新房间名称:");
+    if (roomName && roomName.trim() !== "") {
+        // 生成临时唯一的房间 ID
+        enterChatRoom('r-' + Date.now(), roomName.trim());
+    }
+};
+
+// 退出注销逻辑绑定
 document.getElementById('btn-nav-logout').onclick = function() {
-    if (confirm("确定断开连接并注销身份吗？")) {
+    if (confirm("确定要断开连接并注销当前身份吗？")) {
         localStorage.clear();
-        if (ably) ably.close();
+        if (ably) {
+            ably.close();
+        }
         location.reload();
     }
 };
 
-// 启动应用
+/**
+ * ==========================================
+ * 9. 程序启动入口
+ * ==========================================
+ */
 initApp();

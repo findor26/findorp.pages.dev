@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Findor Chat - 高级版</title>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+    <script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
+    <style>
+        :root {
+            --md-sys-color-primary: #0061a4;
+            --md-sys-color-on-primary: #ffffff;
+            --md-sys-color-primary-container: #d1e4ff;
+            --md-sys-color-on-primary-container: #001d36;
+            --md-sys-color-surface: #fdfbff;
+            --md-sys-color-surface-variant: #e0e2ec;
+            --md-sys-color-on-surface: #1a1c1e;
+            --md-sys-color-on-surface-variant: #44474e;
+            --md-sys-color-secondary-container: #d1e4ff;
+            --md-sys-color-on-secondary-container: #001d36;
+            --md-sys-color-error: #ba1a1a;
+            --md-sys-color-outline: #74777f;
+            --md-sys-radius-small: 8px;
+            --md-sys-radius-medium: 12px;
+            --md-sys-radius-large: 16px;
+            --md-sys-radius-extra-large: 28px;
+            --md-sys-elevation-1: 0 1px 3px rgba(0,0,0,0.12);
+        }
+
+        * { 
+            box-sizing: border-box; 
+            -webkit-tap-highlight-color: transparent; 
+        }
+
+        body {
+            margin: 0; 
+            padding: 0;
+            font-family: 'Roboto', 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--md-sys-color-surface);
+            color: var(--md-sys-color-on-surface);
+            height: 100vh;
+            height: 100dvh; 
+            overflow: hidden;
+        }
+
+        .app-shell { 
+            display: flex; 
+            width: 100vw; 
+            height: 100%; 
+        }
+
+        /* 侧边导航 */
+        .nav-rail {
+            width: 80px; 
+            background-color: var(--md-sys-color-surface-variant);
+            display: flex; 
+            flex-direction: column; 
+            align-items: center;
+            padding: 16px 0; 
+            flex-shrink: 0; 
+            border-right: 1px solid var(--md-sys-color-outline);
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .nav-rail-top { margin-bottom: 32px; }
+
+        .fab {
+            width: 56px; height: 56px; 
+            border-radius: var(--md-sys-radius-large);
+            background-color: var(--md-sys-color-secondary-container);
+            color: var(--md-sys-color-on-secondary-container);
+            border: none; cursor: pointer; 
+            display: flex; align-items: center; justify-content: center; 
+            box-shadow: var(--md-sys-elevation-1);
+            transition: transform 0.2s;
+        }
+
+        .fab:active { transform: scale(0.95); }
+        .fab:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .nav-destinations { 
+            flex: 1; display: flex; flex-direction: column; 
+            gap: 24px; width: 100%; 
+        }
+
+        .nav-item {
+            display: flex; flex-direction: column; align-items: center;
+            cursor: pointer; width: 100%; 
+            color: var(--md-sys-color-on-surface-variant);
+            transition: color 0.2s;
+        }
+
+        .nav-item.disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+
+        .nav-item .material-symbols-rounded {
+            padding: 4px 20px; border-radius: 20px; 
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        .nav-item.active .material-symbols-rounded {
+            background-color: var(--md-sys-color-secondary-container);
+            color: var(--md-sys-color-on-secondary-container);
+        }
+
+        .nav-label { font-size: 12px; margin-top: 4px; font-weight: 500; }
+
+        .logout-item { color: var(--md-sys-color-error); }
+
+        /* 内容区 */
+        .content-main { 
+            flex: 1; display: flex; flex-direction: column; min-width: 0; 
+        }
+
+        .app-bar {
+            height: 64px; padding: 0 24px; display: flex; 
+            align-items: center; justify-content: space-between; 
+            border-bottom: 1px solid var(--md-sys-color-surface-variant);
+        }
+
+        .status-chip { 
+            display: flex; align-items: center; gap: 8px; font-size: 13px; margin-top: 4px; 
+        }
+
+        .status-dot { 
+            width: 8px; height: 8px; background-color: #74777f; border-radius: 50%; 
+            box-shadow: 0 0 0 rgba(52, 168, 83, 0.4);
+        }
+
+        .status-dot.online {
+            background-color: #34a853;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(52, 168, 83, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(52, 168, 83, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(52, 168, 83, 0); }
+        }
+
+        .message-view {
+            flex: 1; overflow-y: auto; padding: 16px 24px; 
+            display: flex; flex-direction: column; gap: 8px;
+            scroll-behavior: smooth;
+        }
+
+        /* 消息渲染 */
+        .msg-group {
+            display: flex; flex-direction: column; width: 100%;
+        }
+
+        .msg-wrapper {
+            display: flex; flex-direction: column; margin-bottom: 4px;
+            max-width: 80%; align-self: flex-start;
+        }
+
+        .msg-wrapper.is-me { align-self: flex-end; align-items: flex-end; }
+
+        .msg-bubble {
+            padding: 12px 16px; font-size: 15px; line-height: 1.5;
+            word-break: break-word; position: relative;
+            background-color: var(--md-sys-color-surface-variant);
+            color: var(--md-sys-color-on-surface-variant);
+            border-radius: 4px 18px 18px 18px; 
+            transition: transform 0.1s;
+        }
+
+        .is-me .msg-bubble {
+            background-color: var(--md-sys-color-primary-container);
+            color: var(--md-sys-color-on-primary-container);
+            border-radius: 18px 4px 18px 18px;
+        }
+
+        .msg-bubble:active { transform: scale(0.98); }
+
+        .sender-info { font-size: 11px; margin-bottom: 2px; opacity: 0.7; }
+
+        .recall-btn {
+            background: none; border: none; color: var(--md-sys-color-primary);
+            font-size: 11px; cursor: pointer; padding: 4px; opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .msg-wrapper:hover .recall-btn { opacity: 1; }
+
+        /* 输入区 */
+        .input-area { padding: 16px 24px 24px; background: var(--md-sys-color-surface); }
+        .input-container {
+            background-color: var(--md-sys-color-surface-variant);
+            border-radius: var(--md-sys-radius-extra-large);
+            display: flex; align-items: center; padding: 4px 8px 4px 20px;
+        }
+
+        #chat-input {
+            flex: 1; border: none; background: transparent; 
+            padding: 12px 0; font-size: 16px; outline: none;
+        }
+
+        .send-button {
+            width: 48px; height: 48px; border-radius: 50%;
+            background-color: var(--md-sys-color-primary); color: white;
+            border: none; cursor: pointer; display: flex; 
+            align-items: center; justify-content: center;
+        }
+
+        .send-button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* 移动端适配 */
+        @media (max-width: 600px) {
+            .app-shell { flex-direction: column-reverse; }
+            .nav-rail {
+                width: 100%; height: auto; flex-direction: row;
+                padding-bottom: calc(env(safe-area-inset-bottom) + 8px);
+                border-right: none; border-top: 1px solid var(--md-sys-color-outline);
+            }
+            .nav-rail-top { display: none; }
+            .nav-item { flex: 1; padding: 8px 0; }
+            .input-area { padding: 8px 12px 12px; }
+            .message-view { padding: 12px; }
+            .msg-wrapper { max-width: 90%; }
+        }
+
+        #md3-toast {
+            position: fixed; bottom: 100px; left: 50%; 
+            transform: translateX(-50%); background: #313033;
+            color: white; padding: 12px 24px; border-radius: 4px;
+            font-size: 14px; z-index: 1000; display: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp { from { bottom: 80px; opacity: 0; } to { bottom: 100px; opacity: 1; } }
+
+        .room-card, .member-item {
+            display: flex; align-items: center; padding: 16px; 
+            margin-bottom: 8px; background: var(--md-sys-color-surface-variant);
+            border-radius: var(--md-sys-radius-medium); cursor: pointer;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+    <div class="app-shell">
+        <nav class="nav-rail">
+            <div class="nav-rail-top">
+                <button class="fab" id="create-room-fab" title="创建新频道" disabled>
+                    <span class="material-symbols-rounded">add</span>
+                </button>
+            </div>
+            <div class="nav-destinations">
+                <div class="nav-item active disabled" id="btn-nav-lobby">
+                    <span class="material-symbols-rounded">grid_view</span>
+                    <span class="nav-label">大厅</span>
+                </div>
+                <div class="nav-item disabled" id="btn-nav-chat">
+                    <span class="material-symbols-rounded">chat</span>
+                    <span class="nav-label">对话</span>
+                </div>
+                <div class="nav-item disabled" id="btn-nav-group">
+                    <span class="material-symbols-rounded">group</span>
+                    <span class="nav-label">成员</span>
+                </div>
+            </div>
+            <div class="nav-bottom" style="width: 100%;">
+                <div class="nav-item logout-item" id="btn-nav-logout">
+                    <span class="material-symbols-rounded">logout</span>
+                    <span class="nav-label">退出</span>
+                </div>
+            </div>
+        </nav>
+
+        <main class="content-main">
+            <header class="app-bar">
+                <div class="title-group">
+                    <h1 id="current-view-title" style="margin:0; font-size:20px; font-weight:500;">正在准备连接...</h1>
+                    <div class="status-chip">
+                        <span class="status-dot"></span>
+                        <span id="online-count">0</span> 人在线
+                        <span id="current-view-subtitle" style="margin-left: 8px; opacity: 0.7;"></span>
+                    </div>
+                </div>
+                <div class="app-bar-actions">
+                    <button class="fab" style="width:40px; height:40px; background:none; box-shadow:none;" id="set-name-btn">
+                        <span class="material-symbols-rounded">account_circle</span>
+                    </button>
+                </div>
+            </header>
+
+            <div id="message-container" class="message-view">
+                <div id="init-loader" style="text-align:center; padding:40px; opacity:0.6;">
+                    正在初始化实时连接并获取令牌...
+                </div>
+            </div>
+
+            <footer class="input-area" id="chat-input-zone" style="display: none;">
+                <div class="input-container">
+                    <input type="text" id="chat-input" placeholder="输入消息..." autocomplete="off">
+                    <button id="send-btn" class="send-button">
+                        <span class="material-symbols-rounded">send</span>
+                    </button>
+                </div>
+            </footer>
+        </main>
+    </div>
+
+    <div id="md3-toast"></div>
+
+    <script>
+        /**
+         * 状态管理
+         */
+        const state = {
+            userId: localStorage.getItem('chat-user-id') || `User-${Math.random().toString(36).substring(7)}`,
+            nickname: localStorage.getItem('chat-nickname') || '',
+            ably: null,
+            lobbyChannel: null,
+            chatChannel: null,
+            currentView: 'lobby',
+            currentRoom: { id: 'Lobby', title: '公共大厅' }
+        };
+
+        localStorage.setItem('chat-user-id', state.userId);
+        if (!state.nickname) state.nickname = state.userId;
+
+        /**
+         * 基础工具
+         */
+        function showToast(msg) {
+            const toast = document.getElementById('md3-toast');
+            toast.textContent = msg;
+            toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 3000);
+        }
+
+        /**
+         * API 认证与连接
+         */
+        async function fetchApiKey(retries = 5, delay = 1000) {
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch('/api/auth');
+                    if (response.ok) return (await response.text()).trim();
+                } catch (e) {
+                    // 忽略单次网络错误
+                }
+                await new Promise(r => setTimeout(r, delay));
+                delay *= 2; // 指数退避避免频繁冲击接口
+            }
+            throw new Error("无法获取认证令牌，请检查后端配置");
+        }
+
+        /**
+         * 解除 UI 限制
+         */
+        function enableUI() {
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('disabled'));
+            document.getElementById('create-room-fab').disabled = false;
+            document.getElementById('current-view-title').textContent = "频道大厅";
+            const loader = document.getElementById('init-loader');
+            if (loader) loader.remove();
+        }
+
+        async function initApp() {
+            try {
+                const apiKey = await fetchApiKey();
+                
+                // 初始化 Ably
+                state.ably = new Ably.Realtime({
+                    key: apiKey,
+                    clientId: state.userId,
+                    echoMessages: false
+                });
+
+                state.lobbyChannel = state.ably.channels.get('lobby');
+                
+                // 处理连接生命周期
+                state.ably.connection.on('connected', () => {
+                    document.querySelector('.status-dot').classList.add('online');
+                    updateOnlineCount();
+                    enableUI();
+                });
+
+                state.ably.connection.on('disconnected', () => {
+                    document.querySelector('.status-dot').classList.remove('online');
+                });
+
+                state.ably.connection.on('failed', () => {
+                    showToast("连接最终失败，请尝试刷新页面");
+                });
+
+                // 订阅在线状态
+                state.lobbyChannel.presence.subscribe(['enter', 'leave', 'update'], () => {
+                    updateOnlineCount();
+                    if (state.currentView === 'lobby') renderLobby();
+                    if (state.currentView === 'group') renderMembers();
+                });
+
+                await state.lobbyChannel.presence.enter({
+                    roomId: state.currentRoom.id,
+                    roomTitle: state.currentRoom.title,
+                    nickname: state.nickname
+                });
+
+                showToast("连接已建立");
+                switchView('lobby');
+
+            } catch (err) {
+                console.error(err);
+                document.getElementById('init-loader').textContent = "系统初始化失败: " + err.message;
+                showToast("连接失败");
+            }
+        }
+
+        /**
+         * 视图切换
+         */
+        function switchView(view) {
+            state.currentView = view;
+            const titleEl = document.getElementById('current-view-title');
+            const subEl = document.getElementById('current-view-subtitle');
+            const inputZone = document.getElementById('chat-input-zone');
+            
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            document.getElementById(`btn-nav-${view}`)?.classList.add('active');
+
+            if (view === 'lobby') {
+                titleEl.textContent = "频道大厅";
+                subEl.textContent = "探索正在进行的对话";
+                inputZone.style.display = 'none';
+                renderLobby();
+            } else if (view === 'group') {
+                titleEl.textContent = "在线成员";
+                subEl.textContent = "实时连接的用户";
+                inputZone.style.display = 'none';
+                renderMembers();
+            } else {
+                titleEl.textContent = state.currentRoom.title;
+                subEl.textContent = "";
+                inputZone.style.display = 'block';
+            }
+        }
+
+        /**
+         * 大厅渲染
+         */
+        async function renderLobby() {
+            if (!state.lobbyChannel) return; // 预防性检查防止未连接时渲染导致报错
+            
+            const container = document.getElementById('message-container');
+            state.lobbyChannel.presence.get((err, members) => {
+                if (err) return;
+                
+                container.innerHTML = '';
+                const rooms = new Map();
+                rooms.set('Lobby', { id: 'Lobby', title: '公共大厅', count: 0 });
+
+                members.forEach(m => {
+                    const rId = m.data?.roomId || 'Lobby';
+                    const rTitle = m.data?.roomTitle || '未知房间';
+                    if (!rooms.has(rId)) rooms.set(rId, { id: rId, title: rTitle, count: 0 });
+                    rooms.get(rId).count++;
+                });
+
+                rooms.forEach(room => {
+                    const card = document.createElement('div');
+                    card.className = 'room-card';
+                    card.onclick = () => enterRoom(room.id, room.title);
+                    card.innerHTML = `
+                        <div style="background:var(--md-sys-color-primary); color:white; padding:10px; border-radius:12px; margin-right:16px;">
+                            <span class="material-symbols-rounded">forum</span>
+                        </div>
+                        <div style="flex:1">
+                            <div style="font-weight:500">${room.title}</div>
+                            <div style="font-size:12px; opacity:0.6">${room.count} 位用户</div>
+                        </div>
+                        <span class="material-symbols-rounded">chevron_right</span>
+                    `;
+                    container.appendChild(card);
+                });
+            });
+        }
+
+        /**
+         * 成员渲染
+         */
+        async function renderMembers() {
+            if (!state.lobbyChannel) return;
+
+            const container = document.getElementById('message-container');
+            state.lobbyChannel.presence.get((err, members) => {
+                if (err) return;
+                container.innerHTML = '';
+                members.forEach(m => {
+                    const nick = m.data?.nickname || m.clientId;
+                    const item = document.createElement('div');
+                    item.className = 'member-item';
+                    item.innerHTML = `
+                        <div style="width:40px; height:40px; border-radius:50%; background:var(--md-sys-color-primary-container); color:var(--md-sys-color-on-primary-container); display:flex; align-items:center; justify-content:center; margin-right:12px; font-weight:bold;">
+                            ${nick.charAt(0).toUpperCase()}
+                        </div>
+                        <div style="flex:1">
+                            <div style="font-weight:500">${nick} ${m.clientId === state.userId ? '(我)' : ''}</div>
+                            <div style="font-size:12px; opacity:0.6">${m.data?.roomTitle || '大厅'}</div>
+                        </div>
+                    `;
+                    container.appendChild(item);
+                });
+            });
+        }
+
+        /**
+         * 聊天逻辑
+         */
+        async function enterRoom(id, title) {
+            // 防护：检查核心客户端是否已就绪
+            if (!state.ably) {
+                showToast("连接尚未准备就绪");
+                return;
+            }
+
+            state.currentRoom = { id, title };
+            if (state.chatChannel) {
+                state.chatChannel.unsubscribe();
+            }
+            
+            state.chatChannel = state.ably.channels.get(`chat:${id}`);
+            
+            // 同步 Presence 信息到大厅
+            if (state.lobbyChannel) {
+                await state.lobbyChannel.presence.update({
+                    roomId: id, roomTitle: title, nickname: state.nickname
+                });
+            }
+
+            switchView('chat');
+            document.getElementById('message-container').innerHTML = '';
+
+            // 处理新消息
+            state.chatChannel.subscribe('msg', (msg) => {
+                renderMsg(msg.data, msg.clientId === state.userId);
+            });
+
+            // 处理撤回
+            state.chatChannel.subscribe('recall', (msg) => {
+                handleRecallUI(msg.data.msgId, msg.data.nickname);
+            });
+
+            // 获取历史记录
+            state.chatChannel.history({ limit: 50 }, (err, page) => {
+                if (err) return;
+                page.items.reverse().forEach(item => {
+                    if (item.name === 'msg') renderMsg(item.data, item.clientId === state.userId);
+                    if (item.name === 'recall') handleRecallUI(item.data.msgId, item.data.nickname);
+                });
+            });
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const text = input.value.trim();
+            if (!text || !state.chatChannel) return;
+
+            const msgId = `m-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+            const payload = { msgId, text, nickname: state.nickname, time: Date.now() };
+
+            try {
+                await state.chatChannel.publish('msg', payload);
+                renderMsg(payload, true);
+                input.value = '';
+            } catch (e) {
+                showToast("发送失败，请检查网络");
+            }
+        }
+
+        function renderMsg(data, isMe) {
+            const container = document.getElementById('message-container');
+            if (document.querySelector(`[data-id="${data.msgId}"]`)) return;
+
+            const wrapper = document.createElement('div');
+            wrapper.className = `msg-wrapper ${isMe ? 'is-me' : ''}`;
+            wrapper.setAttribute('data-id', data.msgId);
+            
+            wrapper.innerHTML = `
+                <div class="sender-info">${isMe ? '你' : data.nickname}</div>
+                <div class="msg-bubble">
+                    ${data.text}
+                </div>
+                ${isMe ? `<button class="recall-btn" onclick="requestRecall('${data.msgId}')">撤回</button>` : ''}
+            `;
+
+            container.appendChild(wrapper);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function requestRecall(msgId) {
+            if (!confirm("确定撤回消息吗？")) return;
+            if (!state.chatChannel) return;
+            await state.chatChannel.publish('recall', { msgId, nickname: state.nickname });
+        }
+
+        function handleRecallUI(msgId, nick) {
+            const el = document.querySelector(`[data-id="${msgId}"]`);
+            if (el) {
+                const info = document.createElement('div');
+                info.style.cssText = "font-size:12px; opacity:0.5; padding:8px; text-align:center; width:100%;";
+                info.textContent = `${nick} 撤回了一条消息`;
+                el.replaceWith(info);
+            }
+        }
+
+        function updateOnlineCount() {
+            if (!state.lobbyChannel) return;
+            state.lobbyChannel.presence.get((err, m) => {
+                if (!err) document.getElementById('online-count').textContent = m.length;
+            });
+        }
+
+        /**
+         * 事件绑定
+         */
+        document.getElementById('send-btn').onclick = sendMessage;
+        document.getElementById('chat-input').onkeydown = (e) => e.key === 'Enter' && sendMessage();
+        
+        document.getElementById('btn-nav-lobby').onclick = () => switchView('lobby');
+        document.getElementById('btn-nav-chat').onclick = () => {
+            if (state.currentRoom.id) enterRoom(state.currentRoom.id, state.currentRoom.title);
+        };
+        document.getElementById('btn-nav-group').onclick = () => switchView('group');
+
+        document.getElementById('create-room-fab').onclick = () => {
+            const name = prompt("输入新房间/频道的名称:");
+            if (name?.trim()) enterRoom(`r-${Date.now()}`, name.trim());
+        };
+
+        document.getElementById('set-name-btn').onclick = async () => {
+            const name = prompt("设置你在聊天室的昵称:", state.nickname);
+            if (name?.trim()) {
+                state.nickname = name.trim();
+                localStorage.setItem('chat-nickname', state.nickname);
+                if (state.lobbyChannel) {
+                    await state.lobbyChannel.presence.update({
+                        roomId: state.currentRoom.id, roomTitle: state.currentRoom.title, nickname: state.nickname
+                    });
+                }
+                showToast("身份信息已更新");
+            }
+        };
+
+        document.getElementById('btn-nav-logout').onclick = () => {
+            if (confirm("确定要注销身份并退出吗？这将清除本地存储的所有信息。")) {
+                localStorage.clear();
+                state.ably?.close();
+                location.reload();
+            }
+        };
+
+        // 启动主流程
+        initApp();
+    </script>
+</body>
+</html>

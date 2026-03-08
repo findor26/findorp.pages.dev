@@ -1,113 +1,176 @@
+/* ==========================================
+   1. 核心变量与重置 (MD3 调色板)
+   ========================================== */
 :root {
+    /* 主色调与背景 */
     --md-sys-color-primary: #0061a4;
     --md-sys-color-on-primary: #ffffff;
     --md-sys-color-surface: #fdfbff;
     --md-sys-color-surface-variant: #e0e2ec;
     --md-sys-color-on-surface: #1a1c1e;
+    --md-sys-color-on-surface-variant: #44474e;
+    
+    /* 容器色调 */
     --md-sys-color-secondary-container: #d1e4ff;
     --md-sys-color-on-secondary-container: #001d36;
+    --md-sys-color-error: #ba1a1a;
     --md-sys-color-outline: #74777f;
+    
+    /* 阴影与圆角 */
+    --md-sys-radius-large: 16px;
+    --md-sys-radius-extra-large: 28px;
+    --md-sys-elevation-1: 0 1px 3px rgba(0,0,0,0.12);
+}
+
+* {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
 }
 
 body {
     margin: 0;
-    font-family: 'Roboto', sans-serif;
+    padding: 0;
+    font-family: 'Roboto', 'Segoe UI', Tahoma, sans-serif;
     background-color: var(--md-sys-color-surface);
     color: var(--md-sys-color-on-surface);
     height: 100vh;
-    overflow: hidden;
+    overflow: hidden; /* 防止页面整体滚动，仅内容区滚动 */
 }
 
-.app-container {
+/* ==========================================
+   2. 整体布局架构 (App Shell)
+   ========================================== */
+.app-shell {
     display: flex;
-    height: 100%;
+    width: 100vw;
+    height: 100vh;
 }
 
-/* 侧边栏：修复居中逻辑 */
-.navigation-rail {
+/* 侧边导航栏：固定宽度且内容居中 */
+.nav-rail {
     width: 80px;
     background-color: var(--md-sys-color-surface-variant);
     display: flex;
     flex-direction: column;
-    align-items: center; /* 确保水平居中 */
-    padding: 12px 0;
-    gap: 20px;
+    align-items: center;
+    padding: 16px 0;
+    flex-shrink: 0;
+    border-right: 1px solid var(--md-sys-color-outline);
 }
 
-.fab-btn {
+/* FAB 悬浮按钮 */
+.fab {
     width: 56px;
     height: 56px;
-    border-radius: 16px;
+    border-radius: var(--md-sys-radius-large);
     background-color: var(--md-sys-color-secondary-container);
+    color: var(--md-sys-color-on-secondary-container);
     border: none;
     cursor: pointer;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
     display: flex;
     align-items: center;
     justify-content: center;
+    margin-bottom: 32px;
+    box-shadow: var(--md-sys-elevation-1);
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.nav-icons {
+.fab:hover {
+    transform: scale(1.05);
+}
+
+/* 导航项 */
+.nav-destinations {
+    flex: 1;
     display: flex;
     flex-direction: column;
-    align-items: center; /* 确保图标水平居中 */
-    gap: 12px;
-    flex: 1;
+    gap: 24px;
     width: 100%;
 }
 
-.nav-icons .material-symbols-rounded {
-    padding: 12px;
-    cursor: pointer;
-    border-radius: 20px;
-    transition: background 0.2s;
+.nav-item {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: center;
+    cursor: pointer;
+    width: 100%;
+    color: var(--md-sys-color-on-surface-variant);
 }
 
-.nav-icons .active {
+.nav-item .material-symbols-rounded {
+    padding: 4px 20px;
+    border-radius: 20px;
+    transition: background-color 0.3s;
+}
+
+.nav-item.active .material-symbols-rounded {
     background-color: var(--md-sys-color-secondary-container);
     color: var(--md-sys-color-on-secondary-container);
 }
 
-/* 退出按钮置底 */
-.logout-icon {
-    margin-top: auto;
-    color: #ba1a1a;
+.nav-label {
+    font-size: 12px;
+    margin-top: 4px;
+    font-weight: 500;
 }
 
-/* 聊天区域 */
-.chat-main {
+.nav-bottom {
+    margin-top: auto;
+    padding-bottom: 16px;
+}
+
+.logout-item {
+    color: var(--md-sys-color-error);
+}
+
+/* ==========================================
+   3. 主内容区与顶部栏
+   ========================================== */
+.content-main {
     flex: 1;
     display: flex;
     flex-direction: column;
-    position: relative;
+    min-width: 0; /* 修复 flex 子元素溢出问题 */
 }
 
-.top-app-bar {
-    padding: 16px 24px;
+.app-bar {
+    height: 64px;
+    padding: 0 24px;
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    border-bottom: 1px solid var(--md-sys-color-outline);
+    justify-content: space-between;
+    background-color: var(--md-sys-color-surface);
+    border-bottom: 1px solid var(--md-sys-color-surface-variant);
 }
 
-.title-large { font-size: 22px; margin: 0; font-weight: 500; }
+.title-group h1 {
+    font-size: 22px;
+    margin: 0;
+    font-weight: 400;
+}
 
 .status-chip {
-    background: #e8f0fe;
-    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    background-color: #e8f0fe;
     padding: 4px 12px;
     border-radius: 8px;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
+    margin-top: 2px;
 }
 
-.dot { width: 8px; height: 8px; background: #34a853; border-radius: 50%; }
+.status-dot {
+    width: 8px;
+    height: 8px;
+    background-color: #34a853;
+    border-radius: 50%;
+    box-shadow: 0 0 4px #34a853;
+}
 
-/* 消息容器 */
+/* ==========================================
+   4. 消息滚动区与气泡逻辑 (核心修正点)
+   ========================================== */
 .message-view {
     flex: 1;
     overflow-y: auto;
@@ -117,168 +180,173 @@ body {
     gap: 16px;
 }
 
-/* 气泡样式修复 */
-.msg-bubble {
-    max-width: 70%;
-    width: fit-content; /* 解决气泡过长 */
-    padding: 12px 16px;
-    border-radius: 12px 20px 20px 12px;
-    background-color: var(--md-sys-color-surface-variant);
-    line-height: 1.5;
+/* 消息包装容器 */
+.msg-wrapper {
+    display: flex;
+    flex-direction: column;
+    max-width: 75%; /* 限制宽度，防止拉伸到全屏 */
+    position: relative;
+}
+
+/* 他人的消息：靠左 */
+.msg-wrapper {
     align-self: flex-start;
 }
 
-.msg-bubble.is-me {
+/* 我的消息：靠右 */
+.msg-wrapper.is-me {
     align-self: flex-end;
-    background-color: var(--md-sys-color-primary);
-    color: var(--md-sys-color-on-primary);
-    border-radius: 20px 12px 12px 20px;
+    align-items: flex-end; /* 内部元数据也靠右 */
 }
 
-.sender-name {
+/* 消息气泡主体 */
+.msg-bubble {
+    padding: 12px 16px;
+    border-radius: 12px 20px 20px 4px;
+    background-color: var(--md-sys-color-surface-variant);
+    color: var(--md-sys-color-on-surface);
+    line-height: 1.5;
+    word-break: break-word;
+    box-shadow: var(--md-sys-elevation-1);
+}
+
+/* 我的气泡色调 */
+.msg-wrapper.is-me .msg-bubble {
+    background-color: var(--md-sys-color-primary);
+    color: var(--md-sys-color-on-primary);
+    border-radius: 20px 12px 4px 20px;
+}
+
+.sender-meta {
     font-size: 11px;
     margin-bottom: 4px;
     opacity: 0.7;
+    font-weight: 500;
 }
 
-/* 房间卡片样式 */
-.room-card {
+/* 撤回按钮：默认不占据空间且隐藏 */
+.recall-btn {
+    font-size: 11px;
+    color: var(--md-sys-color-primary);
+    background: none;
+    border: none;
+    padding: 4px 8px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s;
+    margin-top: 2px;
+}
+
+.msg-wrapper.is-me:hover .recall-btn {
+    opacity: 1;
+}
+
+/* 撤回后的占位提示 */
+.recall-notice {
+    font-size: 12px;
+    font-style: italic;
+    color: var(--md-sys-color-on-surface-variant);
+    background-color: #f1f3f4;
+    padding: 8px 16px;
+    border-radius: 16px;
+    align-self: center; /* 居中显示 */
+    margin: 8px 0;
+    opacity: 0.6;
+}
+
+/* ==========================================
+   5. 大厅房间卡片与成员卡片
+   ========================================== */
+.room-card, .member-item {
     display: flex;
     align-items: center;
     padding: 16px;
-    background: var(--md-sys-color-surface-variant);
-    border-radius: 12px;
-    margin-bottom: 8px;
+    background-color: #f8f9fa;
+    border-radius: var(--md-sys-radius-large);
     cursor: pointer;
-    gap: 16px;
+    transition: background-color 0.2s, transform 0.1s;
+    border: 1px solid transparent;
 }
 
-.room-title { font-weight: 500; }
-.room-meta { font-size: 12px; opacity: 0.7; }
+.room-card:hover {
+    background-color: #f1f3f4;
+    border-color: var(--md-sys-color-primary);
+}
 
-/* 输入区域 */
+.room-card:active {
+    transform: scale(0.98);
+}
+
+/* ==========================================
+   6. 底部输入栏系统
+   ========================================== */
 .input-area {
-    padding: 16px 24px 32px;
+    padding: 16px 24px 32px 24px;
+    background-color: var(--md-sys-color-surface);
 }
 
-.search-bar {
-    background: #f1f3f4;
-    border-radius: 28px;
+.input-container {
+    background-color: #f1f3f4;
+    border-radius: var(--md-sys-radius-extra-large);
     display: flex;
     align-items: center;
-    padding: 4px 16px;
+    padding: 4px 8px 4px 20px;
+    transition: background-color 0.3s;
+}
+
+.input-container:focus-within {
+    background-color: #e8eaed;
 }
 
 #chat-input {
     flex: 1;
     border: none;
     background: transparent;
-    padding: 12px;
+    padding: 12px 0;
     font-size: 16px;
     outline: none;
+    color: var(--md-sys-color-on-surface);
 }
 
-.icon-button {
-    background: none;
+.send-button {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background-color: var(--md-sys-color-primary);
+    color: white;
     border: none;
     cursor: pointer;
-    color: var(--md-sys-color-primary);
-}
-
-/* Toast (Snackbar) */
-#md3-toast {
-    visibility: hidden;
-    min-width: 280px;
-    background-color: #313033;
-    color: #f4eff4;
-    text-align: left;
-    border-radius: 4px;
-    padding: 14px 16px;
-    position: fixed;
-    z-index: 2000;
-    left: 50%;
-    bottom: 80px;
-    transform: translateX(-50%);
-    font-size: 14px;
-    box-shadow: 0 3px 10px rgba(0,0,0,0.2);
-}
-
-#md3-toast.show {
-    visibility: visible;
-}
-
-/* 成员列表卡片 */
-.member-card {
-    display: flex;
-    align-items: center;
-    padding: 12px 16px;
-    background: var(--md-sys-color-surface-variant);
-    border-radius: 28px; /* MD3 风格的胶囊形 */
-    gap: 12px;
-    margin-bottom: 8px;
-}
-
-.member-avatar {
-    width: 40px;
-    height: 40px;
-    background: var(--md-sys-color-primary);
-    color: var(--md-sys-color-on-primary);
-    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: 500;
+    transition: opacity 0.2s;
 }
 
-.member-info {
-    flex: 1;
-}
-
-.member-name {
-    font-weight: 500;
-    font-size: 14px;
-}
-
-.member-status {
-    font-size: 12px;
-    opacity: 0.7;
-}
-
-/* 消息气泡容器，用于定位撤回按钮 */
-.msg-wrapper {
-    display: flex;
-    flex-direction: column;
-    position: relative;
-    max-width: 75%;
-}
-
-.msg-wrapper.is-me {
-    align-self: flex-end;
-}
-
-/* 撤回按钮：默认隐藏，仅在自己的消息上长按或悬停显示 */
-.recall-btn {
-    font-size: 10px;
-    color: var(--md-sys-color-primary);
-    cursor: pointer;
-    margin-top: 4px;
-    align-self: flex-end;
-    display: none;
-    background: none;
-    border: none;
-    padding: 0;
-}
-
-.msg-wrapper.is-me:hover .recall-btn {
-    display: block;
-}
-
-/* 撤回后的提示样式 */
-.recalled-text {
-    font-size: 12px;
-    font-style: italic;
+.send-button:disabled {
     opacity: 0.5;
-    margin: 8px 0;
+    cursor: not-allowed;
+}
+
+/* ==========================================
+   7. 其它组件 (Toast & Loading)
+   ========================================== */
+#md3-toast {
+    position: fixed;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #313033;
+    color: #f4eff4;
+    padding: 12px 24px;
+    border-radius: 4px;
+    font-size: 14px;
+    z-index: 9999;
+    box-shadow: 0 3px 5px rgba(0,0,0,0.2);
+    display: none;
+}
+
+.loading-placeholder {
     text-align: center;
-    width: 100%;
+    padding: 40px;
+    color: var(--md-sys-color-outline);
 }

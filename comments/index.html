@@ -352,6 +352,103 @@
         let currentPage = 1;
         let isFetching = false;
         let noMoreData = false;
+        // --- 新增：自动刷新状态控制 ---
+        let autoRefreshTimer = null;
+        let lastTopMessageId = null; // 记录当前页面最顶部的留言 ID
+
+        // 修改 fetchMessages，记录首条 ID
+        async function fetchMessages(refresh = false) {
+            if (isFetching || (noMoreData && !refresh)) return;
+            if (refresh) {
+                currentPage = 1;
+                noMoreData = false;
+                document.getElementById('message-container').innerHTML = '';
+            }
+
+            isFetching = true;
+            const trigger = document.getElementById('load-more-trigger');
+            if (!refresh) trigger.textContent = '正在搬运数据...';
+
+            try {
+                const headers = isAdmin ? { 'Admin-Token': localStorage.getItem('admin_token') } : {};
+                const res = await fetch(`/api/messages?page=${currentPage}&size=10`, { headers });
+                
+                if (res.status === 401 && isAdmin) {
+                    clearAdminAuth();
+                    return;
+                }
+
+                const data = await res.json();
+                const container = document.getElementById('message-container');
+
+                if (data.length === 0 && currentPage === 1) {
+                    container.innerHTML = `<div class="empty-placeholder">...</div>`;
+                    noMoreData = true;
+                } else {
+                    if (data.length < 10) noMoreData = true;
+                    
+                    // 记录第一页的第一条 ID，用于后续对比新消息
+                    if (currentPage === 1 && data.length > 0) {
+                        lastTopMessageId = data[0].id;
+                    }
+
+                    data.forEach(m => container.insertAdjacentHTML('beforeend', buildMessageHTML(m)));
+                    currentPage++;
+                }
+            } catch (err) {
+                if (!refresh) trigger.textContent = '数据搬运失败';
+            } finally {
+                isFetching = false;
+                if (!noMoreData) trigger.textContent = '';
+                else if (currentPage > 1) trigger.textContent = '已经全部加载完毕';
+            }
+        }
+
+        // --- 新增：静默检查新消息函数 ---
+        async function checkNewMessages() {
+            // 如果用户正在发布或者正在手动加载，跳过本次检查
+            if (isFetching) return;
+
+            try {
+                const headers = isAdmin ? { 'Admin-Token': localStorage.getItem('admin_token') } : {};
+                // 只请求第一页最新的 10 条
+                const res = await fetch(`/api/messages?page=1&size=10`, { headers });
+                if (!res.ok) return;
+
+                const data = await res.json();
+                if (data.length === 0) return;
+
+                const newestId = data[0].id;
+
+                // 如果发现服务器最新的 ID 比本地记录的顶端 ID 还要大
+                if (lastTopMessageId && newestId > lastTopMessageId) {
+                    const container = document.getElementById('message-container');
+                    
+                    // 找出所有比本地最顶端 ID 更新的消息
+                    const newItems = data.filter(m => m.id > lastTopMessageId);
+                    
+                    // 逆序插入，保证时间顺序正确（最新的在最上面）
+                    newItems.reverse().forEach(m => {
+                        container.insertAdjacentHTML('afterbegin', buildMessageHTML(m));
+                    });
+
+                    // 更新本地最顶端 ID 记录
+                    lastTopMessageId = newestId;
+                    
+                    // 可选：在这里可以增加一个微小的提示音或视觉闪烁
+                    console.log(`检测到 ${newItems.length} 条新留言`);
+                }
+            } catch (err) {
+                console.error("实时同步失败:", err);
+            }
+        }
+
+        // --- 新增：启动定时器 ---
+        function startAutoRefresh() {
+            if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+            // 每 15 秒检查一次新消息，平衡实时性与 D1 数据库额度
+            autoRefreshTimer = setInterval(checkNewMessages, 15000);
+        }
 
         // --- 字数统计逻辑 ---
         const nickInp = document.getElementById('nickname');
@@ -419,13 +516,13 @@
                     <div class="content">${safeText(m.content)}</div>
                     
                     <div class="interaction-bar">
-                        <div class="vote-chip ${myVote === 'up' ? 'active-up voted' : (myVote ? 'voted' : '')}" 
-                             onclick="handleVote(${m.id}, 'up')">
+                        <div class="vote-chip ${myVote === 'up' ? 'active-up' : ''}" 
+                             onclick="submitVote(${m.id}, 'up')">
                             <span class="material-symbols-outlined">${myVote === 'up' ? 'thumb_up_filled' : 'thumb_up'}</span>
                             <span class="vote-count">${m.upvotes || 0}</span>
                         </div>
-                        <div class="vote-chip ${myVote === 'down' ? 'active-down voted' : (myVote ? 'voted' : '')}" 
-                             onclick="handleVote(${m.id}, 'down')">
+                        <div class="vote-chip ${myVote === 'down' ? 'active-down' : ''}" 
+                             onclick="submitVote(${m.id}, 'down')">
                             <span class="material-symbols-outlined">${myVote === 'down' ? 'thumb_down_filled' : 'thumb_down'}</span>
                             <span class="vote-count">${m.downvotes || 0}</span>
                         </div>
@@ -445,6 +542,7 @@
                 </div>
             `;
         }
+
         // --- 管理动作逻辑 ---
         async function handlePatch(id, action) {
             const res = await fetch('/api/messages', {
@@ -458,20 +556,20 @@
             if (res.ok) fetchMessages(true);
         }
 
-        async function handleVote(id, type) {
-            // type 为 'up' 或 'down'
+        // --- 修复后的投票逻辑：支持取消 ---
+        async function submitVote(id, type) {
             const currentVote = userVotes[id];
             let action = "";
 
+            // 逻辑：如果点的按钮已激活，执行 un_ 操作；如果没点过，执行正常操作
             if (currentVote === type) {
-                // 如果点击已激活的按钮 -> 执行取消动作
                 action = type === 'up' ? 'un_upvote' : 'un_downvote';
             } else if (!currentVote) {
-                // 如果从未投过票 -> 执行正常投票
                 action = type === 'up' ? 'upvote' : 'downvote';
             } else {
-                // 如果已经投了赞想换成踩（或反之），引导用户先取消
-                return; 
+                // 如果已经投了 A 想投 B，需先取消 A
+                alert("请先取消当前的互动再切换");
+                return;
             }
 
             try {
@@ -484,35 +582,28 @@
                 if (res.ok) {
                     const card = document.getElementById(`msg-card-${id}`);
                     const chips = card.querySelectorAll('.vote-chip');
-                    const chip = type === 'up' ? chips[0] : chips[1];
-                    const countEl = chip.querySelector('.vote-count');
-                    const iconEl = chip.querySelector('.material-symbols-outlined');
+                    const targetIdx = type === 'up' ? 0 : 1;
+                    const targetChip = chips[targetIdx];
+                    const countEl = targetChip.querySelector('.vote-count');
+                    const iconEl = targetChip.querySelector('.material-symbols-outlined');
 
                     if (action.startsWith('un_')) {
-                        // --- 执行取消逻辑 ---
+                        // 取消成功
                         delete userVotes[id];
-                        chip.classList.remove(type === 'up' ? 'active-up' : 'active-down', 'voted');
-                        // 移除禁用状态（让用户可以重新选另一个）
-                        chips.forEach(c => c.classList.remove('voted'));
-                        // 还原图标
+                        targetChip.classList.remove(type === 'up' ? 'active-up' : 'active-down');
                         iconEl.textContent = type === 'up' ? 'thumb_up' : 'thumb_down';
-                        // 数字递减，最小为0
                         countEl.textContent = Math.max(0, parseInt(countEl.textContent) - 1);
                     } else {
-                        // --- 执行投票逻辑 ---
+                        // 投票成功
                         userVotes[id] = type;
-                        chip.classList.add(type === 'up' ? 'active-up' : 'active-down', 'voted');
-                        // 切换至实心图标
+                        targetChip.classList.add(type === 'up' ? 'active-up' : 'active-down');
                         iconEl.textContent = type === 'up' ? 'thumb_up_filled' : 'thumb_down_filled';
-                        // 数字递增
                         countEl.textContent = parseInt(countEl.textContent) + 1;
-                        // 禁用未选中的那个按钮（视觉上）
-                        chips[type === 'up' ? 1 : 0].classList.add('voted');
                     }
                     localStorage.setItem('user_votes', JSON.stringify(userVotes));
                 }
             } catch (err) {
-                console.error("互动操作失败", err);
+                console.error("投票请求异常", err);
             }
         }
 

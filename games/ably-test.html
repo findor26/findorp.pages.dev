@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Findor's Multiplayer Tank | 暴力联机版</title>
+    <title>Findor's Tank | 完整联机对战版</title>
     <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
     <style>
         body { margin: 0; background: #202124; color: white; overflow: hidden; font-family: sans-serif; }
@@ -13,20 +13,26 @@
             background: #0061a4; border-radius: 4px; 
             transition: transform 0.1s linear, left 0.1s linear, top 0.1s linear;
             display: flex; align-items: center; justify-content: center;
-            font-size: 10px; font-weight: bold; color: white;
+            font-size: 10px; font-weight: bold; color: white; z-index: 5;
         }
         .tank::after { /* 炮管 */
             content: ''; position: absolute; top: -10px; left: 18px; 
-            width: 4px; height: 15px; background: #333; 
+            width: 4px; height: 15px; background: #ccc; 
         }
         .remote { background: #ba1a1a; }
+        /* 子弹样式 */
+        .bullet { 
+            position: absolute; width: 8px; height: 8px; 
+            background: #ffff00; border-radius: 50%; 
+            z-index: 10; box-shadow: 0 0 8px #ffff00; 
+        }
         #ui { position: fixed; top: 10px; left: 10px; z-index: 100; pointer-events: none; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px; }
     </style>
 </head>
 <body>
 
 <div id="ui">
-    <div>状态: <span id="status">正在获取秘钥...</span></div>
+    <div>状态: <span id="status">连接中...</span></div>
     <div>我的 ID: <span id="my-id">-</span></div>
     <div>在线坦克: <span id="count">1</span></div>
 </div>
@@ -45,36 +51,42 @@
     let myPos = { x: 100, y: 100, angle: 0 };
     let myTankEl;
 
-    // 1. 初始化并暴力获取 Key
     async function init() {
         try {
             const response = await fetch('/api/auth');
             const apiKey = await response.text();
+            if (!apiKey.includes(':')) throw new Error("API Key 异常");
 
-            if (!apiKey.includes(':')) throw new Error("Key 格式错误");
-
-            const ably = new Ably.Realtime({ 
-                key: apiKey.trim(),
-                clientId: myId 
-            });
-
+            const ably = new Ably.Realtime({ key: apiKey.trim(), clientId: myId });
             await ably.connection.once('connected');
+            
             statusEl.textContent = "✅ 已联机";
             myIdEl.textContent = myId;
-
             channel = ably.channels.get('game-room');
 
-            // 2. 订阅位置更新
-            await channel.subscribe('m', (msg) => {
+            // --- 核心订阅逻辑 ---
+            // 1. 订阅移动 (m)
+            channel.subscribe('m', (msg) => {
                 if (msg.clientId === myId) return;
                 updateRemotePlayer(msg.clientId, msg.data);
             });
 
-            // 3. 订阅在场信息 (处理玩家离开)
-            channel.presence.subscribe('leave', (member) => {
-                if (players[member.clientId]) {
-                    players[member.clientId].remove();
-                    delete players[member.clientId];
+            // 2. 订阅开火 (f)
+            channel.subscribe('f', (msg) => {
+                if (msg.clientId === myId) return;
+                createBullet(msg.data, false); // 渲染别人的子弹
+            });
+
+            // 3. 订阅受击 (h)
+            channel.subscribe('h', (msg) => {
+                flashTank(msg.data.targetId);
+            });
+
+            // 4. 在场逻辑
+            channel.presence.subscribe('leave', (m) => {
+                if (players[m.clientId]) {
+                    players[m.clientId].remove();
+                    delete players[m.clientId];
                     updateCount();
                 }
             });
@@ -85,7 +97,7 @@
             startLoop();
 
         } catch (err) {
-            statusEl.textContent = "❌ 连接失败: " + err.message;
+            statusEl.textContent = "❌ 失败: " + err.message;
         }
     }
 
@@ -115,36 +127,82 @@
         el.style.transform = `rotate(${data.angle}deg)`;
     }
 
+    // 子弹生成与飞行逻辑
+    function createBullet(data, isMine) {
+        const b = document.createElement('div');
+        b.className = 'bullet';
+        container.appendChild(b);
+
+        let curX = data.x, curY = data.y;
+        let dist = 0;
+        const speed = 15; 
+        const rad = (data.angle - 90) * Math.PI / 180;
+
+        const bulletLoop = setInterval(() => {
+            curX += Math.cos(rad) * speed;
+            curY += Math.sin(rad) * speed;
+            b.style.left = curX + 'px';
+            b.style.top = curY + 'px';
+            dist += speed;
+
+            // 如果是我发的子弹，负责检测是否撞到了别人
+            if (isMine) {
+                for (let id in players) {
+                    const p = players[id];
+                    const tx = parseFloat(p.style.left), ty = parseFloat(p.style.top);
+                    if (Math.hypot(curX - tx - 20, curY - ty - 20) < 25) {
+                        channel.publish('h', { targetId: id });
+                        clearInterval(bulletLoop);
+                        b.remove();
+                    }
+                }
+            }
+
+            if (dist > 600) { clearInterval(bulletLoop); b.remove(); }
+        }, 20);
+    }
+
+    function flashTank(id) {
+        const target = (id === myId) ? myTankEl : players[id];
+        if (target) {
+            target.style.background = 'white';
+            setTimeout(() => target.style.background = '', 50);
+        }
+    }
+
     function updateCount() {
         channel.presence.get((err, members) => {
             if (!err) countEl.textContent = members.length;
         });
     }
 
-    // 4. 控制与同步循环
     function startLoop() {
         const keys = {};
         window.onkeydown = (e) => keys[e.key.toLowerCase()] = true;
-        window.onkeyup = (e) => keys[e.key.toLowerCase()] = false;
+        window.onkeyup = (e) => {
+            if (e.key === ' ') { // 空格开火 (按起触发，防止连发)
+                const bData = { x: myPos.x + 16, y: myPos.y + 16, angle: myPos.angle };
+                createBullet(bData, true);
+                channel.publish('f', bData);
+            }
+            keys[e.key.toLowerCase()] = false;
+        };
 
         setInterval(() => {
             let moved = false;
-            const step = 5;
-            if (keys['w']) { myPos.y -= step; myPos.angle = 0; moved = true; }
-            if (keys['s']) { myPos.y += step; myPos.angle = 180; moved = true; }
-            if (keys['a']) { myPos.x -= step; myPos.angle = 270; moved = true; }
-            if (keys['d']) { myPos.x += step; myPos.angle = 90; moved = true; }
+            if (keys['w']) { myPos.y -= 5; myPos.angle = 0; moved = true; }
+            else if (keys['s']) { myPos.y += 5; myPos.angle = 180; moved = true; }
+            else if (keys['a']) { myPos.x -= 5; myPos.angle = 270; moved = true; }
+            else if (keys['d']) { myPos.x += 5; myPos.angle = 90; moved = true; }
 
             if (moved) {
                 syncPos(myTankEl, myPos);
-                // 使用简写 'm' (move) 节省流量
                 channel.publish('m', myPos);
             }
-        }, 30); // 约 33 FPS 同步率
+        }, 30);
     }
 
     init();
 </script>
-
 </body>
 </html>

@@ -96,30 +96,64 @@
         color: var(--md-sys-color-primary);
       }
 
-      /* 链接列表样式 */
-      .link-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-        gap: 12px;
-        margin-top: 16px;
-      }
+      /* 列表容器 */
+.nav-list {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0 0 0;
+  border-top: 1px solid var(--md-sys-color-surface-variant);
+}
 
-      .nav-link {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 12px;
-        background-color: var(--md-sys-color-primary);
-        color: var(--md-sys-color-on-primary);
-        text-decoration: none;
-        border-radius: 12px;
-        font-weight: 500;
-        font-size: 0.9rem;
-      }
+.nav-list li {
+  border-bottom: 1px solid var(--md-sys-color-surface-variant);
+}
 
-      .nav-link:hover {
-        opacity: 0.9;
-      }
+/* 列表项主体 */
+.list-item {
+  display: flex;
+  align-items: center;
+  padding: 16px 8px;
+  text-decoration: none;
+  transition: background-color 0.2s;
+  color: var(--md-sys-color-on-surface);
+}
+
+.list-item:hover {
+  background-color: rgba(0, 100, 149, 0.08); /* 使用 Primary 色的淡化版 */
+  text-decoration: none;
+}
+
+/* 图标部分 */
+.item-icon {
+  width: 40px;
+  font-size: 1.2rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* 文字部分 */
+.item-text {
+  flex: 1;
+  font-size: 1rem;
+  font-weight: 500;
+  margin-left: 12px;
+}
+
+/* 右侧箭头提示 */
+.item-arrow {
+  color: var(--md-sys-color-outline);
+  font-family: monospace;
+  font-weight: bold;
+  opacity: 0.5;
+  transition: transform 0.2s, opacity 0.2s;
+}
+
+.list-item:hover .item-arrow {
+  transform: translateX(4px);
+  opacity: 1;
+  color: var(--md-sys-color-primary);
+}
 
       footer {
         margin-top: auto;
@@ -287,24 +321,59 @@
       </section>
 
       <section class="card">
-        <div class="card-title">3D坦克 快捷导航</div>
-        <div class="link-grid">
-          <a href="https://tankionline.com" class="nav-link" target="_blank"
-            >官方网站</a
-          >
-          <a href="https://3dtank.com" class="nav-link" target="_blank"
-            >国服官网</a
-          >
-          <a href="files" class="nav-link" target="_blank">文件中心</a>
-          <a href="test.html" class="nav-link" target="_blank">测试服</a>
-          <a href="comments" class="nav-link" target="_blank">留言区</a>
-          <a href="chat" class="nav-link" target="_blank">聊天房</a>
-          <a href="https://en.tankiwiki.com" class="nav-link" target="_blank"
-            >游戏维基</a
-          >
-          <!-- <a href="#" class="nav-link">配置模拟器</a> -->
-        </div>
-      </section>
+  <div class="card-title">3D坦克 快捷导航</div>
+  <ul class="nav-list">
+    <li>
+      <a href="https://tankionline.com" target="_blank" class="list-item">
+        <span class="item-icon">🌐</span>
+        <span class="item-text">官方网站</span>
+        <span class="item-arrow">→</span>
+      </a>
+    </li>
+    <li>
+      <a href="https://3dtank.com" target="_blank" class="list-item">
+        <span class="item-icon">🇨🇳</span>
+        <span class="item-text">国服官网</span>
+        <span class="item-arrow">→</span>
+      </a>
+    </li>
+    <li>
+      <a href="files" target="_blank" class="list-item">
+        <span class="item-icon">📂</span>
+        <span class="item-text">文件中心</span>
+        <span class="item-arrow">→</span>
+      </a>
+    </li>
+    <li>
+      <a href="test.html" target="_blank" class="list-item">
+        <span class="item-icon">🛠️</span>
+        <span class="item-text">测试服动态</span>
+        <span class="item-arrow">→</span>
+      </a>
+    </li>
+    <li>
+      <a href="comments" target="_blank" class="list-item">
+        <span class="item-icon">💬</span>
+        <span class="item-text">留言区</span>
+        <span class="item-arrow">→</span>
+      </a>
+    </li>
+    <li>
+      <a href="chat" target="_blank" class="list-item">
+        <span class="item-icon">💬</span>
+        <span class="item-text">聊天房</span>
+        <span class="item-arrow">→</span>
+      </a>
+    </li>
+    <li>
+      <a href="https://en.tankiwiki.com" target="_blank" class="list-item">
+        <span class="item-icon">📖</span>
+        <span class="item-text">游戏维基</span>
+        <span class="item-arrow">→</span>
+      </a>
+    </li>
+  </ul>
+</section>
 
       <section class="card">
         <div class="card-title">当前项目</div>

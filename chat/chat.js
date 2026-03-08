@@ -238,6 +238,165 @@ function logout() {
     }
 }
 
+// 在原有变量定义处增加昵称变量
+let myNickname = localStorage.getItem('chat-nickname') || myId;
+currentView = 'lobby'; 
+
+/**
+ * 修改用户名称
+ */
+async function setMyName() {
+    const newName = prompt("请输入你的新名称:", myNickname);
+    if (!newName || newName.trim() === "") return;
+
+    myNickname = newName.trim();
+    localStorage.setItem('chat-nickname', myNickname); // 持久化存储
+
+    // 关键：更新 Presence 数据，Ably 会自动广播给所有在线用户
+    if (lobbyChannel) {
+        const currentData = (await lobbyChannel.presence.get({ clientId: myId }))[0]?.data || {};
+        await lobbyChannel.presence.update({
+            ...currentData,
+            nickname: myNickname
+        });
+    }
+    
+    showToast(`名称已更新为: ${myNickname}`);
+    
+    // 如果当前在成员列表视图，立即刷新
+    if (currentView === 'group') showGroupView();
+}
+
+/**
+ * 切换到成员列表视图
+ */
+function showGroupView() {
+    currentView = 'group';
+    document.querySelector('.title-large').textContent = "在线成员";
+    document.querySelector('.input-area').style.visibility = 'hidden';
+
+    document.querySelectorAll('.nav-icons .material-symbols-rounded').forEach(i => i.classList.remove('active'));
+    document.getElementById('nav-group').classList.add('active');
+
+    renderMemberList();
+}
+
+/**
+ * 渲染成员列表
+ */
+function renderMemberList() {
+    if (!lobbyChannel || currentView !== 'group') return;
+
+    lobbyChannel.presence.get((err, members) => {
+        if (err) return;
+
+        const container = document.getElementById('message-container');
+        container.innerHTML = '';
+
+        members.forEach(member => {
+            const data = member.data || {};
+            const displayName = data.nickname || member.clientId;
+            const location = data.roomTitle || "闲逛中";
+
+            const card = document.createElement('div');
+            card.className = 'member-card';
+            card.innerHTML = `
+                <div class="member-avatar">${displayName.charAt(0).toUpperCase()}</div>
+                <div class="member-info">
+                    <div class="member-name">${displayName} ${member.clientId === myId ? '(我)' : ''}</div>
+                    <div class="member-status">当前位置: ${location}</div>
+                </div>
+                <span class="material-symbols-rounded" style="color:#34a853; font-size:18px;">fiber_manual_record</span>
+            `;
+            container.appendChild(card);
+        });
+    });
+}
+
+// --- 更新原有的 initApp 中的进入逻辑 ---
+async function initApp() {
+    try {
+        const response = await fetch('/api/auth');
+        if (!response.ok) throw new Error("Auth failed");
+        const apiKey = await response.text();
+        
+        ably = new Ably.Realtime({ 
+            key: apiKey.trim(), 
+            clientId: myId,
+            echoMessages: false 
+        });
+
+        lobbyChannel = ably.channels.get('lobby');
+
+        // 订阅大厅内所有成员的变动
+        lobbyChannel.presence.subscribe(['enter', 'leave', 'update'], () => {
+            if (currentView === 'lobby') fetchAndRenderRooms();
+            if (currentView === 'group') renderMemberList();
+            updateOnlineDisplay();
+        });
+
+        // 初始进入大厅时带上昵称
+        await lobbyChannel.presence.enter({ 
+            currentRoom: 'Lobby',
+            roomTitle: '公共大厅',
+            nickname: myNickname // 发送初始昵称
+        });
+
+        showToast("服务连接成功");
+        goToLobby();
+
+    } catch (err) {
+        console.error("Critical Error:", err);
+        showToast("连接失败");
+    }
+}
+
+// --- 事件绑定补充 ---
+document.getElementById('nav-group').onclick = showGroupView;
+document.getElementById('set-name-btn').onclick = setMyName;
+
+// 修改原有 renderMessage 以显示自定义昵称
+function renderMessage(msgObj, isMe) {
+    if (currentView !== 'chat') return;
+
+    const container = document.getElementById('message-container');
+    const { text, sender, nickname } = msgObj.data; // 假设发送消息时也带上昵称
+
+    const msgBubble = document.createElement('div');
+    msgBubble.className = `msg-bubble ${isMe ? 'is-me' : ''}`;
+    
+    // 优先显示昵称，没有则显示 ID
+    const senderDisplay = isMe ? '我' : (nickname || sender);
+
+    msgBubble.innerHTML = `
+        <div class="sender-name">${senderDisplay}</div>
+        <div class="msg-content">${text}</div>
+    `;
+
+    container.appendChild(msgBubble);
+    container.scrollTop = container.scrollHeight;
+}
+
+// 修改原有 sendMessage 以包含昵称
+async function sendMessage() {
+    const input = document.getElementById('chat-input');
+    const text = input.value.trim();
+    
+    if (!text || !currentChatChannel) return;
+
+    await currentChatChannel.publish('chat-msg', {
+        text: text,
+        sender: myId,
+        nickname: myNickname // 发送消息时带上当前昵称
+    });
+
+    renderMessage({ data: { text, sender: myId, nickname: myNickname } }, true);
+    input.value = '';
+}
+
+// 启动初始化
+initApp();
+
 // --- 5. 事件绑定 ---
 
 document.querySelector('.fab-btn').onclick = async () => {

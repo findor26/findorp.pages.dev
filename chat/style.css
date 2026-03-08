@@ -23,17 +23,6 @@ body {
     height: 100%;
 }
 
-/* 侧边栏 */
-.navigation-rail {
-    width: 80px;
-    background-color: var(--md-sys-color-surface-variant);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 12px 0;
-    gap: 20px;
-}
-
 .fab-btn {
     width: 56px;
     height: 56px;
@@ -44,10 +33,42 @@ body {
     box-shadow: 0 4px 8px rgba(0,0,0,0.1);
 }
 
+/* 侧边栏整体居中 */
+.navigation-rail {
+    width: 80px;
+    background-color: var(--md-sys-color-surface-variant);
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* 确保子元素水平居中 */
+    padding: 20px 0;
+    gap: 24px;
+    box-sizing: border-box;
+}
+
+/* 统一图标按钮的点击区域，确保居中 */
+.nav-icons {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    gap: 16px;
+}
+
 .nav-icons .material-symbols-rounded {
-    padding: 12px;
+    width: 48px;  /* 固定宽度 */
+    height: 48px; /* 固定高度 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
-    border-radius: 20px;
+    border-radius: 24px;
+    transition: background-color 0.2s;
+}
+
+/* 退出按钮使用特定的红色系提示风险 */
+.nav-icons .logout-icon {
+    margin-top: auto; /* 将退出按钮推到底部 */
+    color: #ba1a1a;
 }
 
 .nav-icons .active {
@@ -127,7 +148,7 @@ body {
 
 .is-me .sender-name {
     text-align: right;
-    color: var(--md-sys-color-primary);
+    color: var(--md-sys-color-outline);
     opacity: 0.8;
 }
 

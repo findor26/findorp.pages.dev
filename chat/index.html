@@ -11,15 +11,22 @@
 <body>
     <div class="app-container">
         <nav class="navigation-rail">
-            <button class="fab-btn">
-                <span class="material-symbols-rounded">edit</span>
-            </button>
-            <div class="nav-icons">
-                <span class="material-symbols-rounded active">chat</span>
-                <span class="material-symbols-rounded">group</span>
-                <span class="material-symbols-rounded">settings</span>
-            </div>
-        </nav>
+    <button class="fab-btn" title="创建房间">
+        <span class="material-symbols-rounded">edit</span>
+    </button>
+    
+    <div class="nav-icons">
+        <span class="material-symbols-rounded" id="nav-lobby" title="频道大厅">grid_view</span>
+        
+        <span class="material-symbols-rounded active" id="nav-chat" title="当前聊天">chat</span>
+        
+        <span class="material-symbols-rounded" title="成员列表">group</span>
+        
+        <span class="material-symbols-rounded" title="设置">settings</span>
+
+        <span class="material-symbols-rounded logout-icon" id="nav-logout" title="退出并断开">logout</span>
+    </div>
+</nav>
 
         <main class="chat-main">
             <header class="top-app-bar">

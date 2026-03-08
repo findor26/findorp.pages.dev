@@ -500,9 +500,6 @@ document.getElementById('chat-input').onkeydown = function(e) {
     }
 };
 
-// 昵称修改绑定
-document.getElementById('set-name-btn').onclick = changeNickname;
-
 // 创建房间逻辑绑定
 document.getElementById('create-room-fab').onclick = function() {
     const roomName = prompt("请输入新房间名称:");

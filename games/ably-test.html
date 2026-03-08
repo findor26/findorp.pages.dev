@@ -2,171 +2,71 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>多人实时对战 | Findor's Space</title>
+    <title>Ably 多人游戏测试</title>
     <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
     <style>
-        body { margin: 0; background: #202124; color: white; overflow: hidden; font-family: 'Roboto', sans-serif; }
-        canvas { display: block; background: #1a1a1b; }
-        #ui { 
-            position: fixed; top: 20px; left: 20px; 
-            background: rgba(0,0,0,0.5); padding: 15px; 
-            border-radius: 12px; backdrop-filter: blur(4px);
-            border: 1px solid rgba(255,255,255,0.1);
-            pointer-events: none; 
-        }
-        .stat-row { margin-bottom: 4px; font-size: 14px; }
-        #player-count { color: #00e676; font-weight: bold; }
+        #game { width: 600px; height: 400px; border: 2px solid #333; position: relative; background: #eee; }
+        .tank { width: 30px; height: 30px; position: absolute; background: #0061a4; transition: 0.1s; }
+        .remote { background: #ba1a1a; }
     </style>
 </head>
 <body>
-    <div id="ui">
-        <div class="stat-row">状态: <span id="status">连接中...</span></div>
-        <div class="stat-row">在线玩家: <span id="player-count">0</span></div>
-    </div>
-    <canvas id="gameCanvas"></canvas>
+    <h1>联机坦克 (WASD 移动)</h1>
+    <div id="game"></div>
 
     <script>
-        // 1. 初始化全局变量
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        const players = {}; 
-        const keys = {};
-        const myId = 'user_' + Math.random().toString(36).substring(7);
         let channel;
-        let lastSent = 0;
+        const myId = 'player-' + Math.random().toString(36).substring(7);
+        const tanks = {};
 
-        // 设置画布尺寸
-        function resize() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-        window.addEventListener('resize', resize);
-        resize();
-
-        // 本地坦克状态
-        const me = {
-            id: myId,
-            x: Math.random() * (window.innerWidth - 100) + 50,
-            y: Math.random() * (window.innerHeight - 100) + 50,
-            angle: 0,
-            color: '#0061a4'
-        };
-
-        // 2. 定义核心功能函数
-        async function initAbly() {
-    try {
-        const realtime = new Ably.Realtime({
-            // 使用 authCallback 代替 authUrl
-            authCallback: async (tokenParams, callback) => {
-                try {
-                    const res = await fetch('/api/auth');
-                    const tokenRequest = await res.json();
-                    
-                    // 核心修复：手动确保获取到的 timestamp 是数字类型
-                    if (tokenRequest.timestamp) {
-                        tokenRequest.timestamp = Number(tokenRequest.timestamp);
-                    }
-                    
-                    // 将处理好的对象直接交给 SDK
-                    callback(null, tokenRequest);
-                } catch (err) {
-                    callback(err, null);
-                }
-            }
-        });
-
-        await realtime.connection.once('connected');
-        document.getElementById('status').textContent = "✅ 联机成功";
-        
-        // ...后续频道订阅逻辑不变...
-        channel = realtime.channels.get('game-room-1');
-        startGaming(); 
-
-    } catch (err) {
-        console.error("认证失败:", err);
-        document.getElementById('status').textContent = "❌ 联机失败";
-    }
-}
-
-        function updatePlayerCount() {
-            channel.presence.get((err, members) => {
-                if (!err) document.getElementById('player-count').textContent = members.length;
+        async function start() {
+            // 安全模式：指向你的 Cloudflare Function 授权接口
+            const ably = new Ably.Realtime({ 
+                authUrl: '/api/auth',
+                clientId: myId 
             });
+
+            await ably.connection.once('connected');
+            console.log("✅ 成功连接！");
+
+            channel = ably.channels.get('game-room');
+
+            // 订阅：收到别人移动的消息
+            await channel.subscribe('move', (msg) => {
+                if (msg.clientId === myId) return;
+                updateTank(msg.clientId, msg.data, true);
+            });
+
+            // 自己移动
+            window.onkeydown = (e) => {
+                const pos = { x: parseInt(myTank.style.left || 0), y: parseInt(myTank.style.top || 0) };
+                if (e.key === 'w') pos.y -= 10;
+                if (e.key === 's') pos.y += 10;
+                if (e.key === 'a') pos.x -= 10;
+                if (e.key === 'd') pos.x += 10;
+                
+                myTank.style.left = pos.x + 'px';
+                myTank.style.top = pos.y + 'px';
+                channel.publish('move', pos);
+            };
         }
 
-        function gameLoop() {
-            update();
-            draw();
-            requestAnimationFrame(gameLoop);
-        }
+        const myTank = document.createElement('div');
+        myTank.className = 'tank';
+        document.getElementById('game').appendChild(myTank);
 
-        function update() {
-            let moved = false;
-            const speed = 4;
-
-            if (keys['w'] || keys['ArrowUp']) { me.y -= speed; me.angle = 0; moved = true; }
-            if (keys['s'] || keys['ArrowDown']) { me.y += speed; me.angle = 180; moved = true; }
-            if (keys['a'] || keys['ArrowLeft']) { me.x -= speed; me.angle = 270; moved = true; }
-            if (keys['d'] || keys['ArrowRight']) { me.x += speed; me.angle = 90; moved = true; }
-
-            // 远程玩家位置插值平滑化
-            for (let id in players) {
-                const p = players[id];
-                p.x += (p.targetX - p.x) * 0.15; // 线性插值
-                p.y += (p.targetY - p.y) * 0.15;
+        function updateTank(id, pos, isRemote) {
+            if (!tanks[id]) {
+                const el = document.createElement('div');
+                el.className = 'tank' + (isRemote ? ' remote' : '');
+                document.getElementById('game').appendChild(el);
+                tanks[id] = el;
             }
-
-            // 限制发送频率：每 50ms 发送一次位置更新 (20fps tick)
-            const now = Date.now();
-            if (moved && now - lastSent > 50) {
-                channel.publish('u', { id: myId, x: Math.round(me.x), y: Math.round(me.y), a: me.angle });
-                lastSent = now;
-            }
+            tanks[id].style.left = pos.x + 'px';
+            tanks[id].style.top = pos.y + 'px';
         }
 
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // 绘制其他玩家
-            for (let id in players) {
-                const p = players[id];
-                drawTank(p.x, p.y, p.angle, '#ba1a1a', id.substring(0, 4));
-            }
-
-            // 绘制自己
-            drawTank(me.x, me.y, me.angle, me.color, "ME");
-        }
-
-        function drawTank(x, y, angle, color, label) {
-            ctx.save();
-            ctx.translate(x, y);
-            ctx.rotate(angle * Math.PI / 180);
-            
-            // 坦克底盘
-            ctx.fillStyle = color;
-            ctx.beginPath();
-            ctx.roundRect(-20, -20, 40, 40, 8);
-            ctx.fill();
-
-            // 炮管
-            ctx.fillStyle = "#333";
-            ctx.fillRect(-3, -28, 6, 20);
-            
-            ctx.restore();
-            
-            // 名字标识
-            ctx.fillStyle = "rgba(255,255,255,0.7)";
-            ctx.font = "12px Arial";
-            ctx.textAlign = "center";
-            ctx.fillText(label, x, y + 35);
-        }
-
-        // 3. 事件监听与启动
-        window.addEventListener('keydown', e => keys[e.key] = true);
-        window.addEventListener('keyup', e => keys[e.key] = false);
-
-        // 确保在页面加载完成后再执行初始化
-        window.onload = initAbly;
+        start();
     </script>
 </body>
 </html>

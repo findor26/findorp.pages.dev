@@ -3,131 +3,145 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MDUI 2 完整演示</title>
+    <title>MDUI 2 综合组件演示</title>
 
     <link rel="stylesheet" href="https://unpkg.com/mdui@2/mdui.css">
-    
     <script type="module" src="https://unpkg.com/mdui@2/mdui.global.js"></script>
-
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 
     <style>
-        /* 页面布局调整 */
-        body {
-            background-color: var(--mdui-color-background);
-            color: var(--mdui-color-on-background);
-            margin: 0;
-            padding-top: 64px; /* 为顶栏留出空间 */
+        :root {
+            /* 页面背景色使用 Material Design 变量 */
+            background-color: var(--mdui-color-surface-container-low);
+            color: var(--mdui-color-on-surface);
+            font-family: Roboto, system-ui, sans-serif;
         }
-        .container {
-            max-width: 800px;
+        body { margin: 0; padding-bottom: 80px; }
+        .main-content {
+            max-width: 900px;
             margin: 0 auto;
-            padding: 24px;
-        }
-        .section-card {
-            margin-bottom: 24px;
-            padding: 20px;
-        }
-        .button-group {
+            padding: 16px;
             display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-            margin-top: 16px;
+            flex-direction: column;
+            gap: 24px;
         }
+        .component-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+        }
+        .card-header { margin-bottom: 16px; display: block; }
+        .flex-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
     </style>
 </head>
-<body class="mdui-theme-light"> <mdui-top-app-bar scroll-behavior="hide">
-        <mdui-button-icon icon="menu" id="open-drawer"></mdui-button-icon>
-        <mdui-top-app-bar-title>MDUI 2 控制台</mdui-top-app-bar-title>
+<body class="mdui-theme-light">
+
+    <mdui-top-app-bar variant="center-aligned">
+        <mdui-button-icon icon="arrow_back"></mdui-button-icon>
+        <mdui-top-app-bar-title>组件实验室</mdui-top-app-bar-title>
         <div style="flex-grow: 1"></div>
-        <mdui-button-icon icon="light_mode" id="theme-toggle"></mdui-button-icon>
-        <mdui-button-icon icon="account_circle"></mdui-button-icon>
+        <mdui-button-icon icon="palette" id="theme-toggle"></mdui-button-icon>
     </mdui-top-app-bar>
 
-    <mdui-navigation-drawer id="main-drawer" close-on-overlay-click>
-        <mdui-list>
-            <mdui-list-item icon="home" selected>首页</mdui-list-item>
-            <mdui-list-item icon="settings">系统设置</mdui-list-item>
-            <mdui-list-item icon="info">关于我们</mdui-list-item>
-        </mdui-list>
-    </mdui-navigation-drawer>
-
-    <div class="container">
+    <div class="main-content">
         
-        <mdui-card class="section-card" variant="filled">
-            <mdui-typography variant="headline-small">交互组件</mdui-typography>
-            <mdui-typography variant="body-medium" style="margin-bottom: 16px; display: block;">
-                MDUI 2 提供了多种 Material 3 风格的按钮：
-            </mdui-typography>
+        <mdui-card variant="elevated" style="padding: 16px;">
+            <mdui-typography variant="title-medium" class="card-header">导航与切换</mdui-typography>
             
-            <div class="button-group">
-                <mdui-button variant="filled">填充按钮</mdui-button>
-                <mdui-button variant="tonal">色调按钮</mdui-button>
-                <mdui-button variant="outlined">描边按钮</mdui-button>
-                <mdui-button variant="text">文本按钮</mdui-button>
-                <mdui-button icon="download" loading>正在加载</mdui-button>
-            </div>
+            <mdui-tabs value="tab-1" style="margin-bottom: 16px;">
+                <mdui-tab value="tab-1" icon="dashboard">仪表盘</mdui-tab>
+                <mdui-tab value="tab-2" icon="history">历史记录</mdui-tab>
+                <mdui-tab value="tab-3" icon="settings">设置</mdui-tab>
+            </mdui-tabs>
+
+            <mdui-segmented-button-group select-strategy="single" value="day">
+                <mdui-segmented-button value="day">日视图</mdui-segmented-button>
+                <mdui-segmented-button value="week">周视图</mdui-segmented-button>
+                <mdui-segmented-button value="month">月视图</mdui-segmented-button>
+            </mdui-segmented-button-group>
         </mdui-card>
 
-        <mdui-card class="section-card" variant="outlined">
-            <mdui-typography variant="headline-small">数据输入</mdui-typography>
-            <div style="margin-top: 16px;">
-                <mdui-text-field label="用户名" icon="person" clearable></mdui-text-field>
-                <mdui-text-field label="密码" type="password" toggle-password icon="lock" style="margin-top: 16px;"></mdui-text-field>
+        <div class="component-grid">
+            <mdui-card variant="outlined" style="padding: 16px;">
+                <mdui-typography variant="title-medium" class="card-header">精细调节</mdui-typography>
                 
-                <div style="margin-top: 20px; display: flex; align-items: center; gap: 24px;">
-                    <mdui-checkbox>自动登录</mdui-checkbox>
-                    <mdui-switch icon-on="check" icon-off="close"></mdui-switch>
-                </div>
-            </div>
-        </mdui-card>
+                <mdui-select label="服务器区域" value="cn-shanghai" style="width: 100%; margin-bottom: 20px;">
+                    <mdui-menu-item value="cn-shanghai">华东 (上海)</mdui-menu-item>
+                    <mdui-menu-item value="cn-beijing">华北 (北京)</mdui-beijing>
+                    <mdui-menu-item value="hk">中国香港</mdui-menu-item>
+                </mdui-select>
 
-        <mdui-fab icon="add" extended style="position: fixed; bottom: 24px; right: 24px;">
-            新建任务
-        </mdui-fab>
+                <mdui-typography variant="label-large">亮度调节</mdui-typography>
+                <mdui-slider value="75" icon="brightness_6"></mdui-slider>
+                
+                <mdui-typography variant="label-large" style="margin-top: 10px;">音量</mdui-typography>
+                <mdui-slider range value="[20, 80]"></mdui-slider>
+            </mdui-card>
+
+            <mdui-card variant="outlined" style="padding: 16px;">
+                <mdui-typography variant="title-medium" class="card-header">反馈状态</mdui-typography>
+                
+                <div style="margin-bottom: 24px;">
+                    <mdui-typography variant="body-small">线性进度条</mdui-typography>
+                    <mdui-linear-progress value="0.6"></mdui-linear-progress>
+                </div>
+
+                <div class="flex-row">
+                    <mdui-circular-progress></mdui-circular-progress>
+                    <mdui-circular-progress value="0.75"></mdui-circular-progress>
+                    <mdui-badge content="99+">
+                        <mdui-button variant="tonal">通知</mdui-button>
+                    </mdui-badge>
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <mdui-chip icon="check" closable>已连接</mdui-chip>
+                    <mdui-chip icon="error" variant="filled">异常</mdui-chip>
+                </div>
+            </mdui-card>
+        </div>
+
+        <mdui-card variant="filled" style="padding: 8px;">
+            <mdui-list>
+                <mdui-list-item icon="folder" end-icon="more_vert">
+                    我的项目
+                    <span slot="description">最后修改于 2 小时前</span>
+                </mdui-list-item>
+                <mdui-divider></mdui-divider>
+                <mdui-list-item icon="image" end-icon="delete">
+                    截图_2024.png
+                    <span slot="description">1.2 MB</span>
+                </mdui-list-item>
+                <mdui-list-item icon="description" end-icon="share">
+                    开发文档.pdf
+                    <span slot="description">昨天 18:30</span>
+                </mdui-list-item>
+            </mdui-list>
+        </mdui-card>
 
     </div>
 
-    <mdui-dialog id="example-dialog">
-        <span slot="headline">确认操作</span>
-        <span slot="description">此操作将应用当前的系统设置，是否继续？</span>
-        <mdui-button slot="action" variant="text" id="close-dialog">取消</mdui-button>
-        <mdui-button slot="action" variant="filled">确定</mdui-button>
-    </mdui-dialog>
+    <mdui-navigation-bar value="home">
+        <mdui-navigation-bar-item value="home" icon="home">首页</mdui-navigation-bar-item>
+        <mdui-navigation-bar-item value="search" icon="search">搜索</mdui-navigation-bar-item>
+        <mdui-navigation-bar-item value="profile" icon="person">我的</mdui-navigation-bar-item>
+    </mdui-navigation-bar>
 
     <script>
-        // 侧边栏控制
-        const drawer = document.querySelector('#main-drawer');
-        const openBtn = document.querySelector('#open-drawer');
-        openBtn.addEventListener('click', () => {
-            drawer.open = !drawer.open;
-        });
-
-        // 主题切换逻辑
+        // 主题切换
         const themeBtn = document.querySelector('#theme-toggle');
-        const body = document.body;
         themeBtn.addEventListener('click', () => {
-            if (body.classList.contains('mdui-theme-light')) {
-                body.classList.replace('mdui-theme-light', 'mdui-theme-dark');
-                themeBtn.icon = 'dark_mode';
-            } else {
-                body.classList.replace('mdui-theme-dark', 'mdui-theme-light');
-                themeBtn.icon = 'light_mode';
-            }
+            const isDark = document.body.classList.contains('mdui-theme-dark');
+            document.body.classList.toggle('mdui-theme-dark', !isDark);
+            document.body.classList.toggle('mdui-theme-light', isDark);
+            themeBtn.icon = isDark ? 'palette' : 'dark_mode';
         });
 
-        // 按钮点击触发对话框
-        const dialog = document.querySelector('#example-dialog');
-        const submitBtn = document.querySelector('mdui-button[variant="filled"]');
-        submitBtn.addEventListener('click', () => {
-            dialog.open = true;
-        });
-
-        const closeDialogBtn = document.querySelector('#close-dialog');
-        closeDialogBtn.addEventListener('click', () => {
-            dialog.open = false;
+        // 监听滑块值变化
+        const slider = document.querySelector('mdui-slider');
+        slider.addEventListener('change', (e) => {
+            console.log('当前亮度:', e.target.value);
         });
     </script>
-
 </body>
 </html>

@@ -1,32 +1,43 @@
 export async function onRequest(context) {
     const { env } = context;
     const ABLY_KEY = env.ABLY_API_KEY; 
-    
-    if (!ABLY_KEY) return new Response("Missing Key", { status: 500 });
+
+    if (!ABLY_KEY || !ABLY_KEY.includes(':')) {
+        return new Response(JSON.stringify({ error: "Key 格式不正确" }), { status: 500 });
+    }
 
     const [keyId, keySecret] = ABLY_KEY.split(':');
-    const clientId = "player-" + Math.random().toString(36).substring(7);
-
-    // 直接通过 URL 参数请求，不发 Body，彻底避开 JSON 序列化导致的类型问题
-    const authHeader = btoa(ABLY_KEY);
-    const url = `https://rest.ably.io/keys/${keyId}/requestToken?clientId=${clientId}`;
 
     try {
-        const response = await fetch(url, {
-            method: 'POST', // 虽然参数在 URL 里，但 Ably 要求用 POST
+        // 关键：只传 clientId 和 capability，坚决不传任何时间戳
+        const response = await fetch(`https://rest.ably.io/keys/${keyId}/requestToken`, {
+            method: 'POST',
             headers: {
-                'Authorization': 'Basic ' + authHeader,
+                'Authorization': 'Basic ' + btoa(ABLY_KEY),
                 'Content-Type': 'application/json'
-            }
+            },
+            body: JSON.stringify({
+                clientId: "player-" + Math.random().toString(36).substring(7),
+                capability: { "game-*": ["*"] }
+                // 绝对不要在这里写 timestamp 或 nonce
+            })
         });
 
-        const tokenRequest = await response.json();
+        const result = await response.json();
 
-        // 这里的 JSON 已经是 Ably 官方生成的标准格式了
-        return new Response(JSON.stringify(tokenRequest), {
+        if (!response.ok) {
+            // 如果 Ably 报错，直接返回原始错误
+            return new Response(JSON.stringify({ error: result.error }), { 
+                status: response.status,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+
+        // 成功时直接返回 Ably 颁发的原生 TokenRequest 对象
+        return new Response(JSON.stringify(result), {
             headers: { 'Content-Type': 'application/json' }
         });
     } catch (err) {
-        return new Response(err.message, { status: 500 });
+        return new Response(JSON.stringify({ error: { message: err.message } }), { status: 500 });
     }
 }

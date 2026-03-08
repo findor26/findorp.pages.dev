@@ -15,7 +15,7 @@ export async function onRequest(context) {
     const { nickname, content } = await request.json();
     if (!nickname || !content) return new Response("内容缺失", { status: 400 });
 
-    await env.comments.prepare(
+    await env.DB.prepare(
       "INSERT INTO messages (nickname, content) VALUES (?, ?)"
     ).bind(nickname, content).run();
     return new Response("OK", { status: 201 });

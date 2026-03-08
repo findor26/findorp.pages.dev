@@ -3,47 +3,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Material Chat - Findor</title>
+    <title>Findor - 完整功能聊天室</title>
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
     <script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
 </head>
 <body>
     <div class="app-container">
         <nav class="navigation-rail">
-            <button class="fab-btn">
-                <span class="material-symbols-rounded">edit</span>
+            <button class="fab-btn" id="create-room-fab" title="创建新房间">
+                <span class="material-symbols-rounded">add</span>
             </button>
             <div class="nav-icons">
-                <span class="material-symbols-rounded" id="nav-lobby">grid_view</span>
-                <span class="material-symbols-rounded" id="nav-chat">chat</span>
-                <span class="material-symbols-rounded" id="nav-group">group</span>
-                <span class="material-symbols-rounded logout-icon" id="nav-logout">logout</span>
+                <div class="nav-item" id="btn-nav-lobby" title="频道大厅">
+                    <span class="material-symbols-rounded">grid_view</span>
+                    <span class="label">大厅</span>
+                </div>
+                <div class="nav-item" id="btn-nav-chat" title="当前聊天">
+                    <span class="material-symbols-rounded">chat</span>
+                    <span class="label">聊天</span>
+                </div>
+                <div class="nav-item" id="btn-nav-group" title="在线成员">
+                    <span class="material-symbols-rounded">group</span>
+                    <span class="label">成员</span>
+                </div>
+                <div class="nav-item logout-zone" id="btn-nav-logout" title="断开连接">
+                    <span class="material-symbols-rounded">logout</span>
+                    <span class="label">退出</span>
+                </div>
             </div>
         </nav>
 
         <main class="chat-main">
             <header class="top-app-bar">
                 <div class="header-content">
-                    <h1 class="title-large">频道大厅</h1>
+                    <div class="title-group">
+                        <h1 class="title-large" id="current-view-title">频道大厅</h1>
+                        <p class="title-small" id="current-view-subtitle">实时同步中...</p>
+                    </div>
                     <div class="status-chip">
-                        <span class="dot"></span>
-                        <span id="online-count">1</span> 在线
+                        <span class="status-dot"></span>
+                        <span id="online-count">0</span> 在线
                     </div>
                 </div>
                 <div class="top-actions">
-                    <span class="material-symbols-rounded" id="set-name-btn" title="修改昵称">person_edit</span>
-                    <span class="material-symbols-rounded">more_vert</span>
+                    <button class="icon-button" id="set-name-btn" title="修改我的昵称">
+                        <span class="material-symbols-rounded">person_edit</span>
+                    </button>
                 </div>
             </header>
 
-            <div id="message-container" class="message-view"></div>
+            <div id="message-container" class="message-view">
+                <div class="loading-placeholder">
+                    <p>正在初始化服务...</p>
+                </div>
+            </div>
 
-            <footer class="input-area" style="visibility: hidden;">
-                <div class="search-bar">
-                    <input type="text" id="chat-input" placeholder="输入消息...">
-                    <button id="send-btn" class="icon-button">
+            <footer class="input-area" id="chat-input-zone" style="display: none;">
+                <div class="input-container">
+                    <input type="text" id="chat-input" placeholder="输入消息内容..." autocomplete="off">
+                    <button id="send-btn" class="send-button">
                         <span class="material-symbols-rounded">send</span>
                     </button>
                 </div>

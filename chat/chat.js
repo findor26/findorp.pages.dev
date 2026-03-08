@@ -2,6 +2,29 @@ const myId = 'Findor-' + Math.random().toString(36).substring(7);
 let ably = null;
 let lobbyChannel = null;
 
+/**
+ * MD3 风格的 Snackbar (Toast) 提示
+ * @param {string} message 提示内容
+ */
+function showToast(message) {
+    // 检查是否已存在 toast 容器
+    let toast = document.getElementById('md3-toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'md3-toast';
+        document.body.appendChild(toast);
+    }
+    
+    // 设置文本并触发动画
+    toast.textContent = message;
+    toast.className = 'show';
+    
+    // 3秒后自动隐藏
+    setTimeout(() => {
+        toast.className = toast.className.replace('show', '');
+    }, 3000);
+}
+
 // --- 1. 正规化初始化 ---
 async function initApp() {
     try {

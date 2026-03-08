@@ -144,3 +144,39 @@ body {
     cursor: pointer;
     color: var(--md-sys-color-primary);
 }
+
+/* MD3 Snackbar (Toast) */
+#md3-toast {
+    visibility: hidden;
+    min-width: 280px;
+    background-color: #313033; /* MD3 暗色表面 */
+    color: #f4eff4;
+    text-align: left;
+    border-radius: 4px; /* MD3 规范：较小的圆角用于 Snackbar */
+    padding: 14px 16px;
+    position: fixed;
+    z-index: 2000;
+    left: 50%;
+    bottom: 80px;
+    transform: translateX(-50%);
+    font-size: 14px;
+    box-shadow: 0 3px 5px -1px rgba(0,0,0,0.2), 
+                0 6px 10px 0 rgba(0,0,0,0.14), 
+                0 1px 18px 0 rgba(0,0,0,0.12);
+}
+
+#md3-toast.show {
+    visibility: visible;
+    animation: md3-fade-in 0.2s cubic-bezier(0, 0, 0.2, 1), 
+               md3-fade-out 0.2s 2.8s cubic-bezier(0.4, 0, 1, 1);
+}
+
+@keyframes md3-fade-in {
+    from { bottom: 40px; opacity: 0; }
+    to { bottom: 80px; opacity: 1; }
+}
+
+@keyframes md3-fade-out {
+    from { bottom: 80px; opacity: 1; }
+    to { bottom: 40px; opacity: 0; }
+}

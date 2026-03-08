@@ -415,13 +415,36 @@ function applyRecallToUI(msgId, nickname) {
  * ==========================================
  */
 
-async function changeNickname() {
-    const n = prompt("请输入新的昵称:", myNickname);
-    if (n && n.trim() !== "") {
-        myNickname = n.trim();
+/**
+ * ==========================================
+ * 8. 用户操作与系统事件 (已更新为 MD3 弹窗逻辑)
+ * ==========================================
+ */
+
+const nickDialog = document.getElementById('nickname-dialog-overlay');
+const nickInput = document.getElementById('new-nickname-input');
+
+// 打开弹窗
+async function openNicknameDialog() {
+    nickInput.value = myNickname; // 预填充当前昵称
+    nickDialog.style.display = 'flex';
+    nickInput.focus();
+}
+
+// 关闭弹窗
+function closeNicknameDialog() {
+    nickDialog.style.display = 'none';
+}
+
+// 确认修改逻辑
+async function handleConfirmNickname() {
+    const newName = nickInput.value.trim();
+    
+    if (newName !== "" && newName !== myNickname) {
+        myNickname = newName;
         localStorage.setItem('chat-nickname', myNickname);
         
-        // 实时同步更新到 Presence 状态
+        // 实时同步 Presence 状态
         if (lobbyChannel) {
             await lobbyChannel.presence.update({
                 currentRoom: currentRoomId,
@@ -429,14 +452,31 @@ async function changeNickname() {
                 nickname: myNickname
             });
         }
-        showToast("昵称更新成功");
         
-        // 如果在成员列表视图，立即局部刷新
+        showToast("昵称已成功更新");
+        
+        // 刷新列表视图
         if (currentView === 'group') {
             renderFullMemberList();
         }
     }
+    closeNicknameDialog();
 }
+
+// 事件监听绑定更新
+document.getElementById('set-name-btn').onclick = openNicknameDialog;
+document.getElementById('dialog-cancel-btn').onclick = closeNicknameDialog;
+document.getElementById('dialog-confirm-btn').onclick = handleConfirmNickname;
+
+// 增强体验：点击遮罩层关闭，回车键确认
+nickDialog.onclick = (e) => {
+    if (e.target === nickDialog) closeNicknameDialog();
+};
+
+nickInput.onkeydown = (e) => {
+    if (e.key === 'Enter') handleConfirmNickname();
+    if (e.key === 'Escape') closeNicknameDialog();
+};
 
 function updateOnlineCounter() {
     if (lobbyChannel) {

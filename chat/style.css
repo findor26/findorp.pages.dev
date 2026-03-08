@@ -429,3 +429,86 @@ body {
 .room-card:hover { 
     background: #e0e2ec; 
 }
+
+/* ==========================================
+   9. MD3 Dialog 弹窗样式
+   ========================================== */
+.dialog-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background-color: rgba(0, 0, 0, 0.4);
+    display: none; /* 默认隐藏 */
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(2px);
+}
+
+.md3-dialog {
+    background-color: var(--md-sys-color-surface);
+    width: 90%;
+    max-width: 320px;
+    border-radius: 28px;
+    padding: 24px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    animation: dialog-zoom 0.2s ease-out;
+}
+
+@keyframes dialog-zoom {
+    from { transform: scale(0.9); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+.dialog-title {
+    margin: 0 0 16px 0;
+    font-size: 24px;
+    font-weight: 400;
+    color: var(--md-sys-color-on-surface);
+}
+
+.md3-text-field {
+    position: relative;
+    margin-bottom: 24px;
+}
+
+#new-nickname-input {
+    width: 100%;
+    border: none;
+    border-bottom: 2px solid var(--md-sys-color-outline);
+    padding: 8px 0;
+    font-size: 16px;
+    background: transparent;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+#new-nickname-input:focus {
+    border-bottom-color: var(--md-sys-color-primary);
+}
+
+.dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.text-button {
+    background: none;
+    border: none;
+    padding: 10px 12px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--md-sys-color-primary);
+    cursor: pointer;
+    border-radius: 20px;
+    transition: background 0.2s;
+}
+
+.text-button:hover {
+    background-color: rgba(0, 97, 164, 0.08);
+}
+
+.primary-text {
+    font-weight: 700;
+}

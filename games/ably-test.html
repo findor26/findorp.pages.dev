@@ -3,56 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Findor's Tank | 完整联机对战版</title>
+    <title>Findor's Tank | 完整版</title>
     <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
     <style>
         body { margin: 0; background: #202124; color: white; overflow: hidden; font-family: sans-serif; touch-action: none; }
         #game-container { position: relative; width: 100vw; height: 100vh; background: #1a1a1b; }
         
-        /* 坦克基础样式 */
-        .tank { 
-            position: absolute; width: 40px; height: 40px; 
-            background: #0061a4; border-radius: 4px; 
-            transition: transform 0.06s linear, left 0.06s linear, top 0.06s linear;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 10px; font-weight: bold; color: white; z-index: 5;
+        /* 坦克容器：不再直接旋转，只负责位移 */
+        .tank-wrapper {
+            position: absolute; width: 40px; height: 40px;
+            transition: left 0.06s linear, top 0.06s linear;
+            z-index: 5;
         }
-        .tank::after { /* 炮管 */
+
+        /* 坦克本体：仅此处负责旋转 */
+        .tank-body { 
+            width: 40px; height: 40px; 
+            background: #0061a4; border-radius: 4px; 
+            display: flex; align-items: center; justify-content: center;
+            font-size: 10px; font-weight: bold; color: white;
+            transition: transform 0.06s linear;
+        }
+        .tank-body::after { 
             content: ''; position: absolute; top: -10px; left: 18px; 
             width: 4px; height: 15px; background: #ccc; 
         }
-        .remote { background: #ba1a1a; }
+        .remote .tank-body { background: #ba1a1a; }
         
-        /* 血条样式 */
+        /* 血条：在 wrapper 内绝对定位，不随 body 旋转 */
         .health-bar-container {
-            position: absolute; top: -20px; left: 0;
+            position: absolute; top: -15px; left: 0;
             width: 40px; height: 4px; background: #444; border-radius: 2px;
+            z-index: 6;
         }
         .health-bar-fill {
             width: 100%; height: 100%; background: #00ff00;
             transition: width 0.2s ease-out;
         }
 
-        /* 子弹与道具 */
+        /* 其它元素 */
         .bullet { position: absolute; width: 8px; height: 8px; background: #ffff00; border-radius: 50%; z-index: 10; box-shadow: 0 0 8px #ffff00; }
-        .item {
-            position: absolute; width: 24px; height: 24px; border-radius: 4px; z-index: 4; 
-            display: flex; align-items: center; justify-content: center; font-size: 14px; 
-            font-weight: bold; animation: pulse 1s infinite alternate;
-        }
+        .item { position: absolute; width: 24px; height: 24px; border-radius: 4px; z-index: 4; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; animation: pulse 1s infinite alternate; }
         .item-heal { background: #4caf50; box-shadow: 0 0 10px #4caf50; }
         .item-speed { background: #2196f3; box-shadow: 0 0 10px #2196f3; }
         @keyframes pulse { from { transform: scale(0.9); } to { transform: scale(1.1); } }
 
-        /* UI 与 控制器 */
+        /* UI */
         #ui { position: fixed; top: 10px; left: 10px; z-index: 100; pointer-events: none; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px; }
         #joystick-container { position: fixed; bottom: 40px; left: 40px; width: 120px; height: 120px; background: rgba(255,255,255,0.1); border-radius: 50%; z-index: 1000; }
         #joystick-knob { position: absolute; width: 50px; height: 50px; background: rgba(255,255,255,0.3); border-radius: 50%; left: 35px; top: 35px; }
-        #fire-btn { 
-            position: fixed; bottom: 60px; right: 40px; width: 80px; height: 80px; 
-            background: rgba(186, 26, 26, 0.6); border-radius: 50%; z-index: 1000;
-            display: flex; align-items: center; justify-content: center; font-weight: bold; user-select: none;
-        }
+        #fire-btn { position: fixed; bottom: 60px; right: 40px; width: 80px; height: 80px; background: rgba(186, 26, 26, 0.6); border-radius: 50%; z-index: 1000; display: flex; align-items: center; justify-content: center; font-weight: bold; user-select: none; }
     </style>
 </head>
 <body>
@@ -64,10 +64,7 @@
 </div>
 
 <div id="game-container"></div>
-
-<div id="joystick-container">
-    <div id="joystick-knob"></div>
-</div>
+<div id="joystick-container"><div id="joystick-knob"></div></div>
 <div id="fire-btn">FIRE</div>
 
 <script>
@@ -78,7 +75,6 @@
     const knob = document.getElementById('joystick-knob');
     const fireBtn = document.getElementById('fire-btn');
 
-    // 核心变量
     const myId = 'Tank-' + Math.random().toString(36).substring(7);
     const players = {}; 
     const items = {}; 
@@ -87,10 +83,8 @@
     let lastSentPos = { x: 0, y: 0, angle: 0 };
     let myHealth = 100;
     let mySpeed = 5;
-    let myTankEl;
+    let myTankWrapper;
     let isHost = false;
-
-    // 摇杆变量
     let joystickActive = false;
     let joystickVector = { x: 0, y: 0 };
 
@@ -105,7 +99,6 @@
             myIdEl.textContent = myId;
             channel = ably.channels.get('game-room');
 
-            // 订阅逻辑
             channel.subscribe('m', (msg) => { if (msg.clientId !== myId) updateRemotePlayer(msg.clientId, msg.data); });
             channel.subscribe('f', (msg) => { if (msg.clientId !== myId) createBullet(msg.data, false); });
             channel.subscribe('h', (msg) => handleHit(msg.data.targetId));
@@ -120,14 +113,11 @@
 
             await channel.presence.enter();
             checkHost();
-
             createMyTank();
             initJoystick();
             startLoop();
 
             fireBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); triggerFire(); });
-
-            // 房主定时生成道具
             setInterval(() => { if (isHost) generateItem(); }, 8000);
 
         } catch (err) { statusEl.textContent = "❌ 失败: " + err.message; }
@@ -138,35 +128,44 @@
             if (!err && members.length > 0) {
                 const sorted = members.sort((a, b) => a.timestamp - b.timestamp);
                 isHost = (sorted[0].clientId === myId);
-                updateCountDisplay(members.length);
+                countEl.textContent = members.length;
             }
         });
     }
 
     function createMyTank() {
-        myTankEl = document.createElement('div');
-        myTankEl.className = 'tank';
-        myTankEl.innerHTML = `ME<div class="health-bar-container"><div id="my-hp" class="health-bar-fill"></div></div>`;
-        container.appendChild(myTankEl);
-        syncPos(myTankEl, myPos);
+        myTankWrapper = document.createElement('div');
+        myTankWrapper.className = 'tank-wrapper';
+        myTankWrapper.innerHTML = `
+            <div class="health-bar-container"><div id="my-hp" class="health-bar-fill"></div></div>
+            <div class="tank-body" id="my-body">ME</div>
+        `;
+        container.appendChild(myTankWrapper);
+        updateVisuals(myTankWrapper, myPos);
     }
 
     function updateRemotePlayer(id, data) {
         if (!players[id]) {
-            const el = document.createElement('div');
-            el.className = 'tank remote';
-            el.innerHTML = `${id.substring(5, 9)}<div class="health-bar-container"><div id="hp-${id}" class="health-bar-fill"></div></div>`;
-            container.appendChild(el);
-            players[id] = el;
+            const wrapper = document.createElement('div');
+            wrapper.className = 'tank-wrapper remote';
+            wrapper.innerHTML = `
+                <div class="health-bar-container"><div id="hp-${id}" class="health-bar-fill"></div></div>
+                <div class="tank-body">${id.substring(5, 9)}</div>
+            `;
+            container.appendChild(wrapper);
+            players[id] = wrapper;
         }
-        syncPos(players[id], data);
+        updateVisuals(players[id], data);
         if (data.hp !== undefined) updateHPUI(id, data.hp);
     }
 
-    function syncPos(el, data) {
-        el.style.left = data.x + 'px';
-        el.style.top = data.y + 'px';
-        el.style.transform = `rotate(${data.angle}deg)`;
+    function updateVisuals(wrapper, data) {
+        // Wrapper 只管移动
+        wrapper.style.left = data.x + 'px';
+        wrapper.style.top = data.y + 'px';
+        // 内部 Body 管旋转
+        const body = wrapper.querySelector('.tank-body');
+        if (body) body.style.transform = `rotate(${data.angle}deg)`;
     }
 
     function updateHPUI(id, hp) {
@@ -221,11 +220,12 @@
     }
 
     function flashEffect(id) {
-        const target = (id === myId) ? myTankEl : players[id];
-        if (target && !target.dataset.flashing) {
-            target.dataset.flashing = 'true';
-            target.style.filter = 'brightness(3)';
-            setTimeout(() => { target.style.filter = ''; delete target.dataset.flashing; }, 100);
+        const wrapper = (id === myId) ? myTankWrapper : players[id];
+        if (wrapper && !wrapper.dataset.flashing) {
+            const body = wrapper.querySelector('.tank-body');
+            wrapper.dataset.flashing = 'true';
+            body.style.filter = 'brightness(3)';
+            setTimeout(() => { body.style.filter = ''; delete wrapper.dataset.flashing; }, 100);
         }
     }
 
@@ -287,7 +287,7 @@
             }
 
             if (moved) {
-                syncPos(myTankEl, myPos);
+                updateVisuals(myTankWrapper, myPos);
                 for (let id in items) {
                     const it = items[id];
                     if (Math.hypot(myPos.x + 20 - (it.x + 12), myPos.y + 20 - (it.y + 12)) < 30) {
@@ -296,16 +296,14 @@
                         channel.publish('d', { itemId: id });
                     }
                 }
-                // 限制同步频率：位移大于 2px 才发包
                 if (Math.hypot(myPos.x - lastSentPos.x, myPos.y - lastSentPos.y) > 2 || myPos.angle !== lastSentPos.angle) {
                     channel.publish('m', { ...myPos, hp: myHealth });
                     lastSentPos = { ...myPos };
                 }
             }
-        }, 60);
+        }, 64); // 约 15Hz，防止 Ably 429
     }
 
-    function updateCountDisplay(n) { countEl.textContent = n; }
     init();
 </script>
 </body>

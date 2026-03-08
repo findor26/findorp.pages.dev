@@ -82,6 +82,14 @@
             box-shadow: 0 0 0 4px rgba(0, 97, 164, 0.1);
         }
 
+        .input-counter {
+            text-align: right;
+            font-size: 12px;
+            margin-top: -8px;
+            margin-bottom: 12px;
+            color: var(--md-sys-color-outline-variant);
+        }
+
         textarea.input-field {
             resize: none;
         }
@@ -104,7 +112,12 @@
             transition: box-shadow 0.2s, transform 0.1s;
         }
 
-        .btn:active {
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn:active:not(:disabled) {
             transform: scale(0.98);
         }
 
@@ -159,6 +172,32 @@
 
         .delete-btn:hover {
             background-color: rgba(186, 26, 26, 0.1);
+        }
+
+        /* 空状态样式 */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 48px 0;
+            color: var(--md-sys-color-outline-variant);
+        }
+
+        .empty-state .material-symbols-outlined {
+            font-size: 64px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        /* 加载指示器 */
+        #load-more-trigger {
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--md-sys-color-outline-variant);
+            font-size: 14px;
         }
 
         .action-bar {
@@ -241,10 +280,14 @@
         <h1>留言板</h1>
 
         <div class="card input-card">
-            <input type="text" id="nickname" class="input-field" placeholder="称呼">
-            <textarea id="content" class="input-field" rows="3" placeholder="写下你的想法..."></textarea>
+            <input type="text" id="nickname" class="input-field" placeholder="称呼" maxlength="20">
+            <div class="input-counter"><span id="nickname-count">0</span>/20</div>
+            
+            <textarea id="content" class="input-field" rows="3" placeholder="写下你的想法..." maxlength="500"></textarea>
+            <div class="input-counter"><span id="content-count">0</span>/500</div>
+
             <div style="display: flex; justify-content: flex-end;">
-                <button class="btn" onclick="sendMessage()">
+                <button class="btn" id="send-btn" onclick="sendMessage()">
                     <span class="material-symbols-outlined" style="font-size: 18px;">send</span>
                     发布留言
                 </button>
@@ -252,6 +295,8 @@
         </div>
 
         <div id="msg-list"></div>
+        
+        <div id="load-more-trigger"></div>
 
         <div class="action-bar">
             <button class="btn-text" onclick="showModal('admin-modal')">
@@ -303,6 +348,19 @@
     <script>
         let isAdmin = !!localStorage.getItem('admin_token');
         let pendingDeleteId = null;
+        
+        // 分页变量
+        let currentPage = 1;
+        const pageSize = 10;
+        let isLoading = false;
+        let hasMore = true;
+
+        // 初始化字数统计
+        const nicknameInput = document.getElementById('nickname');
+        const contentInput = document.getElementById('content');
+        
+        nicknameInput.oninput = () => document.getElementById('nickname-count').textContent = nicknameInput.value.length;
+        contentInput.oninput = () => document.getElementById('content-count').textContent = contentInput.value.length;
 
         function showModal(id) {
             document.getElementById(id).style.display = 'flex';
@@ -318,47 +376,108 @@
             showModal('alert-modal');
         }
 
-        async function loadMessages() {
+        // 加载留言（支持分页）
+        async function loadMessages(isRefresh = false) {
+            if (isLoading || (!hasMore && !isRefresh)) return;
+            
+            if (isRefresh) {
+                currentPage = 1;
+                hasMore = true;
+                document.getElementById('msg-list').innerHTML = '';
+            }
+
+            isLoading = true;
+            const trigger = document.getElementById('load-more-trigger');
+            trigger.textContent = '正在加载中...';
+
             try {
-                const res = await fetch('/api/messages');
+                // 后端需要支持 ?page=1&size=10
+                const res = await fetch(`/api/messages?page=${currentPage}&size=${pageSize}`);
                 const data = await res.json();
+                
                 const list = document.getElementById('msg-list');
                 
-                list.innerHTML = data.map(m => `
-                    <div class="card msg-item ${isAdmin ? 'admin-active' : ''}">
-                        <div class="msg-header">
-                            <div class="user-info">
-                                <span class="nickname">${escapeHtml(m.nickname)}</span>
-                                <span class="time">${formatDate(m.created_at)}</span>
+                if (data.length === 0 && currentPage === 1) {
+                    list.innerHTML = `
+                        <div class="empty-state">
+                            <span class="material-symbols-outlined">post_add</span>
+                            <p>还没有人留言，快来抢沙发吧</p>
+                        </div>`;
+                    hasMore = false;
+                } else {
+                    if (data.length < pageSize) hasMore = false;
+                    
+                    const fragment = document.createDocumentFragment();
+                    data.forEach(m => {
+                        const div = document.createElement('div');
+                        div.className = `card msg-item ${isAdmin ? 'admin-active' : ''}`;
+                        div.innerHTML = `
+                            <div class="msg-header">
+                                <div class="user-info">
+                                    <span class="nickname">${escapeHtml(m.nickname)}</span>
+                                    <span class="time">${formatDate(m.created_at)}</span>
+                                </div>
+                                ${isAdmin ? `<span class="material-symbols-outlined delete-btn" onclick="requestDelete(${m.id})">delete</span>` : ''}
                             </div>
-                            ${isAdmin ? `<span class="material-symbols-outlined delete-btn" onclick="requestDelete(${m.id})">delete</span>` : ''}
-                        </div>
-                        <div class="content">${escapeHtml(m.content)}</div>
-                    </div>
-                `).join('');
+                            <div class="content">${escapeHtml(m.content)}</div>
+                        `;
+                        fragment.appendChild(div);
+                    });
+                    list.appendChild(fragment);
+                    currentPage++;
+                }
             } catch (err) {
                 console.error("加载失败", err);
+                trigger.textContent = '加载失败，请刷新重试';
+            } finally {
+                isLoading = false;
+                if (!hasMore && document.querySelectorAll('.msg-item').length > 0) {
+                    trigger.textContent = '到底啦，没有更多留言了';
+                } else if (hasMore) {
+                    trigger.textContent = '';
+                }
             }
         }
 
-        async function sendMessage() {
-            const nickname = document.getElementById('nickname').value.trim();
-            const content = document.getElementById('content').value.trim();
-
-            if (!nickname || !content) return showAlert("提示", "称呼或内容不能为空哦");
-
-            const res = await fetch('/api/messages', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ nickname, content })
-            });
-
-            if (res.ok) {
-                document.getElementById('content').value = '';
+        // 滚动加载监听
+        const observer = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting && hasMore && !isLoading) {
                 loadMessages();
             }
+        }, { threshold: 0.1 });
+
+        observer.observe(document.getElementById('load-more-trigger'));
+
+        async function sendMessage() {
+            const nickname = nicknameInput.value.trim();
+            const content = contentInput.value.trim();
+            const sendBtn = document.getElementById('send-btn');
+
+            // 严格验证
+            if (!nickname || nickname.length > 20) return showAlert("提示", "称呼需要在1-20字之间");
+            if (!content || content.length > 500) return showAlert("提示", "内容需要在1-500字之间");
+
+            sendBtn.disabled = true;
+            try {
+                const res = await fetch('/api/messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nickname, content })
+                });
+
+                if (res.ok) {
+                    contentInput.value = '';
+                    document.getElementById('content-count').textContent = '0';
+                    loadMessages(true); // 发布成功后重置列表
+                }
+            } catch (e) {
+                showAlert("错误", "发送失败，请稍后再试");
+            } finally {
+                sendBtn.disabled = false;
+            }
         }
 
+        // 以下功能保持逻辑一致
         function requestDelete(id) {
             pendingDeleteId = id;
             showModal('confirm-modal');
@@ -374,12 +493,12 @@
 
             hideModal('confirm-modal');
             if (res.ok) {
-                loadMessages();
+                loadMessages(true);
             } else {
                 isAdmin = false;
                 localStorage.removeItem('admin_token');
                 showAlert("校验失败", "令牌已失效，请重新进入管理模式");
-                loadMessages();
+                loadMessages(true);
             }
         };
 
@@ -388,7 +507,7 @@
             if (pwd) {
                 localStorage.setItem('admin_token', pwd);
                 isAdmin = true;
-                loadMessages();
+                loadMessages(true);
                 hideModal('admin-modal');
             }
         }
@@ -403,8 +522,6 @@
             const d = new Date(dateStr);
             return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
         }
-
-        loadMessages();
     </script>
 </body>
 </html>

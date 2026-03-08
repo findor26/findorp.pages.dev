@@ -245,6 +245,58 @@
         }
 
         footer { padding: 40px 0; text-align: center; font-size: 12px; color: var(--md-sys-color-outline-variant); }
+        /* 互动工具栏 */
+.interaction-bar {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+    padding-top: 8px;
+}
+
+.vote-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--md-sys-color-on-surface-variant);
+    padding: 6px 14px;
+    border-radius: 20px;
+    background: var(--md-sys-color-surface-variant);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    user-select: none;
+    border: 1px solid transparent;
+}
+
+.vote-chip:hover {
+    filter: brightness(0.95);
+    transform: translateY(-1px);
+}
+
+.vote-chip.active-up {
+    color: #1b5e20;
+    background: #e8f5e9;
+    border-color: #c8e6c9;
+}
+
+.vote-chip.active-down {
+    color: #b71c1c;
+    background: #ffebee;
+    border-color: #ffcdd2;
+}
+
+.vote-chip.voted {
+    cursor: default;
+    pointer-events: none;
+}
+
+.vote-chip .material-symbols-outlined {
+    font-size: 18px;
+}
+
+.vote-count {
+    font-weight: 500;
+}
     </style>
 </head>
 <body>
@@ -294,6 +346,8 @@
 
     <script>
         // --- 核心状态控制 ---
+        // 记录用户已投票的 ID 及其类型 { id: 'up' | 'down' }
+        let userVotes = JSON.parse(localStorage.getItem('user_votes') || '{}');
         let isAdmin = !!localStorage.getItem('admin_token');
         let currentPage = 1;
         let isFetching = false;
@@ -351,33 +405,46 @@
         }
 
         function buildMessageHTML(m) {
-            const pinned = m.is_pinned === 1;
-            const hidden = m.is_hidden === 1;
-            
-            return `
-                <div class="card msg-item ${pinned ? 'pinned' : ''} ${hidden ? 'hidden' : ''}">
-                    ${pinned ? '<div class="pin-badge"><span class="material-symbols-outlined" style="font-size:16px;">push_pin</span>已置顶</div>' : ''}
-                    <div class="msg-header">
-                        <span class="nickname">${safeText(m.nickname)}</span>
-                        <span class="time">${prettyDate(m.created_at)}</span>
-                    </div>
-                    <div class="content">${safeText(m.content)}</div>
-                    
-                    ${isAdmin ? `
-                        <div class="admin-tools">
-                            <span class="material-symbols-outlined tool-icon ${pinned ? 'active' : ''}" 
-                                  title="置顶/取消" onclick="handlePatch(${m.id}, 'pin')">push_pin</span>
-                            <span class="material-symbols-outlined tool-icon ${hidden ? 'active' : ''}" 
-                                  title="显示/隐藏" onclick="handlePatch(${m.id}, 'hide')">${hidden ? 'visibility_off' : 'visibility'}</span>
-                            <span class="material-symbols-outlined tool-icon danger" 
-                                  title="永久删除" onclick="handleDelete(${m.id})">delete</span>
-                            <span class="ip-info">IP: ${m.ip_address || 'Unset'}</span>
-                        </div>
-                    ` : ''}
-                </div>
-            `;
-        }
+    const pinned = m.is_pinned === 1;
+    const hidden = m.is_hidden === 1;
+    const myVote = userVotes[m.id]; // 获取当前用户对该条留言的投票状态
 
+    return `
+        <div class="card msg-item ${pinned ? 'pinned' : ''} ${hidden ? 'hidden' : ''}" id="msg-card-${m.id}">
+            ${pinned ? '<div class="pin-badge"><span class="material-symbols-outlined">push_pin</span>已置顶</div>' : ''}
+            <div class="msg-header">
+                <span class="nickname">${safeText(m.nickname)}</span>
+                <span class="time">${prettyDate(m.created_at)}</span>
+            </div>
+            <div class="content">${safeText(m.content)}</div>
+            
+            <div class="interaction-bar">
+                <div class="vote-chip ${myVote === 'up' ? 'active-up voted' : ''}" 
+                     onclick="submitVote(${m.id}, 'upvote')">
+                    <span class="material-symbols-outlined">${myVote === 'up' ? 'thumb_up_filled' : 'thumb_up'}</span>
+                    <span class="vote-count">${m.upvotes || 0}</span>
+                </div>
+                <div class="vote-chip ${myVote === 'down' ? 'active-down voted' : ''}" 
+                     onclick="submitVote(${m.id}, 'downvote')">
+                    <span class="material-symbols-outlined">${myVote === 'down' ? 'thumb_down_filled' : 'thumb_down'}</span>
+                    <span class="vote-count">${m.downvotes || 0}</span>
+                </div>
+            </div>
+
+            ${isAdmin ? `
+                <div class="admin-tools">
+                    <span class="material-symbols-outlined tool-icon ${pinned ? 'active' : ''}" 
+                          onclick="handlePatch(${m.id}, 'pin')">push_pin</span>
+                    <span class="material-symbols-outlined tool-icon ${hidden ? 'active' : ''}" 
+                          onclick="handlePatch(${m.id}, 'hide')">${hidden ? 'visibility_off' : 'visibility'}</span>
+                    <span class="material-symbols-outlined tool-icon danger" 
+                          onclick="handleDelete(${m.id})">delete</span>
+                    <span class="ip-info">IP: ${m.ip_address || 'Unknown'}</span>
+                </div>
+            ` : ''}
+        </div>
+    `;
+}
         // --- 管理动作逻辑 ---
         async function handlePatch(id, action) {
             const res = await fetch('/api/messages', {
@@ -390,6 +457,46 @@
             });
             if (res.ok) fetchMessages(true);
         }
+
+        async function submitVote(id, action) {
+    // 如果已经投过票（无论点赞还是踩），禁止重复操作
+    if (userVotes[id]) return;
+
+    try {
+        const res = await fetch('/api/messages', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, action })
+        });
+
+        if (res.ok) {
+            // 1. 更新本地存储状态
+            const voteType = action === 'upvote' ? 'up' : 'down';
+            userVotes[id] = voteType;
+            localStorage.setItem('user_votes', JSON.stringify(userVotes));
+
+            // 2. 局部 UI 更新（无需刷新列表）
+            const card = document.getElementById(`msg-card-${id}`);
+            const chips = card.querySelectorAll('.vote-chip');
+            const targetIndex = action === 'upvote' ? 0 : 1;
+            const targetChip = chips[targetIndex];
+            
+            // 增加数字
+            const countEl = targetChip.querySelector('.vote-count');
+            countEl.textContent = parseInt(countEl.textContent) + 1;
+            
+            // 切换样式和图标
+            targetChip.classList.add(voteType === 'up' ? 'active-up' : 'active-down', 'voted');
+            targetChip.querySelector('.material-symbols-outlined').textContent = 
+                voteType === 'up' ? 'thumb_up_filled' : 'thumb_down_filled';
+            
+            // 禁用另一个按钮
+            chips[1 - targetIndex].classList.add('voted');
+        }
+    } catch (err) {
+        console.error("投票请求异常", err);
+    }
+}
 
         async function handleDelete(id) {
             if (!confirm("此操作不可逆，确定删除该留言吗？")) return;

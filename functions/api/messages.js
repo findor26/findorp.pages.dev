@@ -96,6 +96,30 @@ export async function onRequest(context) {
       return new Response("服务器错误", { status: 500 });
     }
   }
+  // --- 在 PATCH 逻辑中增加以下分支 ---
+if (request.method === "PATCH") {
+  const { id, action } = await request.json();
+  
+  // 权限校验分支
+  if (action === 'pin' || action === 'hide') {
+    if (adminPassword !== env.ADMIN_PASSWORD) return new Response("未授权", { status: 401 });
+    
+    let sql = action === "pin" ? 
+      "UPDATE messages SET is_pinned = 1 - is_pinned WHERE id = ?" : 
+      "UPDATE messages SET is_hidden = 1 - is_hidden WHERE id = ?";
+    await env.DB.prepare(sql).bind(id).run();
+  } 
+  
+  // 公开互动分支：点赞和踩
+  else if (action === 'upvote' || action === 'downvote') {
+    let sql = action === 'upvote' ? 
+      "UPDATE messages SET upvotes = upvotes + 1 WHERE id = ?" : 
+      "UPDATE messages SET downvotes = downvotes + 1 WHERE id = ?";
+    await env.DB.prepare(sql).bind(id).run();
+  }
+
+  return new Response("OK");
+}
 
   // --- 删除逻辑 (DELETE) ---
   if (request.method === "DELETE") {

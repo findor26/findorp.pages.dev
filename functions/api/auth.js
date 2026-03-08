@@ -3,17 +3,15 @@ export async function onRequest(context) {
     const ABLY_KEY = env.ABLY_API_KEY; 
 
     if (!ABLY_KEY || !ABLY_KEY.includes(':')) {
-        return new Response(JSON.stringify({ error: "环境变量 ABLY_API_KEY 配置错误" }), { 
-            status: 500,
-            headers: { 'Content-Type': 'application/json' }
-        });
+        return new Response(JSON.stringify({ error: "环境变量配置错误" }), { status: 500 });
     }
 
     const [keyId, keySecret] = ABLY_KEY.split(':');
-    const clientId = "user_" + Math.random().toString(36).substring(7);
+    // 使用固定的前缀加随机字符，确保符合 clientId 字符串规范
+    const clientId = `user_${Math.random().toString(36).substring(7)}`;
 
     try {
-        // 请求 Ably 生成 TokenRequest
+        // 使用简单的 POST 请求，仅包含必须的最小化字段
         const response = await fetch(`https://rest.ably.io/keys/${keyId}/requestToken`, {
             method: 'POST',
             headers: {
@@ -22,29 +20,28 @@ export async function onRequest(context) {
             },
             body: JSON.stringify({
                 clientId: clientId,
-                // 移除手动 timestamp，交给 Ably 服务端处理
-                capability: { "game-*": ["subscribe", "publish", "presence"] },
-                ttl: 3600000 
+                // 不要在这里写 timestamp，Ably 会自动补全
+                capability: { "game-*": ["subscribe", "publish", "presence"] }
             })
         });
 
+        const result = await response.json();
+
         if (!response.ok) {
-            const errorInfo = await response.json();
-            return new Response(JSON.stringify({ error: "Ably 拒绝了请求", detail: errorInfo }), { 
+            return new Response(JSON.stringify({ 
+                error: "Ably 鉴权失败", 
+                detail: result 
+            }), { 
                 status: response.status,
                 headers: { 'Content-Type': 'application/json' }
             });
         }
 
-        const tokenRequest = await response.json();
-        
-        return new Response(JSON.stringify(tokenRequest), {
-            headers: { 
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*' 
-            }
+        // 直接返回完整的 TokenRequest 对象给前端 SDK
+        return new Response(JSON.stringify(result), {
+            headers: { 'Content-Type': 'application/json' }
         });
     } catch (err) {
-        return new Response(JSON.stringify({ error: "服务器内部错误", message: err.message }), { status: 500 });
+        return new Response(JSON.stringify({ error: "系统异常", message: err.message }), { status: 500 });
     }
 }

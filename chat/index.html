@@ -3,66 +3,81 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Findor - 完整功能聊天室</title>
+    <title>Findor Chat - Full Logic Edition</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
     <script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
 </head>
 <body>
-    <div class="app-container">
-        <nav class="navigation-rail">
-            <button class="fab-btn" id="create-room-fab" title="创建新房间">
-                <span class="material-symbols-rounded">add</span>
-            </button>
-            <div class="nav-icons">
-                <div class="nav-item" id="btn-nav-lobby" title="频道大厅">
-                    <span class="material-symbols-rounded">grid_view</span>
-                    <span class="label">大厅</span>
+    <div class="app-shell">
+        <nav class="nav-rail">
+            <div class="nav-rail-top">
+                <button class="fab-trigger" id="create-room-fab" title="创建新频道">
+                    <span class="material-symbols-rounded">add</span>
+                </button>
+            </div>
+            
+            <div class="nav-rail-middle">
+                <div class="nav-destination active" id="btn-nav-lobby">
+                    <div class="icon-wrapper">
+                        <span class="material-symbols-rounded">grid_view</span>
+                    </div>
+                    <span class="nav-label">大厅</span>
                 </div>
-                <div class="nav-item" id="btn-nav-chat" title="当前聊天">
-                    <span class="material-symbols-rounded">chat</span>
-                    <span class="label">聊天</span>
+                
+                <div class="nav-destination" id="btn-nav-chat">
+                    <div class="icon-wrapper">
+                        <span class="material-symbols-rounded">chat</span>
+                    </div>
+                    <span class="nav-label">对话</span>
                 </div>
-                <div class="nav-item" id="btn-nav-group" title="在线成员">
-                    <span class="material-symbols-rounded">group</span>
-                    <span class="label">成员</span>
+                
+                <div class="nav-destination" id="btn-nav-group">
+                    <div class="icon-wrapper">
+                        <span class="material-symbols-rounded">group</span>
+                    </div>
+                    <span class="nav-label">成员</span>
                 </div>
-                <div class="nav-item logout-zone" id="btn-nav-logout" title="断开连接">
-                    <span class="material-symbols-rounded">logout</span>
-                    <span class="label">退出</span>
+            </div>
+
+            <div class="nav-rail-bottom">
+                <div class="nav-destination logout-action" id="btn-nav-logout">
+                    <div class="icon-wrapper">
+                        <span class="material-symbols-rounded">logout</span>
+                    </div>
+                    <span class="nav-label">退出</span>
                 </div>
             </div>
         </nav>
 
-        <main class="chat-main">
+        <main class="main-container">
             <header class="top-app-bar">
-                <div class="header-content">
-                    <div class="title-group">
-                        <h1 class="title-large" id="current-view-title">频道大厅</h1>
-                        <p class="title-small" id="current-view-subtitle">实时同步中...</p>
-                    </div>
-                    <div class="status-chip">
-                        <span class="status-dot"></span>
-                        <span id="online-count">0</span> 在线
+                <div class="app-bar-content">
+                    <div class="title-section">
+                        <h1 class="headline-title" id="current-view-title">频道大厅</h1>
+                        <div class="presence-indicator">
+                            <span class="status-dot-active"></span>
+                            <span id="online-count">0</span> 人在线
+                        </div>
                     </div>
                 </div>
-                <div class="top-actions">
-                    <button class="icon-button" id="set-name-btn" title="修改我的昵称">
-                        <span class="material-symbols-rounded">person_edit</span>
+                <div class="app-bar-actions">
+                    <button class="action-icon-btn" id="set-name-btn" title="修改昵称">
+                        <span class="material-symbols-rounded">account_circle</span>
                     </button>
                 </div>
             </header>
 
-            <div id="message-container" class="message-view">
-                <div class="loading-placeholder">
-                    <p>正在初始化服务...</p>
+            <div id="message-container" class="view-scroller">
+                <div class="loading-state">
+                    <p>正在连接实时同步服务...</p>
                 </div>
             </div>
 
-            <footer class="input-area" id="chat-input-zone" style="display: none;">
-                <div class="input-container">
+            <footer class="bottom-input-bar" id="chat-input-zone" style="display: none;">
+                <div class="input-surface-wrapper">
                     <input type="text" id="chat-input" placeholder="输入消息内容..." autocomplete="off">
-                    <button id="send-btn" class="send-button">
+                    <button id="send-btn" class="send-action-fab">
                         <span class="material-symbols-rounded">send</span>
                     </button>
                 </div>

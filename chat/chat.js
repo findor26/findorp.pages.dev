@@ -107,6 +107,78 @@ if (chatInput) {
         }
     };
 }
+// --- 功能扩展逻辑 ---
+
+// 1. 侧边栏图标切换 (Active 状态切换)
+const navIcons = document.querySelectorAll('.nav-icons .material-symbols-rounded');
+navIcons.forEach(icon => {
+    icon.onclick = () => {
+        navIcons.forEach(i => i.classList.remove('active'));
+        icon.classList.add('active');
+        // 模拟切换视图逻辑
+        const viewName = icon.textContent;
+        console.log(`正在切换至视图: ${viewName}`);
+        if (viewName === 'group') {
+            showToast("正在加载成员列表...");
+        }
+    };
+});
+
+// 2. 左上角 FAB (新消息/新频道)
+const fabBtn = document.querySelector('.fab-btn');
+if (fabBtn) {
+    fabBtn.onclick = () => {
+        const channelName = prompt("请输入要创建/加入的频道名称:", "技术交流区");
+        if (channelName) {
+            showToast(`已请求加入频道: ${channelName}`);
+        }
+    };
+}
+
+// 3. 顶部更多菜单 (清除聊天记录/退出)
+const moreBtn = document.querySelector('.top-app-bar .material-symbols-rounded:last-child');
+if (moreBtn) {
+    moreBtn.onclick = () => {
+        const action = confirm("是否清空当前页面的聊天记录？（仅本地）");
+        if (action) {
+            const container = document.getElementById('message-container');
+            container.innerHTML = '';
+            showToast("聊天记录已清空");
+        }
+    };
+}
+
+// 4. 输入框左侧添加按钮 (附件/图片)
+const addBtn = document.querySelector('.icon-prefix');
+if (addBtn) {
+    addBtn.onclick = () => {
+        // 触发一个隐藏的文件选择器
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'image/*';
+        fileInput.onchange = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                showToast(`准备上传文件: ${file.name}`);
+                // 此处可以扩展 Ably 的文件同步逻辑
+            }
+        };
+        fileInput.click();
+    };
+}
+
+// --- MD3 风格的轻量提示 (Toast) ---
+function showToast(message) {
+    let toast = document.getElementById('md3-toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'md3-toast';
+        document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.className = 'show';
+    setTimeout(() => { toast.className = toast.className.replace('show', ''); }, 3000);
+}
 
 // 自动聚焦输入框
 window.onload = () => {

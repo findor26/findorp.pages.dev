@@ -1,7 +1,8 @@
 const myId = 'Findor-' + Math.random().toString(36).substring(7);
 let ably = null;
 let lobbyChannel = null;
-let currentChatChannel = null; // 当前正在聊天的频道实例
+let currentChatChannel = null;
+let currentView = 'lobby'; // 标记当前视图状态
 
 /**
  * MD3 风格的 Snackbar (Toast) 提示
@@ -22,7 +23,7 @@ function showToast(message) {
     }, 3000);
 }
 
-// --- 1. 初始化应用 ---
+// --- 1. 正规化初始化 ---
 async function initApp() {
     try {
         const response = await fetch('/api/auth');
@@ -37,224 +38,222 @@ async function initApp() {
 
         lobbyChannel = ably.channels.get('lobby');
 
-        // 监听大厅成员变化，实时更新房间列表
+        // 订阅大厅内所有成员的进入、离开、更新事件
         lobbyChannel.presence.subscribe(['enter', 'leave', 'update'], () => {
-            fetchAndRenderRooms();
+            // 只有在视图为大厅时才刷新 UI，避免在聊天时干扰
+            if (currentView === 'lobby') {
+                fetchAndRenderRooms();
+            }
+            updateOnlineDisplay();
         });
 
-        // 默认进入公共大厅
-        joinRoom('Lobby', '公共频道');
+        // 初始进入大厅
+        await lobbyChannel.presence.enter({ 
+            currentRoom: 'Lobby',
+            roomTitle: '公共大厅'
+        });
 
         showToast("服务连接成功");
+        goToLobby(); // 初始显示大厅
+
     } catch (err) {
         console.error("Critical Error:", err);
         showToast("系统连接异常，请检查 API 配置");
     }
 }
 
-// --- 2. 消息处理逻辑 ---
+// --- 2. 核心视图控制逻辑 ---
 
 /**
- * 发送消息
+ * 切换到大厅视图
  */
-async function sendMessage() {
-    const input = document.getElementById('chat-input');
-    const message = input.value.trim();
-
-    if (!message || !currentChatChannel) return;
-
-    try {
-        // 发布消息到当前频道
-        await currentChatChannel.publish('chat-msg', {
-            text: message,
-            sender: myId,
-            timestamp: Date.now()
-        });
-
-        // 本地立即渲染自己发送的消息
-        renderMessage({
-            data: {
-                text: message,
-                sender: myId
-            }
-        }, true);
-
-        input.value = ''; // 清空输入框
-    } catch (err) {
-        showToast("消息发送失败");
-    }
-}
-
-/**
- * 渲染消息到 UI
- * @param {Object} msgObj Ably 消息对象
- * @param {boolean} isMe 是否由本人发送
- */
-function renderMessage(msgObj, isMe = false) {
-    const container = document.getElementById('message-container');
-    const { text, sender } = msgObj.data;
-
-    const messageElement = document.createElement('div');
-    messageElement.className = `msg-bubble ${isMe ? 'is-me' : ''}`;
+function goToLobby() {
+    currentView = 'lobby';
+    document.querySelector('.title-large').textContent = "频道大厅";
+    document.querySelector('.input-area').style.visibility = 'hidden'; // 大厅隐藏输入框
     
-    messageElement.innerHTML = `
-        <div class="sender-name">${isMe ? '我' : sender}</div>
-        <div class="msg-content">${text}</div>
-    `;
+    // 更新导航图标状态
+    document.querySelectorAll('.nav-icons .material-symbols-rounded').forEach(i => i.classList.remove('active'));
+    document.getElementById('nav-lobby').classList.add('active');
 
-    container.appendChild(messageElement);
-    // 滚动到最新消息
-    container.scrollTop = container.scrollHeight;
+    fetchAndRenderRooms();
 }
-
-// --- 3. 房间切换逻辑 ---
 
 /**
- * 加入指定房间
- * @param {string} roomId 房间唯一标识
- * @param {string} roomName 房间显示名称
+ * 渲染大厅中的房间列表
  */
-async function joinRoom(roomId, roomName) {
-    // 1. 如果已有频道，先取消订阅并离开
-    if (currentChatChannel) {
-        currentChatChannel.unsubscribe();
-    }
-
-    // 2. 更新大厅 Presence 状态，让其他人看到我在哪个房间
-    await lobbyChannel.presence.update({ 
-        currentRoom: roomId,
-        roomTitle: roomName
-    });
-
-    // 3. 获取新频道实例并订阅消息
-    currentChatChannel = ably.channels.get(`chat:${roomId}`);
-    currentChatChannel.subscribe('chat-msg', (msg) => {
-        renderMessage(msg, false); // 接收他人的消息
-    });
-
-    // 4. 更新 UI 标题和清空旧消息
-    document.querySelector('.title-large').textContent = roomName;
-    document.getElementById('message-container').innerHTML = '';
-    
-    showToast(`已进入: ${roomName}`);
-    fetchAndRenderRooms(); // 刷新房间人数统计
-}
-
-// --- 4. 房间列表同步 ---
 async function fetchAndRenderRooms() {
     if (!lobbyChannel) return;
 
     lobbyChannel.presence.get((err, members) => {
-        if (err) return;
+        if (err) return console.error("Presence Error:", err);
 
         const roomsMap = new Map();
+
         members.forEach(member => {
             const data = member.data || {};
             const roomId = data.currentRoom || 'Lobby';
             const roomName = data.roomTitle || '未知频道';
 
             if (!roomsMap.has(roomId)) {
-                roomsMap.set(roomId, { id: roomId, name: roomName, members: 0 });
+                roomsMap.set(roomId, {
+                    id: roomId,
+                    name: roomName,
+                    members: 0
+                });
             }
             roomsMap.get(roomId).members++;
         });
 
-        updateOnlineCount(members.length);
-        // 如果当前是“大厅”视图，可以根据需要决定是否渲染房间列表
-        // 这里假设点击左侧“group”图标时显示列表，点击“chat”显示消息
+        const activeRooms = Array.from(roomsMap.values());
+        updateRoomUI(activeRooms);
     });
 }
 
-function updateOnlineCount(count) {
-    const countEl = document.getElementById('online-count');
-    if (countEl) countEl.textContent = count;
-}
-
-// --- 5. 事件绑定 ---
-
-// 发送按钮点击
-document.getElementById('send-btn').onclick = sendMessage;
-
-// 回车键发送
-document.getElementById('chat-input').onkeydown = (e) => {
-    if (e.key === 'Enter') sendMessage();
-};
-
-// --- 逻辑扩充 ---
-
 /**
- * 返回大厅视图：展示所有房间列表
+ * 更新大厅 UI
  */
-function showLobbyView() {
-    // 切换 UI 状态
-    document.querySelector('.title-large').textContent = "频道大厅";
+function updateRoomUI(rooms) {
     const container = document.getElementById('message-container');
-    container.innerHTML = ''; // 清空消息，准备渲染房间卡片
-    
-    // 更新导航栏激活状态
-    document.querySelectorAll('.nav-icons span').forEach(el => el.classList.remove('active'));
-    document.getElementById('nav-lobby').classList.add('active');
+    container.innerHTML = '';
 
-    fetchAndRenderRooms(); // 触发房间列表渲染
+    if (rooms.length === 0) {
+        container.innerHTML = `<div class="empty-state" style="text-align:center;padding:20px;opacity:0.6;">目前没有活跃房间</div>`;
+        return;
+    }
+
+    rooms.forEach(room => {
+        const item = document.createElement('div');
+        item.className = 'room-card';
+        item.onclick = () => joinRoom(room.id, room.name);
+        item.innerHTML = `
+            <div class="room-lead"><span class="material-symbols-rounded">groups</span></div>
+            <div class="room-content">
+                <div class="room-title">${room.name}</div>
+                <div class="room-meta">${room.members} 用户在线 · ID: ${room.id}</div>
+            </div>
+            <span class="material-symbols-rounded">arrow_forward_ios</span>
+        `;
+        container.appendChild(item);
+    });
 }
 
 /**
- * 彻底退出应用
+ * 更新顶部栏在线人数显示
  */
-function logoutApp() {
-    if (confirm("确定要退出并断开连接吗？")) {
-        if (ably) {
-            ably.close(); // 断开实时连接
-            showToast("已断开连接");
-            setTimeout(() => {
-                window.location.reload(); // 刷新页面回到初始状态
-            }, 1000);
+function updateOnlineDisplay() {
+    lobbyChannel.presence.get((err, members) => {
+        if (!err) {
+            document.getElementById('online-count').textContent = members.length;
         }
-    }
+    });
 }
 
-// --- 事件绑定更新 ---
+// --- 3. 聊天房间逻辑 ---
 
-// 绑定大厅按钮
-document.getElementById('nav-lobby').onclick = showLobbyView;
-
-// 绑定退出按钮
-document.getElementById('nav-logout').onclick = logoutApp;
-
-// 修改原有 joinRoom 逻辑，确保切换到聊天时更新图标状态
+/**
+ * 加入特定房间
+ */
 async function joinRoom(id, name) {
+    currentView = 'chat';
+    
+    // 1. 如果已有频道，先取消订阅
     if (currentChatChannel) {
         currentChatChannel.unsubscribe();
     }
 
-    await lobbyChannel.presence.update({ 
+    // 2. 更新在 lobby 中的位置声明
+    await lobbyChannel.presence.update({
         currentRoom: id,
         roomTitle: name
     });
 
+    // 3. 订阅新房间消息
     currentChatChannel = ably.channels.get(`chat:${id}`);
     currentChatChannel.subscribe('chat-msg', (msg) => {
         renderMessage(msg, false);
     });
 
-    // 切换到聊天视图的 UI 处理
-    document.getElementById('message-container').innerHTML = '';
+    // 4. UI 切换
     document.querySelector('.title-large').textContent = name;
+    document.getElementById('message-container').innerHTML = ''; // 清空房间列表，准备显示消息
+    document.querySelector('.input-area').style.visibility = 'visible';
     
-    document.querySelectorAll('.nav-icons span').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.nav-icons .material-symbols-rounded').forEach(i => i.classList.remove('active'));
     document.getElementById('nav-chat').classList.add('active');
-    
+
     showToast(`已进入: ${name}`);
 }
 
-// 创建房间 FAB
-document.querySelector('.fab-btn').onclick = async () => {
-    const name = prompt("请输入新房间名称:");
-    if (name) {
-        const newRoomId = 'room-' + Date.now();
-        await joinRoom(newRoomId, name);
+/**
+ * 发送消息逻辑
+ */
+async function sendMessage() {
+    const input = document.getElementById('chat-input');
+    const text = input.value.trim();
+    
+    if (!text || !currentChatChannel) return;
+
+    await currentChatChannel.publish('chat-msg', {
+        text: text,
+        sender: myId
+    });
+
+    // 本地即时渲染
+    renderMessage({ data: { text, sender: myId } }, true);
+    input.value = '';
+}
+
+/**
+ * 渲染单条消息
+ */
+function renderMessage(msgObj, isMe) {
+    if (currentView !== 'chat') return; // 如果不在聊天视图，不渲染
+
+    const container = document.getElementById('message-container');
+    const { text, sender } = msgObj.data;
+
+    const msgBubble = document.createElement('div');
+    msgBubble.className = `msg-bubble ${isMe ? 'is-me' : ''}`;
+    
+    msgBubble.innerHTML = `
+        <div class="sender-name">${isMe ? '我' : sender}</div>
+        <div class="msg-content">${text}</div>
+    `;
+
+    container.appendChild(msgBubble);
+    container.scrollTop = container.scrollHeight;
+}
+
+// --- 4. 功能性操作 ---
+
+/**
+ * 退出应用断开连接
+ */
+function logout() {
+    if (confirm("确定要断开连接并退出吗？")) {
+        if (ably) ably.close();
+        showToast("已断开连接");
+        setTimeout(() => window.location.reload(), 1000);
     }
+}
+
+// --- 5. 事件绑定 ---
+
+document.querySelector('.fab-btn').onclick = async () => {
+    const name = prompt("请输入房间名称:");
+    if (!name) return;
+    const roomId = 'room-' + Date.now();
+    await joinRoom(roomId, name);
 };
 
-// 启动
+document.getElementById('send-btn').onclick = sendMessage;
+document.getElementById('chat-input').onkeydown = (e) => {
+    if (e.key === 'Enter') sendMessage();
+};
+
+document.getElementById('nav-lobby').onclick = goToLobby;
+document.getElementById('nav-logout').onclick = logout;
+
+// 默认执行初始化
 initApp();

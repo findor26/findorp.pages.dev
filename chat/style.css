@@ -243,3 +243,42 @@ body {
     font-size: 12px;
     opacity: 0.7;
 }
+
+/* 消息气泡容器，用于定位撤回按钮 */
+.msg-wrapper {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    max-width: 75%;
+}
+
+.msg-wrapper.is-me {
+    align-self: flex-end;
+}
+
+/* 撤回按钮：默认隐藏，仅在自己的消息上长按或悬停显示 */
+.recall-btn {
+    font-size: 10px;
+    color: var(--md-sys-color-primary);
+    cursor: pointer;
+    margin-top: 4px;
+    align-self: flex-end;
+    display: none;
+    background: none;
+    border: none;
+    padding: 0;
+}
+
+.msg-wrapper.is-me:hover .recall-btn {
+    display: block;
+}
+
+/* 撤回后的提示样式 */
+.recalled-text {
+    font-size: 12px;
+    font-style: italic;
+    opacity: 0.5;
+    margin: 8px 0;
+    text-align: center;
+    width: 100%;
+}

@@ -1,13 +1,14 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MDUI 2 全组件大满贯演示</title>
 
-    <link rel="stylesheet" href="https://unpkg.com/mdui@2/mdui.css">
+    <link rel="stylesheet" href="https://unpkg.com/mdui@2/mdui.css" />
     <script type="module" src="https://unpkg.com/mdui@2/mdui.global.js"></script>
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
 
     <style>
         :root {
@@ -15,12 +16,26 @@
             color: var(--mdui-color-on-surface);
             font-family: Roboto, system-ui, sans-serif;
         }
-        body { margin: 0; display: flex; min-height: 100vh; }
-        
+
+        body {
+            margin: 0;
+            display: flex;
+            min-height: 100vh;
+        }
+
         /* 响应式侧边栏 */
-        mdui-navigation-rail { height: 100vh; position: sticky; top: 0; }
-        
-        .content-wrapper { flex-grow: 1; display: flex; flex-direction: column; }
+        mdui-navigation-rail {
+            height: 100vh;
+            position: sticky;
+            top: 0;
+        }
+
+        .content-wrapper {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
         .main-content {
             max-width: 1000px;
             margin: 0 auto;
@@ -31,22 +46,49 @@
             width: 100%;
             box-sizing: border-box;
         }
+
         .component-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
             gap: 20px;
         }
-        .card-header { margin-bottom: 12px; display: block; font-weight: 500; }
-        .flex-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-        
+
+        .card-header {
+            margin-bottom: 12px;
+            display: block;
+            font-weight: 500;
+        }
+
+        .flex-row {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
         /* 表格容器样式 */
-        .table-container { overflow-x: auto; border-radius: 12px; border: 1px solid var(--mdui-color-outline-variant); }
-        table { width: 100%; border-collapse: collapse; background: var(--mdui-color-surface); }
-        th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--mdui-color-outline-variant); }
+        .table-container {
+            overflow-x: auto;
+            border-radius: 12px;
+            border: 1px solid var(--mdui-color-outline-variant);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--mdui-color-surface);
+        }
+
+        th,
+        td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--mdui-color-outline-variant);
+        }
     </style>
 </head>
-<body class="mdui-theme-light">
 
+<body class="mdui-theme-light">
     <mdui-navigation-rail value="home" divider>
         <mdui-button-icon icon="menu" slot="top"></mdui-button-icon>
         <mdui-navigation-rail-item value="home" icon="home">首页</mdui-navigation-rail-item>
@@ -66,13 +108,13 @@
         </mdui-top-app-bar>
 
         <div class="main-content">
-            
             <div class="component-grid">
-                <mdui-card variant="elevated" style="padding: 16px;">
+                <mdui-card variant="elevated" style="padding: 16px">
                     <mdui-typography variant="title-medium" class="card-header">运行状态</mdui-typography>
-                    <div style="margin-bottom: 16px;">
+                    <div style="margin-bottom: 16px">
                         <mdui-linear-progress value="0.4" id="sync-progress"></mdui-linear-progress>
-                        <mdui-typography variant="label-small" style="margin-top: 4px; display: block;">数据同步中 (40%)</mdui-typography>
+                        <mdui-typography variant="label-small" style="margin-top: 4px; display: block">数据同步中
+                            (40%)</mdui-typography>
                     </div>
                     <div class="flex-row">
                         <mdui-circular-progress></mdui-circular-progress>
@@ -81,9 +123,20 @@
                         </mdui-badge>
                         <mdui-chip icon="bolt" variant="filled">性能模式</mdui-chip>
                     </div>
+                    <!-- 定义弹窗 -->
+                    <mdui-dialog id="my-dialog" headline="对话框标题">
+                        这是对话框的内容区域。
+                        <mdui-button slot="action" variant="text"
+                            onclick="document.getElementById('my-dialog').open = false">取消</mdui-button>
+                        <mdui-button slot="action" variant="text"
+                            onclick="document.getElementById('my-dialog').open = false">确定</mdui-button>
+                    </mdui-dialog>
+
+                    <!-- 触发按钮 -->
+                    <mdui-button onclick="document.getElementById('my-dialog').open = true">打开弹窗</mdui-button>
                 </mdui-card>
 
-                <mdui-card variant="outlined" style="padding: 16px;">
+                <mdui-card variant="outlined" style="padding: 16px">
                     <mdui-typography variant="title-medium" class="card-header">常见问题</mdui-typography>
                     <mdui-collapse>
                         <mdui-collapse-item header="如何修改主题颜色？" icon="color_lens">
@@ -96,7 +149,7 @@
                 </mdui-card>
             </div>
 
-            <mdui-card variant="filled" style="padding: 16px;">
+            <mdui-card variant="filled" style="padding: 16px">
                 <mdui-typography variant="title-medium" class="card-header">近 7 日服务器负载</mdui-typography>
                 <div class="table-container">
                     <table>
@@ -111,7 +164,9 @@
                         <tbody>
                             <tr>
                                 <td>Findor-Server-01</td>
-                                <td><span style="color: var(--mdui-color-error)">88%</span></td>
+                                <td>
+                                    <span style="color: var(--mdui-color-error)">88%</span>
+                                </td>
                                 <td>良好</td>
                                 <td><mdui-button variant="text">重启</mdui-button></td>
                             </tr>
@@ -126,20 +181,20 @@
                 </div>
             </mdui-card>
 
-            <mdui-card variant="outlined" style="padding: 16px;">
+            <mdui-card variant="outlined" style="padding: 16px">
                 <mdui-typography variant="title-medium" class="card-header">系统配置</mdui-typography>
-                <div class="component-grid" style="margin-top: 12px;">
+                <div class="component-grid" style="margin-top: 12px">
                     <div>
                         <mdui-select label="自动备份频率" value="daily">
                             <mdui-menu-item value="hourly">每小时</mdui-menu-item>
                             <mdui-menu-item value="daily">每天</mdui-menu-item>
                             <mdui-menu-item value="weekly">每周</mdui-menu-item>
                         </mdui-select>
-                        <mdui-slider value="50" icon="volume_up" style="margin-top: 24px;"></mdui-slider>
+                        <mdui-slider value="50" icon="volume_up" style="margin-top: 24px"></mdui-slider>
                     </div>
                     <div>
                         <mdui-text-field label="访问令牌" type="password" toggle-password icon="vpn_key"></mdui-text-field>
-                        <div class="flex-row" style="margin-top: 16px;">
+                        <div class="flex-row" style="margin-top: 16px">
                             <mdui-checkbox checked>启用 API</mdui-checkbox>
                             <mdui-switch id="debug-mode"></mdui-switch>
                             <mdui-typography variant="label-large">调试模式</mdui-typography>
@@ -148,7 +203,7 @@
                 </div>
             </mdui-card>
 
-            <div class="flex-row" style="justify-content: center; margin-bottom: 50px;">
+            <div class="flex-row" style="justify-content: center; margin-bottom: 50px">
                 <mdui-dropdown>
                     <mdui-button slot="trigger" variant="tonal" end-icon="arrow_drop_down">操作菜单</mdui-button>
                     <mdui-menu>
@@ -174,24 +229,24 @@
 
     <script>
         // 主题切换
-        const themeBtn = document.querySelector('#theme-toggle');
-        themeBtn.addEventListener('click', () => {
+        const themeBtn = document.querySelector("#theme-toggle");
+        themeBtn.addEventListener("click", () => {
             const body = document.body;
-            const isDark = body.classList.contains('mdui-theme-dark');
-            body.classList.toggle('mdui-theme-dark', !isDark);
-            body.classList.toggle('mdui-theme-light', isDark);
-            themeBtn.icon = isDark ? 'palette' : 'dark_mode';
+            const isDark = body.classList.contains("mdui-theme-dark");
+            body.classList.toggle("mdui-theme-dark", !isDark);
+            body.classList.toggle("mdui-theme-light", isDark);
+            themeBtn.icon = isDark ? "palette" : "dark_mode";
         });
 
         // Snackbar 演示
-        const snackbarBtn = document.querySelector('#btn-snackbar');
-        const snackbar = document.querySelector('#snackbar-main');
-        snackBtn.addEventListener('click', () => {
+        const snackbarBtn = document.querySelector("#btn-snackbar");
+        const snackbar = document.querySelector("#snackbar-main");
+        snackBtn.addEventListener("click", () => {
             snackbar.open = true;
         });
 
         // 模拟进度条变化
-        const progress = document.querySelector('#sync-progress');
+        const progress = document.querySelector("#sync-progress");
         let val = 0.4;
         setInterval(() => {
             val = val >= 1 ? 0 : val + 0.05;
@@ -199,4 +254,5 @@
         }, 2000);
     </script>
 </body>
+
 </html>

@@ -1,76 +1,144 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
     <title>Findor's Tank | Canvas 引擎版</title>
     <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.150.1/three.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js" integrity="sha512-avLcnGxl5mqAX/wIKERdb1gFNkOLHh2W5JNCfJm5OugpEPBz7LNXJJ3BDjjwO00AxEY1MqdNjtEmiYhKC0ld7g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"
+      integrity="sha512-avLcnGxl5mqAX/wIKERdb1gFNkOLHh2W5JNCfJm5OugpEPBz7LNXJJ3BDjjwO00AxEY1MqdNjtEmiYhKC0ld7g=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    ></script>
     <style>
-        body { margin: 0; background: #1a1a1b; color: white; overflow: hidden; font-family: sans-serif; touch-action: none; }
-        #game-canvas { display: block; background: #202124; }
-        #ui { position: fixed; top: 10px; left: 10px; z-index: 100; pointer-events: none; background: rgba(0,0,0,0.6); padding: 10px; border-radius: 8px; font-size: 14px; }
-        #ctrl { position: fixed; bottom: 40px; left: 40px; right: 40px; display: flex; justify-content: space-between; align-items: flex-end; }
-        #joystick-container { width: 120px; height: 120px; background: rgba(255,255,255,0.1); border-radius: 50%; position: relative; }
-        #joystick-knob { width: 50px; height: 50px; background: rgba(255,255,255,0.3); border-radius: 50%; position: absolute; left: 35px; top: 35px; }
-        #fire-btn { width: 80px; height: 80px; background: rgba(186, 26, 26, 0.6); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; pointer-events: auto; }
-        #chat-box {
-    position: fixed;
-    bottom: 140px; /* 避开摇杆高度 */
-    left: 20px;
-    width: 260px;
-    height: 200px;
-    background: rgba(0, 0, 0, 0.4);
-    border-radius: 8px;
-    display: flex;
-    flex-direction: column;
-    pointer-events: auto;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-#chat-messages {
-    flex: 1;
-    overflow-y: auto;
-    padding: 8px;
-    font-size: 13px;
-    color: #eee;
-    word-break: break-all;
-}
-#chat-input {
-    background: rgba(255, 255, 255, 0.1);
-    border: none;
-    padding: 8px;
-    color: white;
-    border-radius: 0 0 8px 8px;
-    outline: none;
-}
-.chat-msg { margin-bottom: 4px; }
-.chat-msg-id { color: #4caf50; font-weight: bold; margin-right: 4px; }
+      body {
+        margin: 0;
+        background: #1a1a1b;
+        color: white;
+        overflow: hidden;
+        font-family: sans-serif;
+        touch-action: none;
+      }
+      #game-canvas {
+        display: block;
+        background: #202124;
+      }
+      #ui {
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        z-index: 100;
+        pointer-events: none;
+        background: rgba(0, 0, 0, 0.6);
+        padding: 10px;
+        border-radius: 8px;
+        font-size: 14px;
+      }
+      #ctrl {
+        position: fixed;
+        bottom: 40px;
+        left: 40px;
+        right: 40px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+      }
+      #joystick-container {
+        width: 120px;
+        height: 120px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 50%;
+        position: relative;
+      }
+      #joystick-knob {
+        width: 50px;
+        height: 50px;
+        background: rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        position: absolute;
+        left: 35px;
+        top: 35px;
+      }
+      #fire-btn {
+        width: 80px;
+        height: 80px;
+        background: rgba(186, 26, 26, 0.6);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        pointer-events: auto;
+      }
+      #chat-box {
+        position: fixed;
+        bottom: 140px; /* 避开摇杆高度 */
+        left: 20px;
+        width: 260px;
+        height: 200px;
+        background: rgba(0, 0, 0, 0.4);
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        pointer-events: auto;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      #chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px;
+        font-size: 13px;
+        color: #eee;
+        word-break: break-all;
+      }
+      #chat-input {
+        background: rgba(255, 255, 255, 0.1);
+        border: none;
+        padding: 8px;
+        color: white;
+        border-radius: 0 0 8px 8px;
+        outline: none;
+      }
+      .chat-msg {
+        margin-bottom: 4px;
+      }
+      .chat-msg-id {
+        color: #4caf50;
+        font-weight: bold;
+        margin-right: 4px;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
+    <div id="ui">
+      <div>状态: <span id="status">初始化...</span></div>
+      <div>ID: <span id="my-id">-</span></div>
+      <div>在线: <span id="count">0</span></div>
+      <!-- <div style="color: #ffeb3b;">提示: 房主负责生成道具</div> -->
+    </div>
 
-<div id="ui">
-    <div>状态: <span id="status">初始化...</span></div>
-    <div>ID: <span id="my-id">-</span></div>
-    <div>在线: <span id="count">0</span></div>
-    <div style="color: #ffeb3b;">提示: 房主负责生成道具</div>
-</div>
+    <canvas id="game-canvas"></canvas>
 
-<canvas id="game-canvas"></canvas>
+    <div id="chat-box">
+      <div id="chat-messages"></div>
+      <input
+        type="text"
+        id="chat-input"
+        placeholder="按回车键聊天..."
+        maxlength="50"
+      />
+    </div>
 
-<div id="chat-box">
-    <div id="chat-messages"></div>
-    <input type="text" id="chat-input" placeholder="按回车键聊天..." maxlength="50">
-</div>
+    <div id="ctrl">
+      <div id="joystick-container"><div id="joystick-knob"></div></div>
+      <div id="fire-btn">FIRE</div>
+    </div>
 
-<div id="ctrl">
-    <div id="joystick-container"><div id="joystick-knob"></div></div>
-    <div id="fire-btn">FIRE</div>
-</div>
-
-
-
-<script src="game.js"></script>
-</body>
+    <script src="game.js"></script>
+  </body>
 </html>

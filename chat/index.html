@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MD3 Chat Space</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Symbols+Rounded" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <nav class="navigation-rail">
+            <button class="fab-btn">
+                <span class="material-symbols-rounded">edit</span>
+            </button>
+            <div class="nav-icons">
+                <span class="material-symbols-rounded active">chat</span>
+                <span class="material-symbols-rounded">group</span>
+                <span class="material-symbols-rounded">settings</span>
+            </div>
+        </nav>
+
+        <main class="chat-main">
+            <header class="top-app-bar">
+                <div class="header-content">
+                    <h1 class="title-large">公共频道</h1>
+                    <div class="status-chip">
+                        <span class="dot"></span>
+                        <span id="online-count">1</span> 在线
+                    </div>
+                </div>
+                <span class="material-symbols-rounded">more_vert</span>
+            </header>
+
+            <div id="message-container" class="message-view">
+                </div>
+
+            <footer class="input-area">
+                <div class="search-bar">
+                    <span class="material-symbols-rounded icon-prefix">add</span>
+                    <input type="text" id="chat-input" placeholder="输入消息..." autocomplete="off">
+                    <button id="send-btn" class="icon-button">
+                        <span class="material-symbols-rounded">send</span>
+                    </button>
+                </div>
+            </footer>
+        </main>
+    </div>
+
+    <script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
+    <script src="chat.js"></script>
+</body>
+</html>

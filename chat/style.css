@@ -400,6 +400,16 @@ body {
     color: var(--md-sys-color-outline);
 }
 
+/* 1. 修复全局高度定义，确保不超出 Edge 视口 */
+body, .app-shell {
+    /* 使用 dvh 自动排除浏览器工具栏高度 */
+    height: 100vh; 
+    height: 100dvh; 
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
 /* 针对移动端的深度布局修复 */
 @media (max-width: 600px) {
     /* 1. 将容器改为上下布局，防止侧边栏横向遮挡 */
@@ -407,17 +417,34 @@ body {
         flex-direction: column-reverse; 
     }
 
-    /* 2. 将侧边导航重置为底部导航栏 */
+    /* 2. 增强底部导航栏的间距，防止被 Edge 按钮挡住 */
     .nav-rail {
+        flex-direction: row;
         width: 100%;
-        height: auto;
-        padding: 8px 0;
-        flex-direction: row; /* 横向排列图标 */
-        border-right: none;
-        border-top: 1px solid var(--md-sys-color-surface-variant);
         background-color: var(--md-sys-color-surface);
-        justify-content: space-around;
+        border-top: 1px solid var(--md-sys-color-surface-variant);
+        
+        /* 核心修复：增加底部内边距 */
+        /* safe-area-inset-bottom 处理全面屏黑条 */
+        /* 额外增加 12px 避开 Edge 的操作按钮敏感区 */
+        padding-bottom: calc(env(safe-area-inset-bottom) + 12px); 
+        
+        position: relative;
         z-index: 100;
+    }
+
+    /* 3. 确保主内容区域高度自适应 */
+    .content-main {
+        flex: 1;
+        height: 0; /* 强制 flex 容器计算高度而非撑开 */
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* 4. 如果是在对话界面，输入框也需要避让 */
+    .input-area {
+        /* 如果导航栏在底部，输入框上方需要留空，或者导航栏在输入框下方时增加底边距 */
+        padding-bottom: 8px; 
     }
 
     /* 移动端隐藏 FAB 或调整位置 */
@@ -438,13 +465,6 @@ body {
 
     .nav-item .material-symbols-rounded {
         padding: 4px 16px; /* 缩小背景色块，适应窄屏 */
-    }
-
-    /* 3. 修复内容区域被遮挡的问题 */
-    .content-main {
-        width: 100%;
-        flex: 1;
-        overflow: hidden;
     }
 
     /* 4. 优化顶部状态栏，防止状态碎片重叠 */

@@ -71,6 +71,41 @@ export async function onRequest(context) {
   }
 
   // --- 状态更新逻辑 (PATCH) ---
+  // --- 修复后的 PATCH 逻辑 ---
+  if (request.method === "PATCH") {
+    try {
+      const { id, action } = await request.json();
+      if (!id || !action) return new Response("参数缺失", { status: 400 });
+
+      // 第一类：管理操作（置顶、隐藏）-> 必须校验 Admin-Token
+      if (action === "pin" || action === "hide") {
+        if (!isAdmin) {
+          return new Response("未授权的管理操作", { status: 401 });
+        }
+
+        let sql = action === "pin" 
+          ? "UPDATE messages SET is_pinned = 1 - is_pinned WHERE id = ?" 
+          : "UPDATE messages SET is_hidden = 1 - is_hidden WHERE id = ?";
+        
+        await env.DB.prepare(sql).bind(id).run();
+        return new Response("管理状态已更新");
+      }
+
+      // 第二类：公共互动（点赞、踩）-> 所有人可用，无需 401 校验
+      if (action === "upvote" || action === "downvote") {
+        let sql = action === "upvote"
+          ? "UPDATE messages SET upvotes = upvotes + 1 WHERE id = ?"
+          : "UPDATE messages SET downvotes = downvotes + 1 WHERE id = ?";
+        
+        await env.DB.prepare(sql).bind(id).run();
+        return new Response("投票成功");
+      }
+
+      return new Response("未知操作", { status: 400 });
+    } catch (err) {
+      return new Response("服务器内部错误", { status: 500 });
+    }
+  }
   // 用于管理员 置顶 (pin) 或 隐藏 (hide) 留言
   if (request.method === "PATCH") {
     if (!isAdmin) return new Response("未授权", { status: 401 });
@@ -96,30 +131,6 @@ export async function onRequest(context) {
       return new Response("服务器错误", { status: 500 });
     }
   }
-  // --- 在 PATCH 逻辑中增加以下分支 ---
-if (request.method === "PATCH") {
-  const { id, action } = await request.json();
-  
-  // 权限校验分支
-  if (action === 'pin' || action === 'hide') {
-    if (adminPassword !== env.ADMIN_PASSWORD) return new Response("未授权", { status: 401 });
-    
-    let sql = action === "pin" ? 
-      "UPDATE messages SET is_pinned = 1 - is_pinned WHERE id = ?" : 
-      "UPDATE messages SET is_hidden = 1 - is_hidden WHERE id = ?";
-    await env.DB.prepare(sql).bind(id).run();
-  } 
-  
-  // 公开互动分支：点赞和踩
-  else if (action === 'upvote' || action === 'downvote') {
-    let sql = action === 'upvote' ? 
-      "UPDATE messages SET upvotes = upvotes + 1 WHERE id = ?" : 
-      "UPDATE messages SET downvotes = downvotes + 1 WHERE id = ?";
-    await env.DB.prepare(sql).bind(id).run();
-  }
-
-  return new Response("OK");
-}
 
   // --- 删除逻辑 (DELETE) ---
   if (request.method === "DELETE") {

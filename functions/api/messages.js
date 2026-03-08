@@ -4,7 +4,7 @@ export async function onRequest(context) {
 
   // --- 获取逻辑 (GET) ---
   if (request.method === "GET") {
-    const { results } = await env.comments.prepare(
+    const { results } = await env.DB.prepare(
       "SELECT * FROM messages ORDER BY created_at DESC LIMIT 100"
     ).all();
     return Response.json(results);
@@ -23,9 +23,7 @@ export async function onRequest(context) {
 
   // --- 删除逻辑 (DELETE) ---
   if (request.method === "DELETE") {
-    // 简单的鉴权：从 Header 获取密码
     const adminPassword = request.headers.get("Admin-Token");
-    // 建议把密码存在 Pages 的环境变量里（Environment Variables），这里暂定为 "mypassword"
     const SECRET = env.ADMIN_PASSWORD || "mypassword"; 
 
     if (adminPassword !== SECRET) {
@@ -35,7 +33,7 @@ export async function onRequest(context) {
     const messageId = url.searchParams.get("id");
     if (!messageId) return new Response("缺少 ID", { status: 400 });
 
-    await env.comments.prepare(
+    await env.DB.prepare(
       "DELETE FROM messages WHERE id = ?"
     ).bind(messageId).run();
 

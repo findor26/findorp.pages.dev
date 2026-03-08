@@ -20,23 +20,50 @@
         const tanks = {};
 
         async function start() {
-            // 安全模式：指向你的 Cloudflare Function 授权接口
-            const ably = new Ably.Realtime({ 
-                authUrl: '/api/auth',
-                clientId: myId 
-            });
+            // 强制修正模式：通过回调函数手动控制数据进入 SDK 的格式
+    const ably = new Ably.Realtime({ 
+        clientId: myId,
+        authCallback: async (tokenParams, callback) => {
+            try {
+                const response = await fetch('/api/auth');
+                const data = await response.json();
 
-            await ably.connection.once('connected');
-            console.log("✅ 成功连接！");
+                // 核心修复逻辑：Ably SDK 对 timestamp 类型极其挑剔
+                // 如果后端返回的是字符串，这里强制转为 Number
+                if (data.timestamp) {
+                    data.timestamp = Number(data.timestamp);
+                }
 
-            channel = ably.channels.get('game-room');
+                // 如果返回的对象里套了层 "error"，说明后端报错了，透传给 SDK
+                if (data.error) {
+                    console.error("后端认证失败:", data.error);
+                    callback(data.error, null);
+                    return;
+                }
 
-            // 订阅：收到别人移动的消息
-            await channel.subscribe('move', (msg) => {
-                if (msg.clientId === myId) return;
-                updateTank(msg.clientId, msg.data, true);
-            });
+                // 成功：将纯净的、类型正确的 TokenRequest 交给 Ably
+                callback(null, data);
+            } catch (err) {
+                console.error("网络请求异常:", err);
+                callback(err, null);
+            }
+        }
+    });
 
+    // 监听连接状态
+    ably.connection.on('connected', () => {
+        console.log("✅ 坦克已上线！ID:", myId);
+    });
+
+    await ably.connection.once('connected');
+
+    channel = ably.channels.get('game-room');
+
+    // 订阅逻辑... (保持不变)
+    await channel.subscribe('move', (msg) => {
+        if (msg.clientId === myId) return;
+        updateTank(msg.clientId, msg.data, true);
+    });
             // 自己移动
             window.onkeydown = (e) => {
                 const pos = { x: parseInt(myTank.style.left || 0), y: parseInt(myTank.style.top || 0) };

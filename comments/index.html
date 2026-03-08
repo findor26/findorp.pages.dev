@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>留言板 | MD3</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
+    <style>
+        :root {
+            /* MD3 标准配色方案 (Tonal Palettes) */
+            --md-sys-color-primary: #0061a4;
+            --md-sys-color-on-primary: #ffffff;
+            --md-sys-color-primary-container: #d1e4ff;
+            --md-sys-color-on-primary-container: #001d36;
+            --md-sys-color-surface: #fdfcff;
+            --md-sys-color-on-surface: #1a1c1e;
+            --md-sys-color-surface-variant: #dfe2eb;
+            --md-sys-color-on-surface-variant: #43474e;
+            --md-sys-color-outline: #73777f;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--md-sys-color-surface);
+            color: var(--md-sys-color-on-surface);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+        }
+
+        /* MD3 Card 样式 */
+        .card {
+            background-color: var(--md-sys-color-surface);
+            border: 1px solid var(--md-sys-color-outline);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            transition: box-shadow 0.2s;
+        }
+
+        .card:hover {
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+        }
+
+        /* 输入框样式 */
+        .input-field {
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid var(--md-sys-color-outline);
+            border-radius: 4px;
+            padding: 12px;
+            margin-top: 8px;
+            margin-bottom: 16px;
+            background: transparent;
+            font-size: 16px;
+        }
+
+        .input-field:focus {
+            outline: 2px solid var(--md-sys-color-primary);
+            border-color: transparent;
+        }
+
+        /* MD3 Filled Button */
+        .btn {
+            background-color: var(--md-sys-color-primary);
+            color: var(--md-sys-color-on-primary);
+            border: none;
+            padding: 10px 24px;
+            border-radius: 100px;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-text {
+            background: none;
+            color: var(--md-sys-color-primary);
+            padding: 10px;
+            font-size: 14px;
+        }
+
+        /* 留言列表 */
+        .msg-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .nickname {
+            font-weight: 500;
+            color: var(--md-sys-color-primary);
+        }
+
+        .time {
+            font-size: 12px;
+            color: var(--md-sys-color-on-surface-variant);
+        }
+
+        .content {
+            line-height: 1.5;
+            word-break: break-all;
+        }
+
+        .delete-btn {
+            color: #ba1a1a;
+            cursor: pointer;
+            font-size: 18px;
+            display: none; /* 默认隐藏 */
+        }
+
+        .admin-active .delete-btn {
+            display: inline-block;
+        }
+
+        footer {
+            margin-top: 40px;
+            font-size: 12px;
+            opacity: 0.6;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1 style="font-weight: 400;">留言板</h1>
+
+        <div class="card">
+            <input type="text" id="nickname" class="input-field" placeholder="称呼">
+            <textarea id="content" class="input-field" rows="3" placeholder="说点什么..."></textarea>
+            <button class="btn" onclick="sendMessage()">
+                <span class="material-symbols-outlined">send</span>
+                发布
+            </button>
+        </div>
+
+        <div id="msg-list">
+            </div>
+
+        <button class="btn-text" onclick="toggleAdmin()">
+            管理模式
+        </button>
+    </div>
+
+    <footer>Powered by Cloudflare Pages & D1</footer>
+
+    <script>
+        let isAdmin = false;
+
+        // 加载留言
+        async function loadMessages() {
+            try {
+                const res = await fetch('/api/messages');
+                const data = await res.json();
+                const list = document.getElementById('msg-list');
+                
+                list.innerHTML = data.map(m => `
+                    <div class="card ${isAdmin ? 'admin-active' : ''}">
+                        <div class="msg-header">
+                            <div>
+                                <span class="nickname">${escapeHtml(m.nickname)}</span>
+                                <span class="time">${new Date(m.created_at).toLocaleString()}</span>
+                            </div>
+                            <span class="material-symbols-outlined delete-btn" onclick="deleteMessage(${m.id})">delete</span>
+                        </div>
+                        <div class="content">${escapeHtml(m.content)}</div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error("加载失败", err);
+            }
+        }
+
+        // 发送留言
+        async function sendMessage() {
+            const nickname = document.getElementById('nickname').value;
+            const content = document.getElementById('content').value;
+
+            if (!nickname || !content) return alert("请填写完整信息");
+
+            const res = await fetch('/api/messages', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nickname, content })
+            });
+
+            if (res.ok) {
+                document.getElementById('content').value = '';
+                loadMessages();
+            }
+        }
+
+        // 删除留言
+        async function deleteMessage(id) {
+            if (!confirm("确定要删除这条留言吗？")) return;
+            
+            const pwd = localStorage.getItem('admin_token');
+            const res = await fetch(`/api/messages?id=${id}`, {
+                method: 'DELETE',
+                headers: { 'Admin-Token': pwd }
+            });
+
+            if (res.ok) {
+                loadMessages();
+            } else {
+                alert("权限不足");
+            }
+        }
+
+        // 切换管理模式
+        function toggleAdmin() {
+            const pwd = prompt("输入管理令牌:");
+            if (pwd) {
+                localStorage.setItem('admin_token', pwd);
+                isAdmin = true;
+                loadMessages();
+            }
+        }
+
+        // 转义 HTML 防止 XSS
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        // 初始化加载
+        loadMessages();
+    </script>
+</body>
+</html>

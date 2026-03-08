@@ -1,188 +1,130 @@
 const myId = 'Findor-' + Math.random().toString(36).substring(7);
-let channel = null;
+let ably = null;
+let lobbyChannel = null;
+let allRooms = []; // 存储所有在线房间数据
 
-// --- 0. 彻底清除 3D 坦克时代的残留监听器 ---
-// 强制覆盖掉 window 上的 keydown 事件，防止数字键被拦截
-window.onkeydown = null;
-window.onkeyup = null;
-
-async function initChat() {
+// --- 1. 初始化连接 ---
+async function initApp() {
     try {
         const response = await fetch('/api/auth');
         const apiKey = await response.text();
-        const ably = new Ably.Realtime({ key: apiKey.trim(), clientId: myId });
-
+        
+        // 初始化 Ably 客户端
+        ably = new Ably.Realtime({ key: apiKey.trim(), clientId: myId });
         await new Promise(resolve => ably.connection.on('connected', resolve));
         
-        channel = ably.channels.get('global-chat');
-
-        // 订阅消息
-        channel.subscribe('msg', (messageData) => {
-            renderMessage(messageData.clientId, messageData.data, messageData.clientId === myId);
-        });
-
-        // 统计在线人数
-        channel.presence.subscribe('enter', updateCount);
-        channel.presence.subscribe('leave', updateCount);
+        // 默认进入大厅频道（用于发现房间）
+        lobbyChannel = ably.channels.get('lobby');
+        await lobbyChannel.presence.enter({ roomName: '大厅' });
         
-        // 进入 Presence 集合
-        await channel.presence.enter();
-        updateCount();
-
+        showToast("已连接至服务器");
+        refreshRooms(); // 初始加载
     } catch (err) {
-        console.error("连接失败", err);
+        console.error("认证失败:", err);
+        showToast("无法获取 API Key");
     }
 }
 
-function updateCount() {
-    if (!channel) return;
-    channel.presence.get((err, members) => {
-        const countElement = document.getElementById('online-count');
-        if (!err && countElement) {
-            countElement.textContent = members.length;
-        }
+// --- 2. 刷新按钮功能 (Refresh) ---
+async function refreshRooms() {
+    if (!lobbyChannel) return;
+
+    showToast("正在同步房间...");
+    
+    // 获取大厅中的所有成员，分析他们所在的房间
+    lobbyChannel.presence.get((err, members) => {
+        if (err) return console.error(err);
+
+        // 模拟/分析成员数据生成房间列表
+        // 实际开发中通常由后端 API 直接返回 active_channels
+        allRooms = [
+            { id: 'tech', name: '技术交流区', count: members.length, lastActive: '刚才' },
+            { id: 'tank', name: '3D坦克基地', count: 3, lastActive: '5分钟前' },
+            { id: 'chat', name: '闲聊区', count: 7, lastActive: '2小时前' }
+        ];
+
+        renderRoomUI(allRooms);
+        updateRoomStatusText(allRooms.length);
     });
 }
 
-function renderMessage(sender, text, isMe) {
-    const container = document.getElementById('message-container');
-    if (!container) return;
-
-    const wrap = document.createElement('div');
-    wrap.style.display = 'flex';
-    wrap.style.flexDirection = 'column';
-    wrap.style.alignItems = isMe ? 'flex-end' : 'flex-start';
-
-    const bubble = document.createElement('div');
-    bubble.className = isMe ? 'msg-bubble is-me' : 'msg-bubble';
-    
-    // 渲染发送者名称和内容
-    bubble.innerHTML = `
-        ${!isMe ? `<div class="sender-name">${sender}</div>` : ''}
-        <div class="content"></div>
-    `;
-    
-    // 使用 textContent 赋值，防止 XSS 攻击
-    bubble.querySelector('.content').textContent = text;
-
-    wrap.appendChild(bubble);
-    container.appendChild(wrap);
-    
-    // 平滑滚动到底部
-    container.scrollTo({
-        top: container.scrollHeight,
-        behavior: 'smooth'
-    });
-}
-
-function processSendMessage() {
-    const input = document.getElementById('chat-input');
-    const messageText = input.value.trim();
-    
-    if (messageText && channel) {
-        channel.publish('msg', messageText);
-        input.value = '';
-        input.focus(); // 发送后重新聚焦
-    }
-}
-
-// --- 事件绑定 ---
-const sendButton = document.getElementById('send-btn');
+// --- 3. 房间搜索功能 (Room Finder) ---
 const chatInput = document.getElementById('chat-input');
+chatInput.addEventListener('input', (e) => {
+    const searchTerm = e.target.value.toLowerCase();
+    const filtered = allRooms.filter(room => 
+        room.name.toLowerCase().includes(searchTerm) || 
+        room.id.toLowerCase().includes(searchTerm)
+    );
+    renderRoomUI(filtered);
+    updateRoomStatusText(filtered.length);
+});
 
-if (sendButton) {
-    sendButton.onclick = processSendMessage;
-}
-
-if (chatInput) {
-    // 确保数字输入不会被阻止
-    chatInput.onkeydown = (e) => {
-        // 允许所有字符（包括数字）传播，不调用 preventDefault
-        e.stopPropagation();
-    };
-
-    chatInput.onkeypress = (e) => {
-        if (e.key === 'Enter') {
-            processSendMessage();
-        }
-    };
-}
-// --- 功能扩展逻辑 ---
-
-// 1. 侧边栏图标切换 (Active 状态切换)
-const navIcons = document.querySelectorAll('.nav-icons .material-symbols-rounded');
-navIcons.forEach(icon => {
+// --- 4. 侧边栏按钮逻辑 (Navigation Rail) ---
+document.querySelectorAll('.nav-icons span').forEach(icon => {
     icon.onclick = () => {
-        navIcons.forEach(i => i.classList.remove('active'));
+        // MD3 状态切换
+        document.querySelector('.nav-icons .active').classList.remove('active');
         icon.classList.add('active');
-        // 模拟切换视图逻辑
-        const viewName = icon.textContent;
-        console.log(`正在切换至视图: ${viewName}`);
-        if (viewName === 'group') {
-            showToast("正在加载成员列表...");
+        
+        const view = icon.textContent;
+        if (view === 'group') {
+            showToast("正在加载用户列表...");
+        } else if (view === 'settings') {
+            showToast("设置界面开发中...");
         }
     };
 });
 
-// 2. 左上角 FAB (新消息/新频道)
-const fabBtn = document.querySelector('.fab-btn');
-if (fabBtn) {
-    fabBtn.onclick = () => {
-        const channelName = prompt("请输入要创建/加入的频道名称:", "技术交流区");
-        if (channelName) {
-            showToast(`已请求加入频道: ${channelName}`);
-        }
-    };
-}
-
-// 3. 顶部更多菜单 (清除聊天记录/退出)
-const moreBtn = document.querySelector('.top-app-bar .material-symbols-rounded:last-child');
-if (moreBtn) {
-    moreBtn.onclick = () => {
-        const action = confirm("是否清空当前页面的聊天记录？（仅本地）");
-        if (action) {
-            const container = document.getElementById('message-container');
-            container.innerHTML = '';
-            showToast("聊天记录已清空");
-        }
-    };
-}
-
-// 4. 输入框左侧添加按钮 (附件/图片)
-const addBtn = document.querySelector('.icon-prefix');
-if (addBtn) {
-    addBtn.onclick = () => {
-        // 触发一个隐藏的文件选择器
-        const fileInput = document.createElement('input');
-        fileInput.type = 'file';
-        fileInput.accept = 'image/*';
-        fileInput.onchange = (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                showToast(`准备上传文件: ${file.name}`);
-                // 此处可以扩展 Ably 的文件同步逻辑
-            }
-        };
-        fileInput.click();
-    };
-}
-
-// --- MD3 风格的轻量提示 (Toast) ---
-function showToast(message) {
-    let toast = document.getElementById('md3-toast');
-    if (!toast) {
-        toast = document.createElement('div');
-        toast.id = 'md3-toast';
-        document.body.appendChild(toast);
+// --- 5. 创建按钮功能 (FAB) ---
+document.querySelector('.fab-btn').onclick = () => {
+    const newRoomName = prompt("请输入新房间名称:");
+    if (newRoomName) {
+        showToast(`房间 "${newRoomName}" 创建成功！`);
+        // 逻辑：在此发布一条创建消息或直接跳转
     }
-    toast.textContent = message;
-    toast.className = 'show';
-    setTimeout(() => { toast.className = toast.className.replace('show', ''); }, 3000);
-}
-
-// 自动聚焦输入框
-window.onload = () => {
-    if (chatInput) chatInput.focus();
 };
 
-initChat();
+// --- 辅助：渲染列表 ---
+function renderRoomUI(rooms) {
+    const container = document.getElementById('message-container');
+    container.innerHTML = '';
+
+    if (rooms.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <span class="material-symbols-rounded">search_off</span>
+                <p>没有找到匹配的房间</p>
+            </div>
+        `;
+        return;
+    }
+
+    rooms.forEach(room => {
+        const card = document.createElement('div');
+        card.className = 'room-card';
+        card.onclick = () => joinRoom(room.id);
+        card.innerHTML = `
+            <div class="room-lead">
+                <span class="material-symbols-rounded">forum</span>
+            </div>
+            <div class="room-content">
+                <div class="room-title">${room.name}</div>
+                <div class="room-meta">${room.count} 人在线 · ${room.lastActive}</div>
+            </div>
+            <span class="material-symbols-rounded">chevron_right</span>
+        `;
+        container.appendChild(card);
+    });
+}
+
+function updateRoomStatusText(count) {
+    const statusText = document.querySelector('.header-content p') || { textContent: '' };
+    statusText.textContent = `Showing: ${count} of ${allRooms.length}`;
+}
+
+function joinRoom(id) {
+    showToast(`进入房间: ${id}`);
+}
+
+initApp();

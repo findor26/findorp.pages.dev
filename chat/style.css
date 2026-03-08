@@ -207,10 +207,26 @@ body {
 .message-view {
     flex: 1;
     overflow-y: auto;
-    padding: 24px;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
+    /* 核心：启用移动端流畅的“原生感”滚动 */
+    -webkit-overflow-scrolling: touch; 
+    
+    /* 强制显示滚动条轨道（如果需要视觉提示） */
+    scrollbar-width: thin; /* Firefox */
+    scrollbar-color: var(--md-sys-color-outline) transparent; /* Firefox */
+}
+
+/* 2. WebKit 内核（Chrome/Safari）滚动条美化 */
+.message-view::-webkit-scrollbar {
+    width: 4px; /* 设置极细滚动条，避免占用过多屏幕空间 */
+}
+
+.message-view::-webkit-scrollbar-track {
+    background: transparent; /* 轨道透明 */
+}
+
+.message-view::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.2); /* 半透明滑块 */
+    border-radius: 10px;
 }
 
 /* 消息包装容器 */
@@ -446,6 +462,19 @@ body {
     /* 5. 调整消息气泡最大宽度 */
     .msg-wrapper {
         max-width: 85%; /* 移动端屏幕窄，允许气泡占更宽空间 */
+    }
+
+    .content-main {
+        /* 确保主区域高度计算排除掉底部导航栏高度 */
+        height: calc(100vh - 80px); 
+        display: flex;
+        flex-direction: column;
+    }
+
+    .message-view {
+        /* 确保容器有明确的高度边界，否则无法触发滚动 */
+        height: 0; 
+        flex-grow: 1;
     }
 }
 

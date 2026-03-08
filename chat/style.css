@@ -400,74 +400,79 @@ body {
     color: var(--md-sys-color-outline);
 }
 
-/* 移动端适配逻辑 */
-/* 移动端 MD3 深度适配 */
+/* 针对移动端的深度布局修复 */
 @media (max-width: 600px) {
-    /* 1. 彻底解决“灰色方块”问题：增加点击热区并确保圆角 */
-    .action-icon-btn {
-        width: 48px; /* 移动端标准热区大小 */
-        height: 48px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 50%; /* 确保是圆形而非方块 */
-        background: transparent;
-        border: none;
-        transition: background-color 0.2s;
+    /* 1. 将容器改为上下布局，防止侧边栏横向遮挡 */
+    .app-shell {
+        flex-direction: column-reverse; 
     }
 
-    .action-icon-btn:active {
-        background-color: rgba(0, 0, 0, 0.1); /* 触摸时的反馈 */
+    /* 2. 将侧边导航重置为底部导航栏 */
+    .nav-rail {
+        width: 100%;
+        height: auto;
+        padding: 8px 0;
+        flex-direction: row; /* 横向排列图标 */
+        border-right: none;
+        border-top: 1px solid var(--md-sys-color-surface-variant);
+        background-color: var(--md-sys-color-surface);
+        justify-content: space-around;
+        z-index: 100;
     }
 
-    /* 2. 优化顶部 AppBar 布局 */
-    .app-bar {
-        padding: 0 8px 0 16px;
-        height: 64px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
+    /* 移动端隐藏 FAB 或调整位置 */
+    .nav-rail-top {
+        display: none; 
     }
 
-    .title-group h1 {
-        font-size: 18px;
-        margin-bottom: 2px;
+    .nav-destinations {
+        flex-direction: row; /* 菜单项横向铺开 */
+        width: 100%;
+        gap: 0;
     }
 
-    /* 3. 修复滚动逻辑：让容器在触屏上顺畅且不消失 */
-    .message-view {
+    .nav-item {
         flex: 1;
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch; /* iOS 弹性滚动 */
-        padding: 16px;
-        /* 隐藏默认滚动条但保留功能，或美化它 */
-        scrollbar-width: none; 
+        padding: 4px 0;
     }
 
-    .message-view::-webkit-scrollbar {
-        display: none; /* 移动端通常不显示滚动条轨迹 */
+    .nav-item .material-symbols-rounded {
+        padding: 4px 16px; /* 缩小背景色块，适应窄屏 */
     }
 
-    /* 4. 输入栏 MD3 悬浮效果适配 */
-    .input-area {
-        padding: 8px 16px 24px; /* 留出底部手势区间距 */
-        background: var(--md-sys-color-surface);
+    /* 3. 修复内容区域被遮挡的问题 */
+    .content-main {
+        width: 100%;
+        flex: 1;
+        overflow: hidden;
     }
 
-    .input-container {
-        height: 56px;
-        background-color: var(--md-sys-color-surface-variant);
-        border-radius: 28px;
-        padding-right: 4px;
+    /* 4. 优化顶部状态栏，防止状态碎片重叠 */
+    .app-bar {
+        padding: 0 12px;
     }
 
-    #chat-input {
-        font-size: 16px; /* 防止 iOS 聚焦时页面自动缩放 */
+    .status-chip {
+        max-width: 200px;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        font-size: 11px;
     }
 
-    /* 5. 消息气泡在窄屏下的宽度优化 */
+    /* 5. 调整消息容器，确保气泡有呼吸空间 */
+    .message-view {
+        padding: 12px;
+        padding-bottom: 20px;
+    }
+
     .msg-wrapper {
-        max-width: 85%;
+        max-width: 90%; /* 移动端气泡可以更宽一些 */
+    }
+
+    /* 6. 处理 iOS 底部安全区 */
+    .nav-rail {
+        padding-bottom: env(safe-area-inset-bottom);
     }
 }
 

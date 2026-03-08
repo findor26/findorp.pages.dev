@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MDUI 2 综合组件演示</title>
+    <title>MDUI 2 全组件大满贯演示</title>
 
     <link rel="stylesheet" href="https://unpkg.com/mdui@2/mdui.css">
     <script type="module" src="https://unpkg.com/mdui@2/mdui.global.js"></script>
@@ -11,137 +11,192 @@
 
     <style>
         :root {
-            /* 页面背景色使用 Material Design 变量 */
             background-color: var(--mdui-color-surface-container-low);
             color: var(--mdui-color-on-surface);
             font-family: Roboto, system-ui, sans-serif;
         }
-        body { margin: 0; padding-bottom: 80px; }
+        body { margin: 0; display: flex; min-height: 100vh; }
+        
+        /* 响应式侧边栏 */
+        mdui-navigation-rail { height: 100vh; position: sticky; top: 0; }
+        
+        .content-wrapper { flex-grow: 1; display: flex; flex-direction: column; }
         .main-content {
-            max-width: 900px;
+            max-width: 1000px;
             margin: 0 auto;
-            padding: 16px;
+            padding: 24px;
             display: flex;
             flex-direction: column;
-            gap: 24px;
+            gap: 32px;
+            width: 100%;
+            box-sizing: border-box;
         }
         .component-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 16px;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 20px;
         }
-        .card-header { margin-bottom: 16px; display: block; }
+        .card-header { margin-bottom: 12px; display: block; font-weight: 500; }
         .flex-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+        
+        /* 表格容器样式 */
+        .table-container { overflow-x: auto; border-radius: 12px; border: 1px solid var(--mdui-color-outline-variant); }
+        table { width: 100%; border-collapse: collapse; background: var(--mdui-color-surface); }
+        th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--mdui-color-outline-variant); }
     </style>
 </head>
 <body class="mdui-theme-light">
 
-    <mdui-top-app-bar variant="center-aligned">
-        <mdui-button-icon icon="arrow_back"></mdui-button-icon>
-        <mdui-top-app-bar-title>组件实验室</mdui-top-app-bar-title>
-        <div style="flex-grow: 1"></div>
-        <mdui-button-icon icon="palette" id="theme-toggle"></mdui-button-icon>
-    </mdui-top-app-bar>
+    <mdui-navigation-rail value="home" divider>
+        <mdui-button-icon icon="menu" slot="top"></mdui-button-icon>
+        <mdui-navigation-rail-item value="home" icon="home">首页</mdui-navigation-rail-item>
+        <mdui-navigation-rail-item value="tasks" icon="assignment">任务</mdui-navigation-rail-item>
+        <mdui-navigation-rail-item value="analytics" icon="bar_chart">分析</mdui-navigation-rail-item>
+        <mdui-fab icon="edit" slot="bottom"></mdui-fab>
+    </mdui-navigation-rail>
 
-    <div class="main-content">
-        
-        <mdui-card variant="elevated" style="padding: 16px;">
-            <mdui-typography variant="title-medium" class="card-header">导航与切换</mdui-typography>
+    <div class="content-wrapper">
+        <mdui-top-app-bar variant="center-aligned">
+            <mdui-top-app-bar-title>MDUI 2 终极演示</mdui-top-app-bar-title>
+            <div style="flex-grow: 1"></div>
+            <mdui-button-icon icon="palette" id="theme-toggle"></mdui-button-icon>
+            <mdui-tooltip content="查看源代码">
+                <mdui-button-icon icon="code"></mdui-button-icon>
+            </mdui-tooltip>
+        </mdui-top-app-bar>
+
+        <div class="main-content">
             
-            <mdui-tabs value="tab-1" style="margin-bottom: 16px;">
-                <mdui-tab value="tab-1" icon="dashboard">仪表盘</mdui-tab>
-                <mdui-tab value="tab-2" icon="history">历史记录</mdui-tab>
-                <mdui-tab value="tab-3" icon="settings">设置</mdui-tab>
-            </mdui-tabs>
+            <div class="component-grid">
+                <mdui-card variant="elevated" style="padding: 16px;">
+                    <mdui-typography variant="title-medium" class="card-header">运行状态</mdui-typography>
+                    <div style="margin-bottom: 16px;">
+                        <mdui-linear-progress value="0.4" id="sync-progress"></mdui-linear-progress>
+                        <mdui-typography variant="label-small" style="margin-top: 4px; display: block;">数据同步中 (40%)</mdui-typography>
+                    </div>
+                    <div class="flex-row">
+                        <mdui-circular-progress></mdui-circular-progress>
+                        <mdui-badge content="8" variant="small">
+                            <mdui-icon name="notifications"></mdui-icon>
+                        </mdui-badge>
+                        <mdui-chip icon="bolt" variant="filled">性能模式</mdui-chip>
+                    </div>
+                </mdui-card>
 
-            <mdui-segmented-button-group select-strategy="single" value="day">
-                <mdui-segmented-button value="day">日视图</mdui-segmented-button>
-                <mdui-segmented-button value="week">周视图</mdui-segmented-button>
-                <mdui-segmented-button value="month">月视图</mdui-segmented-button>
-            </mdui-segmented-button-group>
-        </mdui-card>
+                <mdui-card variant="outlined" style="padding: 16px;">
+                    <mdui-typography variant="title-medium" class="card-header">常见问题</mdui-typography>
+                    <mdui-collapse>
+                        <mdui-collapse-item header="如何修改主题颜色？" icon="color_lens">
+                            使用 setColorScheme 函数可以根据颜色种子生成 Material 3 配色。
+                        </mdui-collapse-item>
+                        <mdui-collapse-item header="支持 IE 浏览器吗？" icon="help_outline">
+                            由于基于 Web Components，MDUI 2 不支持已经退役的 IE 浏览器。
+                        </mdui-collapse-item>
+                    </mdui-collapse>
+                </mdui-card>
+            </div>
 
-        <div class="component-grid">
-            <mdui-card variant="outlined" style="padding: 16px;">
-                <mdui-typography variant="title-medium" class="card-header">精细调节</mdui-typography>
-                
-                <mdui-select label="服务器区域" value="cn-shanghai" style="width: 100%; margin-bottom: 20px;">
-                    <mdui-menu-item value="cn-shanghai">华东 (上海)</mdui-menu-item>
-                    <mdui-menu-item value="cn-beijing">华北 (北京)</mdui-beijing>
-                    <mdui-menu-item value="hk">中国香港</mdui-menu-item>
-                </mdui-select>
-
-                <mdui-typography variant="label-large">亮度调节</mdui-typography>
-                <mdui-slider value="75" icon="brightness_6"></mdui-slider>
-                
-                <mdui-typography variant="label-large" style="margin-top: 10px;">音量</mdui-typography>
-                <mdui-slider range value="[20, 80]"></mdui-slider>
+            <mdui-card variant="filled" style="padding: 16px;">
+                <mdui-typography variant="title-medium" class="card-header">近 7 日服务器负载</mdui-typography>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>节点名称</th>
+                                <th>CPU 使用率</th>
+                                <th>内存状态</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Findor-Server-01</td>
+                                <td><span style="color: var(--mdui-color-error)">88%</span></td>
+                                <td>良好</td>
+                                <td><mdui-button variant="text">重启</mdui-button></td>
+                            </tr>
+                            <tr>
+                                <td>Findor-Server-02</td>
+                                <td>12%</td>
+                                <td>空闲</td>
+                                <td><mdui-button variant="text">管理</mdui-button></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </mdui-card>
 
             <mdui-card variant="outlined" style="padding: 16px;">
-                <mdui-typography variant="title-medium" class="card-header">反馈状态</mdui-typography>
-                
-                <div style="margin-bottom: 24px;">
-                    <mdui-typography variant="body-small">线性进度条</mdui-typography>
-                    <mdui-linear-progress value="0.6"></mdui-linear-progress>
-                </div>
-
-                <div class="flex-row">
-                    <mdui-circular-progress></mdui-circular-progress>
-                    <mdui-circular-progress value="0.75"></mdui-circular-progress>
-                    <mdui-badge content="99+">
-                        <mdui-button variant="tonal">通知</mdui-button>
-                    </mdui-badge>
-                </div>
-
-                <div style="margin-top: 20px;">
-                    <mdui-chip icon="check" closable>已连接</mdui-chip>
-                    <mdui-chip icon="error" variant="filled">异常</mdui-chip>
+                <mdui-typography variant="title-medium" class="card-header">系统配置</mdui-typography>
+                <div class="component-grid" style="margin-top: 12px;">
+                    <div>
+                        <mdui-select label="自动备份频率" value="daily">
+                            <mdui-menu-item value="hourly">每小时</mdui-menu-item>
+                            <mdui-menu-item value="daily">每天</mdui-menu-item>
+                            <mdui-menu-item value="weekly">每周</mdui-menu-item>
+                        </mdui-select>
+                        <mdui-slider value="50" icon="volume_up" style="margin-top: 24px;"></mdui-slider>
+                    </div>
+                    <div>
+                        <mdui-text-field label="访问令牌" type="password" toggle-password icon="vpn_key"></mdui-text-field>
+                        <div class="flex-row" style="margin-top: 16px;">
+                            <mdui-checkbox checked>启用 API</mdui-checkbox>
+                            <mdui-switch id="debug-mode"></mdui-switch>
+                            <mdui-typography variant="label-large">调试模式</mdui-typography>
+                        </div>
+                    </div>
                 </div>
             </mdui-card>
+
+            <div class="flex-row" style="justify-content: center; margin-bottom: 50px;">
+                <mdui-dropdown>
+                    <mdui-button slot="trigger" variant="tonal" end-icon="arrow_drop_down">操作菜单</mdui-button>
+                    <mdui-menu>
+                        <mdui-menu-item icon="file_download">导出数据</mdui-menu-item>
+                        <mdui-menu-item icon="share">分享链接</mdui-menu-item>
+                        <mdui-divider></mdui-divider>
+                        <mdui-menu-item icon="delete" variant="error">删除项目</mdui-menu-item>
+                    </mdui-menu>
+                </mdui-dropdown>
+
+                <mdui-button variant="filled" id="btn-snackbar">显示提示条</mdui-button>
+            </div>
         </div>
 
-        <mdui-card variant="filled" style="padding: 8px;">
-            <mdui-list>
-                <mdui-list-item icon="folder" end-icon="more_vert">
-                    我的项目
-                    <span slot="description">最后修改于 2 小时前</span>
-                </mdui-list-item>
-                <mdui-divider></mdui-divider>
-                <mdui-list-item icon="image" end-icon="delete">
-                    截图_2024.png
-                    <span slot="description">1.2 MB</span>
-                </mdui-list-item>
-                <mdui-list-item icon="description" end-icon="share">
-                    开发文档.pdf
-                    <span slot="description">昨天 18:30</span>
-                </mdui-list-item>
-            </mdui-list>
-        </mdui-card>
-
+        <mdui-navigation-bar value="home">
+            <mdui-navigation-bar-item value="home" icon="home">首页</mdui-navigation-bar-item>
+            <mdui-navigation-bar-item value="search" icon="search">搜索</mdui-navigation-bar-item>
+            <mdui-navigation-bar-item value="person" icon="person">我的</mdui-navigation-bar-item>
+        </mdui-navigation-bar>
     </div>
 
-    <mdui-navigation-bar value="home">
-        <mdui-navigation-bar-item value="home" icon="home">首页</mdui-navigation-bar-item>
-        <mdui-navigation-bar-item value="search" icon="search">搜索</mdui-navigation-bar-item>
-        <mdui-navigation-bar-item value="profile" icon="person">我的</mdui-navigation-bar-item>
-    </mdui-navigation-bar>
+    <mdui-snackbar id="snackbar-main">操作已成功完成</mdui-snackbar>
 
     <script>
         // 主题切换
         const themeBtn = document.querySelector('#theme-toggle');
         themeBtn.addEventListener('click', () => {
-            const isDark = document.body.classList.contains('mdui-theme-dark');
-            document.body.classList.toggle('mdui-theme-dark', !isDark);
-            document.body.classList.toggle('mdui-theme-light', isDark);
+            const body = document.body;
+            const isDark = body.classList.contains('mdui-theme-dark');
+            body.classList.toggle('mdui-theme-dark', !isDark);
+            body.classList.toggle('mdui-theme-light', isDark);
             themeBtn.icon = isDark ? 'palette' : 'dark_mode';
         });
 
-        // 监听滑块值变化
-        const slider = document.querySelector('mdui-slider');
-        slider.addEventListener('change', (e) => {
-            console.log('当前亮度:', e.target.value);
+        // Snackbar 演示
+        const snackbarBtn = document.querySelector('#btn-snackbar');
+        const snackbar = document.querySelector('#snackbar-main');
+        snackBtn.addEventListener('click', () => {
+            snackbar.open = true;
         });
+
+        // 模拟进度条变化
+        const progress = document.querySelector('#sync-progress');
+        let val = 0.4;
+        setInterval(() => {
+            val = val >= 1 ? 0 : val + 0.05;
+            progress.value = val;
+        }, 2000);
     </script>
 </body>
 </html>

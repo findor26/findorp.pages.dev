@@ -54,43 +54,39 @@
 
         // 2. 定义核心功能函数
         async function initAbly() {
-            try {
-                const realtime = new Ably.Realtime({ authUrl: '/api/auth' });
-                await realtime.connection.once('connected');
-                document.getElementById('status').textContent = "✅ 已联机";
-
-                channel = realtime.channels.get('game-room-1');
-
-                // 订阅位置更新 (使用缩写 u 代表 update 以节省流量)
-                await channel.subscribe('u', (msg) => {
-                    if (msg.clientId === myId) return;
-                    const data = msg.data;
-                    if (!players[data.id]) {
-                        players[data.id] = { ...data, targetX: data.x, targetY: data.y };
-                    } else {
-                        // 记录目标坐标供插值平滑处理
-                        players[data.id].targetX = data.x;
-                        players[data.id].targetY = data.y;
-                        players[data.id].angle = data.a;
+    try {
+        const realtime = new Ably.Realtime({
+            // 使用 authCallback 代替 authUrl
+            authCallback: async (tokenParams, callback) => {
+                try {
+                    const res = await fetch('/api/auth');
+                    const tokenRequest = await res.json();
+                    
+                    // 核心修复：手动确保获取到的 timestamp 是数字类型
+                    if (tokenRequest.timestamp) {
+                        tokenRequest.timestamp = Number(tokenRequest.timestamp);
                     }
-                });
-
-                // 玩家进出管理
-                channel.presence.subscribe('enter', updatePlayerCount);
-                channel.presence.subscribe('leave', (member) => {
-                    delete players[member.clientId];
-                    updatePlayerCount();
-                });
-                
-                await channel.presence.enter({ color: me.color });
-                updatePlayerCount();
-
-                // 启动游戏循环
-                requestAnimationFrame(gameLoop);
-            } catch (err) {
-                document.getElementById('status').textContent = "❌ 连接失败: " + err.message;
+                    
+                    // 将处理好的对象直接交给 SDK
+                    callback(null, tokenRequest);
+                } catch (err) {
+                    callback(err, null);
+                }
             }
-        }
+        });
+
+        await realtime.connection.once('connected');
+        document.getElementById('status').textContent = "✅ 联机成功";
+        
+        // ...后续频道订阅逻辑不变...
+        channel = realtime.channels.get('game-room-1');
+        startGaming(); 
+
+    } catch (err) {
+        console.error("认证失败:", err);
+        document.getElementById('status').textContent = "❌ 联机失败";
+    }
+}
 
         function updatePlayerCount() {
             channel.presence.get((err, members) => {

@@ -256,14 +256,21 @@
     }
 
     function generateItem() {
-        const data = {
-            itemId: 'it-' + Math.random().toString(36).substring(7),
-            x: Math.random() * (window.innerWidth - 60) + 30,
-            y: Math.random() * (window.innerHeight - 60) + 30,
-            type: Math.random() > 0.5 ? 'heal' : 'speed'
-        };
-        channel.publish('i', data);
-    }
+    // 限制在屏幕中心 80% 的区域内生成
+    const margin = 100;
+    const spawnX = Math.random() * (window.innerWidth - margin * 2) + margin;
+    const spawnY = Math.random() * (window.innerHeight - margin * 2) + margin;
+
+    const data = {
+        itemId: 'it-' + Math.random().toString(36).substring(7),
+        x: spawnX,
+        y: spawnY,
+        type: Math.random() > 0.5 ? 'heal' : 'speed'
+    };
+    
+    console.log(`[房主同步] 尝试在坐标 (${Math.round(spawnX)}, ${Math.round(spawnY)}) 生成道具`);
+    channel.publish('i', data);
+}
 
     function spawnItem(data) {
         const el = document.createElement('div');

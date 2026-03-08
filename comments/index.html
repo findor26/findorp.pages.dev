@@ -20,6 +20,7 @@
             --md-sys-color-outline: #c4c7cf;
             --md-sys-color-outline-variant: #73777f;
             --md-sys-color-error: #ba1a1a;
+            --md-sys-color-secondary-container: #e1e2ec;
         }
 
         body {
@@ -32,6 +33,7 @@
             align-items: center;
             min-height: 100vh;
             padding: 24px 16px;
+            transition: background-color 0.3s;
         }
 
         .container {
@@ -44,7 +46,33 @@
             font-weight: 400;
             margin-bottom: 24px;
             color: var(--md-sys-color-on-surface);
-            text-align: left;
+        }
+
+        /* 统计卡片样式 */
+        .stats-grid {
+            display: none;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .stat-card {
+            background-color: var(--md-sys-color-secondary-container);
+            padding: 16px;
+            border-radius: 20px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 500;
+            display: block;
+            color: var(--md-sys-color-primary);
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--md-sys-color-on-surface-variant);
         }
 
         .card {
@@ -52,9 +80,9 @@
             border-radius: 24px;
             padding: 24px;
             margin-bottom: 16px;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
             border: 1px solid var(--md-sys-color-outline);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: transform 0.2s, box-shadow 0.2s;
         }
 
         .input-card {
@@ -90,10 +118,6 @@
             color: var(--md-sys-color-outline-variant);
         }
 
-        textarea.input-field {
-            resize: none;
-        }
-
         .btn {
             background-color: var(--md-sys-color-primary);
             color: var(--md-sys-color-on-primary);
@@ -102,107 +126,94 @@
             height: 48px;
             border-radius: 24px;
             font-weight: 500;
-            font-size: 14px;
-            letter-spacing: 0.1px;
             cursor: pointer;
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            transition: box-shadow 0.2s, transform 0.1s;
+            transition: filter 0.2s, transform 0.1s;
         }
 
-        .btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
+        .btn:hover { filter: brightness(1.1); }
+        .btn:active { transform: scale(0.98); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* 留言条目逻辑样式 */
+        .msg-item.pinned {
+            border: 2px solid var(--md-sys-color-primary);
+            background-color: #f0f7ff;
         }
 
-        .btn:active:not(:disabled) {
-            transform: scale(0.98);
+        .msg-item.hidden {
+            opacity: 0.5;
+            filter: grayscale(0.8);
         }
 
-        .msg-item {
-            background-color: #ffffff;
+        .pin-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 12px;
+            background: var(--md-sys-color-primary);
+            color: white;
+            border-radius: 16px;
+            font-size: 12px;
+            margin-bottom: 12px;
         }
 
         .msg-header {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 12px;
+            margin-bottom: 8px;
         }
 
-        .user-info {
+        .nickname { font-weight: 500; color: var(--md-sys-color-primary); }
+        .time { font-size: 12px; color: var(--md-sys-color-outline-variant); }
+        .content { line-height: 1.6; white-space: pre-wrap; word-break: break-all; }
+
+        .admin-tools {
+            margin-top: 16px;
+            padding-top: 12px;
+            border-top: 1px dashed var(--md-sys-color-outline-variant);
             display: flex;
-            flex-direction: column;
-            gap: 2px;
+            gap: 16px;
+            align-items: center;
         }
 
-        .nickname {
-            font-weight: 500;
-            color: var(--md-sys-color-primary);
-            font-size: 15px;
-        }
-
-        .time {
-            font-size: 12px;
-            color: var(--md-sys-color-on-surface-variant);
-        }
-
-        .content {
-            line-height: 1.6;
-            color: var(--md-sys-color-on-surface);
-            font-size: 15px;
-            white-space: pre-wrap;
-        }
-
-        .admin-active {
-            border-color: var(--md-sys-color-error);
-            background-color: #fff8f7;
-        }
-
-        .delete-btn {
-            color: var(--md-sys-color-error);
+        .tool-icon {
             cursor: pointer;
             font-size: 20px;
-            padding: 4px;
-            border-radius: 50%;
-            transition: background 0.2s;
-        }
-
-        .delete-btn:hover {
-            background-color: rgba(186, 26, 26, 0.1);
-        }
-
-        .empty-state {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 48px 0;
             color: var(--md-sys-color-outline-variant);
+            transition: color 0.2s;
         }
 
-        .empty-state .material-symbols-outlined {
-            font-size: 64px;
-            margin-bottom: 16px;
-            opacity: 0.5;
+        .tool-icon:hover { color: var(--md-sys-color-primary); }
+        .tool-icon.active { color: var(--md-sys-color-primary); }
+        .tool-icon.danger:hover { color: var(--md-sys-color-error); }
+
+        .ip-info { font-size: 10px; color: var(--md-sys-color-outline-variant); margin-left: auto; }
+
+        /* 空状态 */
+        .empty-placeholder {
+            padding: 60px 0;
+            text-align: center;
+            color: var(--md-sys-color-outline-variant);
         }
 
         #load-more-trigger {
-            height: 48px;
+            height: 60px;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: var(--md-sys-color-outline-variant);
             font-size: 14px;
+            color: var(--md-sys-color-outline-variant);
         }
 
         .action-bar {
             display: flex;
             justify-content: center;
-            gap: 12px;
-            margin: 24px 0;
+            gap: 16px;
+            margin: 32px 0;
         }
 
         .btn-text {
@@ -213,135 +224,66 @@
             font-weight: 500;
             cursor: pointer;
             border-radius: 20px;
-            font-size: 13px;
             display: inline-flex;
             align-items: center;
-            gap: 4px;
+            gap: 6px;
         }
 
-        .btn-text:hover {
-            background-color: rgba(0, 97, 164, 0.08);
-        }
+        .btn-text:hover { background: rgba(0, 97, 164, 0.08); }
+        .btn-text.error { color: var(--md-sys-color-error); }
 
-        .btn-text.error {
-            color: var(--md-sys-color-error);
-        }
-
-        .btn-text.error:hover {
-            background-color: rgba(186, 26, 26, 0.08);
-        }
-
-        footer {
-            margin-top: auto;
-            padding: 32px 0;
-            font-size: 12px;
-            color: var(--md-sys-color-outline-variant);
-            text-align: center;
-        }
-
+        /* 模态框 */
         .modal-overlay {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.4);
-            backdrop-filter: blur(4px);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
+            display: none; align-items: center; justify-content: center; z-index: 2000;
         }
 
-        .modal-content {
-            background-color: #ffffff;
-            width: 90%;
-            max-width: 320px;
-            padding: 24px;
-            border-radius: 28px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            animation: modalPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        .modal-box {
+            background: white; padding: 28px; border-radius: 28px;
+            width: 90%; max-width: 340px; box-shadow: 0 12px 32px rgba(0,0,0,0.15);
         }
 
-        @keyframes modalPop {
-            from { opacity: 0; transform: scale(0.9) translateY(20px); }
-            to { opacity: 1; transform: scale(1) translateY(0); }
-        }
-
-        .modal-title {
-            font-size: 24px;
-            margin-bottom: 16px;
-            color: var(--md-sys-color-on-surface);
-        }
-
-        .modal-body {
-            font-size: 14px;
-            color: var(--md-sys-color-on-surface-variant);
-            margin-bottom: 24px;
-            line-height: 1.5;
-        }
-
-        .modal-actions {
-            display: flex;
-            justify-content: flex-end;
-            gap: 8px;
-        }
+        footer { padding: 40px 0; text-align: center; font-size: 12px; color: var(--md-sys-color-outline-variant); }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>留言板</h1>
 
+        <div id="admin-stats-bar" class="stats-grid">
+            <div class="stat-card"><span class="stat-value" id="count-total">0</span><span class="stat-label">总计留言</span></div>
+            <div class="stat-card"><span class="stat-value" id="count-today">0</span><span class="stat-label">今日新增</span></div>
+        </div>
+
         <div class="card input-card">
             <input type="text" id="nickname" class="input-field" placeholder="称呼" maxlength="20">
-            <div class="input-counter"><span id="nickname-count">0</span>/20</div>
+            <div class="input-counter"><span id="nick-num">0</span>/20</div>
             
-            <textarea id="content" class="input-field" rows="3" placeholder="写下你的想法..." maxlength="500"></textarea>
-            <div class="input-counter"><span id="content-count">0</span>/500</div>
+            <textarea id="content" class="input-field" rows="4" placeholder="写下你的想法..." maxlength="500"></textarea>
+            <div class="input-counter"><span id="cont-num">0</span>/500</div>
 
             <div style="display: flex; justify-content: flex-end;">
-                <button class="btn" id="send-btn" onclick="sendMessage()">
-                    <span class="material-symbols-outlined" style="font-size: 18px;">send</span>
-                    发布留言
+                <button class="btn" id="post-btn" onclick="handleSendMessage()">
+                    <span class="material-symbols-outlined" style="font-size: 20px;">send</span>发布留言
                 </button>
             </div>
         </div>
 
-        <div id="msg-list"></div>
-        <div id="load-more-trigger"></div>
+        <div id="message-container"></div>
+        <div id="load-more-trigger">正在探测地球信号...</div>
 
-        <div class="action-bar" id="action-bar">
-            </div>
+        <div class="action-bar" id="bottom-bar"></div>
     </div>
 
-    <div id="admin-modal" class="modal-overlay">
-        <div class="modal-content">
-            <div class="modal-title">身份验证</div>
-            <div class="modal-body">请输入管理令牌以启用删除功能。</div>
-            <form onsubmit="return false;">
-                <input type="password" id="admin-token-input" class="input-field" placeholder="令牌" autocomplete="new-password">
-            </form>
-            <div class="modal-actions">
-                <button class="btn-text" onclick="hideModal('admin-modal')">取消</button>
-                <button class="btn" onclick="submitAdminToken()">确认</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="confirm-modal" class="modal-overlay">
-        <div class="modal-content">
-            <div class="modal-title">确认删除？</div>
-            <div class="modal-body">此记录移除后将无法恢复，请确认操作。</div>
-            <div class="modal-actions">
-                <button class="btn-text" onclick="hideModal('confirm-modal')">取消</button>
-                <button class="btn" style="background-color: var(--md-sys-color-error);" id="confirm-delete-btn">确认删除</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="alert-modal" class="modal-overlay">
-        <div class="modal-content">
-            <div class="modal-title" id="alert-title">提示</div>
-            <div class="modal-body" id="alert-body">内容不能为空。</div>
-            <div class="modal-actions">
-                <button class="btn" onclick="hideModal('alert-modal')">知道了</button>
+    <div id="auth-modal" class="modal-overlay">
+        <div class="modal-box">
+            <h3 style="margin-top: 0;">身份验证</h3>
+            <p style="font-size: 14px; color: var(--md-sys-color-on-surface-variant);">请输入管理令牌以解锁高级功能。</p>
+            <input type="password" id="token-input" class="input-field" placeholder="管理令牌" autocomplete="new-password">
+            <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
+                <button class="btn-text" onclick="closeModal('auth-modal')">取消</button>
+                <button class="btn" onclick="saveAdminAuth()">确认</button>
             </div>
         </div>
     </div>
@@ -351,204 +293,199 @@
     </footer>
 
     <script>
+        // --- 核心状态控制 ---
         let isAdmin = !!localStorage.getItem('admin_token');
-        let pendingDeleteId = null;
         let currentPage = 1;
-        const pageSize = 10;
-        let isLoading = false;
-        let hasMore = true;
+        let isFetching = false;
+        let noMoreData = false;
 
-        const nicknameInput = document.getElementById('nickname');
-        const contentInput = document.getElementById('content');
-        
-        nicknameInput.oninput = () => document.getElementById('nickname-count').textContent = nicknameInput.value.length;
-        contentInput.oninput = () => document.getElementById('content-count').textContent = contentInput.value.length;
+        // --- 字数统计逻辑 ---
+        const nickInp = document.getElementById('nickname');
+        const contInp = document.getElementById('content');
+        nickInp.oninput = () => document.getElementById('nick-num').textContent = nickInp.value.length;
+        contInp.oninput = () => document.getElementById('cont-num').textContent = contInp.value.length;
 
-        function showModal(id) {
-            document.getElementById(id).style.display = 'flex';
-        }
-
-        function hideModal(id) {
-            document.getElementById(id).style.display = 'none';
-        }
-
-        function showAlert(title, body) {
-            document.getElementById('alert-title').textContent = title;
-            document.getElementById('alert-body').textContent = body;
-            showModal('alert-modal');
-        }
-
-        function updateActionBar() {
-            const bar = document.getElementById('action-bar');
-            if (isAdmin) {
-                bar.innerHTML = `
-                    <button class="btn-text error" onclick="exitAdminMode()">
-                        <span class="material-symbols-outlined" style="font-size: 16px;">logout</span>
-                        退出管理模式
-                    </button>
-                `;
-            } else {
-                bar.innerHTML = `
-                    <button class="btn-text" onclick="showModal('admin-modal')">
-                        <span class="material-symbols-outlined" style="font-size: 16px;">admin_panel_settings</span>
-                        进入管理模式
-                    </button>
-                `;
-            }
-        }
-
-        async function loadMessages(isRefresh = false) {
-            if (isLoading || (!hasMore && !isRefresh)) return;
-            
-            if (isRefresh) {
+        // --- 数据渲染逻辑 ---
+        async function fetchMessages(refresh = false) {
+            if (isFetching || (noMoreData && !refresh)) return;
+            if (refresh) {
                 currentPage = 1;
-                hasMore = true;
-                document.getElementById('msg-list').innerHTML = '';
+                noMoreData = false;
+                document.getElementById('message-container').innerHTML = '';
             }
 
-            isLoading = true;
+            isFetching = true;
             const trigger = document.getElementById('load-more-trigger');
-            trigger.textContent = '正在加载中...';
+            trigger.textContent = '正在搬运数据...';
 
             try {
-                const res = await fetch(`/api/messages?page=${currentPage}&size=${pageSize}`);
-                const data = await res.json();
-                const list = document.getElementById('msg-list');
+                const headers = isAdmin ? { 'Admin-Token': localStorage.getItem('admin_token') } : {};
+                const res = await fetch(`/api/messages?page=${currentPage}&size=10`, { headers });
                 
+                if (res.status === 401 && isAdmin) {
+                    clearAdminAuth(); // 令牌失效处理
+                    return;
+                }
+
+                const data = await res.json();
+                const container = document.getElementById('message-container');
+
                 if (data.length === 0 && currentPage === 1) {
-                    list.innerHTML = `
-                        <div class="empty-state">
-                            <span class="material-symbols-outlined">post_add</span>
-                            <p>还没有人留言，快来抢沙发吧</p>
-                        </div>`;
-                    hasMore = false;
+                    container.innerHTML = `<div class="empty-placeholder">
+                        <span class="material-symbols-outlined" style="font-size: 48px; opacity:0.3;">cloud_off</span>
+                        <p>暂无留言，写下第一条吧</p>
+                    </div>`;
+                    noMoreData = true;
                 } else {
-                    if (data.length < pageSize) hasMore = false;
-                    
-                    const fragment = document.createDocumentFragment();
-                    data.forEach(m => {
-                        const div = document.createElement('div');
-                        div.className = `card msg-item ${isAdmin ? 'admin-active' : ''}`;
-                        div.innerHTML = `
-                            <div class="msg-header">
-                                <div class="user-info">
-                                    <span class="nickname">${escapeHtml(m.nickname)}</span>
-                                    <span class="time">${formatDate(m.created_at)}</span>
-                                </div>
-                                ${isAdmin ? `<span class="material-symbols-outlined delete-btn" onclick="requestDelete(${m.id})">delete</span>` : ''}
-                            </div>
-                            <div class="content">${escapeHtml(m.content)}</div>
-                        `;
-                        fragment.appendChild(div);
-                    });
-                    list.appendChild(fragment);
+                    if (data.length < 10) noMoreData = true;
+                    data.forEach(m => container.insertAdjacentHTML('beforeend', buildMessageHTML(m)));
                     currentPage++;
                 }
             } catch (err) {
-                console.error("加载失败", err);
-                trigger.textContent = '加载失败，请刷新重试';
+                trigger.textContent = '数据搬运失败，请检查网络';
             } finally {
-                isLoading = false;
-                if (!hasMore && document.querySelectorAll('.msg-item').length > 0) {
-                    trigger.textContent = '到底啦，没有更多留言了';
-                } else if (hasMore) {
-                    trigger.textContent = '';
-                }
+                isFetching = false;
+                if (!noMoreData) trigger.textContent = '';
+                else if (currentPage > 1) trigger.textContent = '已经全部加载完毕';
             }
         }
 
-        const observer = new IntersectionObserver((entries) => {
-            if (entries[0].isIntersecting && hasMore && !isLoading) {
-                loadMessages();
+        function buildMessageHTML(m) {
+            const pinned = m.is_pinned === 1;
+            const hidden = m.is_hidden === 1;
+            
+            return `
+                <div class="card msg-item ${pinned ? 'pinned' : ''} ${hidden ? 'hidden' : ''}">
+                    ${pinned ? '<div class="pin-badge"><span class="material-symbols-outlined" style="font-size:16px;">push_pin</span>已置顶</div>' : ''}
+                    <div class="msg-header">
+                        <span class="nickname">${safeText(m.nickname)}</span>
+                        <span class="time">${prettyDate(m.created_at)}</span>
+                    </div>
+                    <div class="content">${safeText(m.content)}</div>
+                    
+                    ${isAdmin ? `
+                        <div class="admin-tools">
+                            <span class="material-symbols-outlined tool-icon ${pinned ? 'active' : ''}" 
+                                  title="置顶/取消" onclick="handlePatch(${m.id}, 'pin')">push_pin</span>
+                            <span class="material-symbols-outlined tool-icon ${hidden ? 'active' : ''}" 
+                                  title="显示/隐藏" onclick="handlePatch(${m.id}, 'hide')">${hidden ? 'visibility_off' : 'visibility'}</span>
+                            <span class="material-symbols-outlined tool-icon danger" 
+                                  title="永久删除" onclick="handleDelete(${m.id})">delete</span>
+                            <span class="ip-info">IP: ${m.ip_address || 'Unset'}</span>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        // --- 管理动作逻辑 ---
+        async function handlePatch(id, action) {
+            const res = await fetch('/api/messages', {
+                method: 'PATCH',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Admin-Token': localStorage.getItem('admin_token')
+                },
+                body: JSON.stringify({ id, action })
+            });
+            if (res.ok) fetchMessages(true);
+        }
+
+        async function handleDelete(id) {
+            if (!confirm("此操作不可逆，确定删除该留言吗？")) return;
+            const res = await fetch(`/api/messages?id=${id}`, {
+                method: 'DELETE',
+                headers: { 'Admin-Token': localStorage.getItem('admin_token') }
+            });
+            if (res.ok) fetchMessages(refresh = true);
+        }
+
+        async function fetchAdminStats() {
+            if (!isAdmin) return;
+            const res = await fetch('/api/messages?stats=true', {
+                headers: { 'Admin-Token': localStorage.getItem('admin_token') }
+            });
+            if (res.ok) {
+                const stats = await res.json();
+                document.getElementById('count-total').textContent = stats.total;
+                document.getElementById('count-today').textContent = stats.today;
+                document.getElementById('admin-stats-bar').style.display = 'grid';
             }
-        }, { threshold: 0.1 });
+        }
 
-        observer.observe(document.getElementById('load-more-trigger'));
+        // --- 发布逻辑 ---
+        async function handleSendMessage() {
+            const nickname = nickInp.value.trim();
+            const content = contInp.value.trim();
+            const btn = document.getElementById('post-btn');
 
-        async function sendMessage() {
-            const nickname = nicknameInput.value.trim();
-            const content = contentInput.value.trim();
-            const sendBtn = document.getElementById('send-btn');
+            if (!nickname || !content) return alert("称呼和内容都要填哦");
+            if (nickname.length > 20 || content.length > 500) return alert("字数超限啦");
 
-            if (!nickname || nickname.length > 20) return showAlert("提示", "称呼需要在1-20字之间");
-            if (!content || content.length > 500) return showAlert("提示", "内容需要在1-500字之间");
-
-            sendBtn.disabled = true;
+            btn.disabled = true;
             try {
                 const res = await fetch('/api/messages', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ nickname, content })
                 });
-
                 if (res.ok) {
-                    contentInput.value = '';
-                    document.getElementById('content-count').textContent = '0';
-                    loadMessages(true); 
+                    contInp.value = '';
+                    document.getElementById('cont-num').textContent = '0';
+                    fetchMessages(true);
                 }
-            } catch (e) {
-                showAlert("错误", "发送失败，请稍后再试");
             } finally {
-                sendBtn.disabled = false;
+                btn.disabled = false;
             }
         }
 
-        function requestDelete(id) {
-            pendingDeleteId = id;
-            showModal('confirm-modal');
-        }
-
-        document.getElementById('confirm-delete-btn').onclick = async () => {
-            if (!pendingDeleteId) return;
-            const pwd = localStorage.getItem('admin_token');
-            const res = await fetch(`/api/messages?id=${pendingDeleteId}`, {
-                method: 'DELETE',
-                headers: { 'Admin-Token': pwd }
-            });
-
-            hideModal('confirm-modal');
-            if (res.ok) {
-                loadMessages(true);
+        // --- 权限管理 ---
+        function updateUIState() {
+            const bar = document.getElementById('bottom-bar');
+            if (isAdmin) {
+                bar.innerHTML = `<button class="btn-text error" onclick="clearAdminAuth()">
+                    <span class="material-symbols-outlined">logout</span>退出管理模式</button>`;
+                fetchAdminStats();
             } else {
-                exitAdminMode();
-                showAlert("校验失败", "令牌已失效，请重新进入管理模式");
-            }
-        };
-
-        function submitAdminToken() {
-            const pwdInput = document.getElementById('admin-token-input');
-            const pwd = pwdInput.value.trim();
-            if (pwd) {
-                localStorage.setItem('admin_token', pwd);
-                isAdmin = true;
-                pwdInput.value = '';
-                updateActionBar();
-                loadMessages(true);
-                hideModal('admin-modal');
+                bar.innerHTML = `<button class="btn-text" onclick="openModal('auth-modal')">
+                    <span class="material-symbols-outlined">admin_panel_settings</span>进入管理模式</button>`;
+                document.getElementById('admin-stats-bar').style.display = 'none';
             }
         }
 
-        function exitAdminMode() {
+        function saveAdminAuth() {
+            const t = document.getElementById('token-input').value.trim();
+            if (t) {
+                localStorage.setItem('admin_token', t);
+                location.reload();
+            }
+        }
+
+        function clearAdminAuth() {
             localStorage.removeItem('admin_token');
-            isAdmin = false;
-            updateActionBar();
-            loadMessages(true);
+            location.reload();
         }
 
-        function escapeHtml(str) {
-            const div = document.createElement('div');
-            div.textContent = str;
-            return div.innerHTML;
+        // --- 辅助工具 ---
+        function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+        function safeText(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+        function prettyDate(s) { 
+            const d = new Date(s);
+            return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
         }
 
-        function formatDate(dateStr) {
-            const d = new Date(dateStr);
-            return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
-        }
+        // --- 滚动监听器 ---
+        const scrollObserver = new IntersectionObserver(entries => {
+            if (entries[0].isIntersecting && !noMoreData && !isFetching) {
+                fetchMessages();
+            }
+        }, { threshold: 0.1 });
+        scrollObserver.observe(document.getElementById('load-more-trigger'));
 
-        // 初始化
-        updateActionBar();
-        loadMessages();
+        // 初始化启动
+        updateUIState();
+        fetchMessages();
     </script>
 </body>
 </html>

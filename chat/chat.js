@@ -1,130 +1,134 @@
 const myId = 'Findor-' + Math.random().toString(36).substring(7);
 let ably = null;
 let lobbyChannel = null;
-let allRooms = []; // 存储所有在线房间数据
 
-// --- 1. 初始化连接 ---
+// --- 1. 正规化初始化 ---
 async function initApp() {
     try {
         const response = await fetch('/api/auth');
+        if (!response.ok) throw new Error("Auth failed");
         const apiKey = await response.text();
         
-        // 初始化 Ably 客户端
-        ably = new Ably.Realtime({ key: apiKey.trim(), clientId: myId });
-        await new Promise(resolve => ably.connection.on('connected', resolve));
-        
-        // 默认进入大厅频道（用于发现房间）
+        // 生产环境配置：启用状态恢复与心跳检测
+        ably = new Ably.Realtime({ 
+            key: apiKey.trim(), 
+            clientId: myId,
+            echoMessages: false 
+        });
+
         lobbyChannel = ably.channels.get('lobby');
-        await lobbyChannel.presence.enter({ roomName: '大厅' });
-        
-        showToast("已连接至服务器");
-        refreshRooms(); // 初始加载
+
+        // 订阅大厅内所有成员的进入、离开、更新事件
+        lobbyChannel.presence.subscribe(['enter', 'leave', 'update'], () => {
+            fetchAndRenderRooms(); // 任何变动即刻刷新 UI
+        });
+
+        // 初始进入大厅，并在数据中声明自己当前所在的房间（默认为大厅）
+        await lobbyChannel.presence.enter({ 
+            currentRoom: 'Lobby',
+            roomTitle: '公共大厅'
+        });
+
+        showToast("服务连接成功");
+        fetchAndRenderRooms();
+
     } catch (err) {
-        console.error("认证失败:", err);
-        showToast("无法获取 API Key");
+        console.error("Critical Error:", err);
+        showToast("系统连接异常，请检查 API 配置");
     }
 }
 
-// --- 2. 刷新按钮功能 (Refresh) ---
-async function refreshRooms() {
+// --- 2. 正规化数据同步 (非模拟) ---
+async function fetchAndRenderRooms() {
     if (!lobbyChannel) return;
 
-    showToast("正在同步房间...");
-    
-    // 获取大厅中的所有成员，分析他们所在的房间
+    // 获取当前大厅所有活跃连接
     lobbyChannel.presence.get((err, members) => {
-        if (err) return console.error(err);
+        if (err) return console.error("Presence Error:", err);
 
-        // 模拟/分析成员数据生成房间列表
-        // 实际开发中通常由后端 API 直接返回 active_channels
-        allRooms = [
-            { id: 'tech', name: '技术交流区', count: members.length, lastActive: '刚才' },
-            { id: 'tank', name: '3D坦克基地', count: 3, lastActive: '5分钟前' },
-            { id: 'chat', name: '闲聊区', count: 7, lastActive: '2小时前' }
-        ];
+        // 核心逻辑：归并算法。从成员的 metadata 中提取不重复的房间信息
+        const roomsMap = new Map();
 
-        renderRoomUI(allRooms);
-        updateRoomStatusText(allRooms.length);
+        members.forEach(member => {
+            const data = member.data || {};
+            const roomId = data.currentRoom || 'Lobby';
+            const roomName = data.roomTitle || '未知频道';
+
+            if (!roomsMap.has(roomId)) {
+                roomsMap.set(roomId, {
+                    id: roomId,
+                    name: roomName,
+                    members: 0
+                });
+            }
+            roomsMap.get(roomId).members++;
+        });
+
+        const activeRooms = Array.from(roomsMap.values());
+        updateRoomUI(activeRooms);
     });
 }
 
-// --- 3. 房间搜索功能 (Room Finder) ---
-const chatInput = document.getElementById('chat-input');
-chatInput.addEventListener('input', (e) => {
-    const searchTerm = e.target.value.toLowerCase();
-    const filtered = allRooms.filter(room => 
-        room.name.toLowerCase().includes(searchTerm) || 
-        room.id.toLowerCase().includes(searchTerm)
-    );
-    renderRoomUI(filtered);
-    updateRoomStatusText(filtered.length);
-});
+// --- 3. 真正的房间创建逻辑 ---
+async function createRoom() {
+    const name = prompt("请输入房间名称:");
+    if (!name) return;
 
-// --- 4. 侧边栏按钮逻辑 (Navigation Rail) ---
-document.querySelectorAll('.nav-icons span').forEach(icon => {
-    icon.onclick = () => {
-        // MD3 状态切换
-        document.querySelector('.nav-icons .active').classList.remove('active');
-        icon.classList.add('active');
-        
-        const view = icon.textContent;
-        if (view === 'group') {
-            showToast("正在加载用户列表...");
-        } else if (view === 'settings') {
-            showToast("设置界面开发中...");
-        }
-    };
-});
+    const roomId = 'room-' + Date.now();
+    
+    // 更新自己的状态，告知全网：我创建并进入了这个新房间
+    // 这样其他用户的 lobbyChannel.presence.subscribe 就会被触发
+    await lobbyChannel.presence.update({
+        currentRoom: roomId,
+        roomTitle: name
+    });
 
-// --- 5. 创建按钮功能 (FAB) ---
-document.querySelector('.fab-btn').onclick = () => {
-    const newRoomName = prompt("请输入新房间名称:");
-    if (newRoomName) {
-        showToast(`房间 "${newRoomName}" 创建成功！`);
-        // 逻辑：在此发布一条创建消息或直接跳转
-    }
-};
+    showToast(`房间 ${name} 已创建`);
+    // 此时 fetchAndRenderRooms 会被自动触发
+}
 
-// --- 辅助：渲染列表 ---
-function renderRoomUI(rooms) {
+// --- 4. 视图更新 (MD3 规范) ---
+function updateRoomUI(rooms) {
     const container = document.getElementById('message-container');
+    const showingText = document.querySelector('.header-content p');
+    
     container.innerHTML = '';
+    if (showingText) showingText.textContent = `Showing: ${rooms.length} of ${rooms.length}`;
 
     if (rooms.length === 0) {
-        container.innerHTML = `
-            <div class="empty-state">
-                <span class="material-symbols-rounded">search_off</span>
-                <p>没有找到匹配的房间</p>
-            </div>
-        `;
+        container.innerHTML = `<div class="empty-state">目前没有活跃房间</div>`;
         return;
     }
 
     rooms.forEach(room => {
-        const card = document.createElement('div');
-        card.className = 'room-card';
-        card.onclick = () => joinRoom(room.id);
-        card.innerHTML = `
-            <div class="room-lead">
-                <span class="material-symbols-rounded">forum</span>
-            </div>
+        const item = document.createElement('div');
+        item.className = 'room-card';
+        item.onclick = () => joinRoom(room.id, room.name);
+        item.innerHTML = `
+            <div class="room-lead"><span class="material-symbols-rounded">groups</span></div>
             <div class="room-content">
                 <div class="room-title">${room.name}</div>
-                <div class="room-meta">${room.count} 人在线 · ${room.lastActive}</div>
+                <div class="room-meta">${room.members} 用户在线 · ID: ${room.id}</div>
             </div>
-            <span class="material-symbols-rounded">chevron_right</span>
+            <span class="material-symbols-rounded">arrow_forward_ios</span>
         `;
-        container.appendChild(card);
+        container.appendChild(item);
     });
 }
 
-function updateRoomStatusText(count) {
-    const statusText = document.querySelector('.header-content p') || { textContent: '' };
-    statusText.textContent = `Showing: ${count} of ${allRooms.length}`;
+async function joinRoom(id, name) {
+    // 正规切换逻辑：更新在 lobby 中的位置声明
+    await lobbyChannel.presence.update({
+        currentRoom: id,
+        roomTitle: name
+    });
+    showToast(`已进入: ${name}`);
 }
 
-function joinRoom(id) {
-    showToast(`进入房间: ${id}`);
-}
+// 绑定 FAB 按钮
+document.querySelector('.fab-btn').onclick = createRoom;
+// 绑定刷新按钮
+const refreshBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Refresh'));
+if (refreshBtn) refreshBtn.onclick = fetchAndRenderRooms;
 
 initApp();

@@ -2,71 +2,94 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>多人实时对战测试 | Findor's Space</title>
+    <title>多人实时对战 | Findor's Space</title>
     <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
     <style>
-        body { margin: 0; background: #202124; color: white; overflow: hidden; font-family: sans-serif; }
+        body { margin: 0; background: #202124; color: white; overflow: hidden; font-family: 'Roboto', sans-serif; }
         canvas { display: block; background: #1a1a1b; }
-        #ui { position: fixed; top: 10px; left: 10px; pointer-events: none; }
+        #ui { 
+            position: fixed; top: 20px; left: 20px; 
+            background: rgba(0,0,0,0.5); padding: 15px; 
+            border-radius: 12px; backdrop-filter: blur(4px);
+            border: 1px solid rgba(255,255,255,0.1);
+            pointer-events: none; 
+        }
+        .stat-row { margin-bottom: 4px; font-size: 14px; }
+        #player-count { color: #00e676; font-weight: bold; }
     </style>
 </head>
 <body>
     <div id="ui">
-        <div>状态: <span id="status">连接中...</span></div>
-        <div>在线玩家: <span id="player-count">0</span></div>
+        <div class="stat-row">状态: <span id="status">连接中...</span></div>
+        <div class="stat-row">在线玩家: <span id="player-count">0</span></div>
     </div>
     <canvas id="gameCanvas"></canvas>
 
     <script>
+        // 1. 初始化全局变量
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-
+        const players = {}; 
+        const keys = {};
+        const myId = 'user_' + Math.random().toString(36).substring(7);
         let channel;
-        const players = {}; // 存储所有玩家数据
-        let myId = 'user_' + Math.random().toString(36).substring(7);
-        
-        // 本地玩家状态
+        let lastSent = 0;
+
+        // 设置画布尺寸
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // 本地坦克状态
         const me = {
             id: myId,
-            x: Math.random() * canvas.width,
-            y: Math.random() * canvas.height,
+            x: Math.random() * (window.innerWidth - 100) + 50,
+            y: Math.random() * (window.innerHeight - 100) + 50,
             angle: 0,
-            color: '#0061a4',
-            lastSent: 0
+            color: '#0061a4'
         };
 
-        async function initGame() {
-            const ably = new Ably.Realtime({ authUrl: '/api/auth' });
-            await ably.connection.once('connected');
-            document.getElementById('status').textContent = "已联机";
+        // 2. 定义核心功能函数
+        async function initAbly() {
+            try {
+                const realtime = new Ably.Realtime({ authUrl: '/api/auth' });
+                await realtime.connection.once('connected');
+                document.getElementById('status').textContent = "✅ 已联机";
 
-            channel = ably.channels.get('game-room-1');
+                channel = realtime.channels.get('game-room-1');
 
-            // 1. 订阅位置同步 (广播)
-            channel.subscribe('u', (msg) => {
-                if (msg.clientId === myId) return;
-                const data = msg.data;
-                if (!players[data.id]) {
-                    players[data.id] = { ...data, targetX: data.x, targetY: data.y };
-                } else {
-                    // 记录目标位置用于插值
-                    players[data.id].targetX = data.x;
-                    players[data.id].targetY = data.y;
-                    players[data.id].angle = data.a;
-                }
-            });
+                // 订阅位置更新 (使用缩写 u 代表 update 以节省流量)
+                await channel.subscribe('u', (msg) => {
+                    if (msg.clientId === myId) return;
+                    const data = msg.data;
+                    if (!players[data.id]) {
+                        players[data.id] = { ...data, targetX: data.x, targetY: data.y };
+                    } else {
+                        // 记录目标坐标供插值平滑处理
+                        players[data.id].targetX = data.x;
+                        players[data.id].targetY = data.y;
+                        players[data.id].angle = data.a;
+                    }
+                });
 
-            // 2. 玩家进出管理
-            channel.presence.subscribe('enter', (member) => updatePlayerCount());
-            channel.presence.subscribe('leave', (member) => {
-                delete players[member.clientId];
+                // 玩家进出管理
+                channel.presence.subscribe('enter', updatePlayerCount);
+                channel.presence.subscribe('leave', (member) => {
+                    delete players[member.clientId];
+                    updatePlayerCount();
+                });
+                
+                await channel.presence.enter({ color: me.color });
                 updatePlayerCount();
-            });
-            await channel.presence.enter({ color: me.color });
-            
-            gameLoop();
+
+                // 启动游戏循环
+                requestAnimationFrame(gameLoop);
+            } catch (err) {
+                document.getElementById('status').textContent = "❌ 连接失败: " + err.message;
+            }
         }
 
         function updatePlayerCount() {
@@ -75,7 +98,6 @@
             });
         }
 
-        // 核心游戏循环
         function gameLoop() {
             update();
             draw();
@@ -85,52 +107,70 @@
         function update() {
             let moved = false;
             const speed = 4;
-            // 简单的键盘处理 (此处省略具体按键监听逻辑，假设使用 WASD)
-            // if (keys['w']) { me.y -= speed; me.angle = 0; moved = true; }
-            
-            // 模拟平滑移动远程玩家 (插值)
+
+            if (keys['w'] || keys['ArrowUp']) { me.y -= speed; me.angle = 0; moved = true; }
+            if (keys['s'] || keys['ArrowDown']) { me.y += speed; me.angle = 180; moved = true; }
+            if (keys['a'] || keys['ArrowLeft']) { me.x -= speed; me.angle = 270; moved = true; }
+            if (keys['d'] || keys['ArrowRight']) { me.x += speed; me.angle = 90; moved = true; }
+
+            // 远程玩家位置插值平滑化
             for (let id in players) {
                 const p = players[id];
-                p.x += (p.targetX - p.x) * 0.2; // 线性插值线性
-                p.y += (p.targetY - p.y) * 0.2;
+                p.x += (p.targetX - p.x) * 0.15; // 线性插值
+                p.y += (p.targetY - p.y) * 0.15;
             }
 
-            // 频率限制发送：每 50ms 发送一次位置
+            // 限制发送频率：每 50ms 发送一次位置更新 (20fps tick)
             const now = Date.now();
-            if (moved && now - me.lastSent > 50) {
-                channel.publish('u', { id: myId, x: me.x, y: me.y, a: me.angle });
-                me.lastSent = now;
+            if (moved && now - lastSent > 50) {
+                channel.publish('u', { id: myId, x: Math.round(me.x), y: Math.round(me.y), a: me.angle });
+                lastSent = now;
             }
         }
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // 绘制自己
-            drawTank(me.x, me.y, me.angle, me.color, "我");
-
             // 绘制其他玩家
             for (let id in players) {
                 const p = players[id];
                 drawTank(p.x, p.y, p.angle, '#ba1a1a', id.substring(0, 4));
             }
+
+            // 绘制自己
+            drawTank(me.x, me.y, me.angle, me.color, "ME");
         }
 
         function drawTank(x, y, angle, color, label) {
             ctx.save();
             ctx.translate(x, y);
             ctx.rotate(angle * Math.PI / 180);
+            
+            // 坦克底盘
             ctx.fillStyle = color;
-            ctx.fillRect(-20, -20, 40, 40); // 坦克主体
+            ctx.beginPath();
+            ctx.roundRect(-20, -20, 40, 40, 8);
+            ctx.fill();
+
+            // 炮管
             ctx.fillStyle = "#333";
-            ctx.fillRect(-2, -25, 4, 20); // 炮管
+            ctx.fillRect(-3, -28, 6, 20);
+            
             ctx.restore();
             
-            ctx.fillStyle = "white";
-            ctx.fillText(label, x - 15, y + 35);
+            // 名字标识
+            ctx.fillStyle = "rgba(255,255,255,0.7)";
+            ctx.font = "12px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText(label, x, y + 35);
         }
 
-        initAbly();
+        // 3. 事件监听与启动
+        window.addEventListener('keydown', e => keys[e.key] = true);
+        window.addEventListener('keyup', e => keys[e.key] = false);
+
+        // 确保在页面加载完成后再执行初始化
+        window.onload = initAbly;
     </script>
 </body>
 </html>

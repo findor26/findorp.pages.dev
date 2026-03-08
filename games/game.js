@@ -349,6 +349,24 @@ function render() {
     }
 }
 
+/**
+ * 生成子弹函数
+ * @param {Object} data - 包含坐标、角度和速度的数据对象
+ * @param {boolean} isMine - 标识是否为当前玩家发射的子弹
+ */
+function spawnBullet(data, isMine) {
+    // 将子弹数据推入全局 bullets 数组供 update 和 render 循环使用
+    bullets.push({
+        x: data.x,
+        y: data.y,
+        angle: data.angle,
+        speed: data.speed || 12, // 如果未指定则使用默认速度
+        dist: 0,                 // 记录飞行距离用于射程控制
+        isMine: isMine,          // 标识权属，用于后续的伤害判定逻辑
+        active: true             // 标识存活状态
+    });
+}
+
 // 交互
 window.onkeydown = (e) => keys[e.key.toLowerCase()] = true;
 window.onkeyup = (e) => { if (e.key === ' ' && currentWeather !== 'emp') fire(); keys[e.key.toLowerCase()] = false; };

@@ -208,44 +208,44 @@
             letter-spacing: 0.5px;
         }
         /* 对齐主页的模态框样式 */
-.modal-overlay {
-    position: fixed;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0, 0, 0, 0.4); /* 遮罩层 */
-    backdrop-filter: blur(4px); /* 毛玻璃效果 */
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-}
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.4); /* 遮罩层 */
+            backdrop-filter: blur(4px); /* 毛玻璃效果 */
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
 
-.modal-content {
-    background-color: #ffffff;
-    width: 90%;
-    max-width: 320px;
-    padding: 24px;
-    border-radius: 28px; /* MD3 标准对话框圆角 */
-    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-    animation: modalPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
+        .modal-content {
+            background-color: #ffffff;
+            width: 90%;
+            max-width: 320px;
+            padding: 24px;
+            border-radius: 28px; /* MD3 标准对话框圆角 */
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            animation: modalPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
 
-@keyframes modalPop {
-    from { opacity: 0; transform: scale(0.9) translateY(20px); }
-    to { opacity: 1; transform: scale(1) translateY(0); }
-}
+        @keyframes modalPop {
+            from { opacity: 0; transform: scale(0.9) translateY(20px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
 
-.modal-title {
-    font-size: 24px;
-    margin-bottom: 16px;
-    color: var(--md-sys-color-on-surface);
-}
+        .modal-title {
+            font-size: 24px;
+            margin-bottom: 16px;
+            color: var(--md-sys-color-on-surface);
+        }
 
-.modal-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    margin-top: 24px;
-}
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-top: 24px;
+        }
     </style>
 </head>
 <body>
@@ -263,14 +263,24 @@
             </div>
         </div>
 
-        <div id="msg-list">
-            </div>
+        <div id="msg-list"></div>
 
         <div class="action-bar">
             <button class="btn-text" onclick="toggleAdmin()">
                 <span class="material-symbols-outlined" style="font-size: 16px; vertical-align: middle;">admin_panel_settings</span>
                 进入管理模式
             </button>
+        </div>
+    </div>
+
+    <div id="admin-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-title">身份验证</div>
+            <input type="password" id="admin-token-input" class="input-field" placeholder="请输入管理令牌">
+            <div class="modal-actions">
+                <button class="btn-text" onclick="closeAdminModal()">取消</button>
+                <button class="btn" onclick="submitAdminToken()">确认</button>
+            </div>
         </div>
     </div>
 
@@ -287,6 +297,9 @@
                 const data = await res.json();
                 const list = document.getElementById('msg-list');
                 
+                // 如果 localStorage 里有 token，开启管理展示逻辑
+                if(localStorage.getItem('admin_token')) isAdmin = true;
+
                 list.innerHTML = data.map(m => `
                     <div class="card msg-item ${isAdmin ? 'admin-active' : ''}">
                         <div class="msg-header">
@@ -340,45 +353,25 @@
             }
         }
 
-        // 切换管理模式：弹出自定义对话框
-function toggleAdmin() {
-    document.getElementById('admin-modal').style.display = 'flex';
-    document.getElementById('admin-token-input').focus();
-}
+        function toggleAdmin() {
+            document.getElementById('admin-modal').style.display = 'flex';
+            document.getElementById('admin-token-input').focus();
+        }
 
-// 关闭对话框
-function closeAdminModal() {
-    document.getElementById('admin-modal').style.display = 'none';
-    document.getElementById('admin-token-input').value = '';
-}
+        function closeAdminModal() {
+            document.getElementById('admin-modal').style.display = 'none';
+            document.getElementById('admin-token-input').value = '';
+        }
 
-// 提交令牌
-function submitAdminToken() {
-    const pwd = document.getElementById('admin-token-input').value;
-    if (pwd) {
-        localStorage.setItem('admin_token', pwd);
-        isAdmin = true;
-        loadMessages(); // 重新加载以显示删除按钮
-        closeAdminModal();
-    }
-}
-
-// 修改原有的 loadMessages，在渲染时应用 admin-active
-async function loadMessages() {
-    try {
-        const res = await fetch('/api/messages');
-        const data = await res.json();
-        const list = document.getElementById('msg-list');
-        
-        // 如果 localStorage 里有 token，默认开启管理展示逻辑
-        if(localStorage.getItem('admin_token')) isAdmin = true;
-
-        list.innerHTML = data.map(m => `
-            <div class="card msg-item ${isAdmin ? 'admin-active' : ''}">
-                </div>
-        `).join('');
-    } catch (err) { /* ... */ }
-}
+        function submitAdminToken() {
+            const pwd = document.getElementById('admin-token-input').value;
+            if (pwd) {
+                localStorage.setItem('admin_token', pwd);
+                isAdmin = true;
+                loadMessages();
+                closeAdminModal();
+            }
+        }
 
         function escapeHtml(str) {
             const div = document.createElement('div');
@@ -386,7 +379,6 @@ async function loadMessages() {
             return div.innerHTML;
         }
 
-        // 格式化时间，更符合中文习惯
         function formatDate(dateStr) {
             const d = new Date(dateStr);
             return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;

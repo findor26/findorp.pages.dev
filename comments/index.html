@@ -265,7 +265,9 @@
         <div class="modal-content">
             <div class="modal-title">身份验证</div>
             <div class="modal-body">请输入管理令牌以启用删除功能。</div>
-            <input type="password" id="admin-token-input" class="input-field" placeholder="令牌">
+            <form onsubmit="return false;">
+                <input type="password" id="admin-token-input" class="input-field" placeholder="令牌">
+            </form>
             <div class="modal-actions">
                 <button class="btn-text" onclick="hideModal('admin-modal')">取消</button>
                 <button class="btn" onclick="submitAdminToken()">确认</button>

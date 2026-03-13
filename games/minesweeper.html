@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Material 3 扫雷 - 实时计数版</title>
+    <style>
+        :root {
+            --md-sys-color-primary: #0061a4;
+            --md-sys-color-on-primary: #ffffff;
+            --md-sys-color-primary-container: #d1e4ff;
+            --md-sys-color-on-primary-container: #001d36;
+            --md-sys-color-surface: #fdfcff;
+            --md-sys-color-surface-container-high: #e0e2ec;
+            --md-sys-color-outline: #74777f;
+            --md-sys-color-error: #ba1a1a;
+            --font-family: 'Roboto', system-ui, -apple-system, sans-serif;
+        }
+
+        body {
+            background-color: var(--md-sys-color-surface);
+            font-family: var(--font-family);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            color: var(--md-sys-color-on-primary-container);
+        }
+
+        .game-container {
+            background-color: var(--md-sys-color-surface-container-high);
+            padding: 24px;
+            border-radius: 28px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .stats {
+            display: flex;
+            gap: 12px;
+        }
+
+        .stat-badge {
+            background-color: var(--md-sys-color-primary-container);
+            padding: 8px 16px;
+            border-radius: 12px;
+            font-weight: 500;
+            font-size: 14px;
+            min-width: 80px;
+            text-align: center;
+        }
+
+        .minefield {
+            display: grid;
+            gap: 4px;
+            background-color: var(--md-sys-color-outline);
+            padding: 4px;
+            border-radius: 12px;
+            user-select: none;
+        }
+
+        .cell {
+            width: 32px;
+            height: 32px;
+            background-color: var(--md-sys-color-primary);
+            border-radius: 4px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+
+        .cell:active { transform: scale(0.9); }
+
+        .cell.revealed {
+            background-color: var(--md-sys-color-surface);
+            cursor: default;
+        }
+
+        .cell.mine { background-color: var(--md-sys-color-error); color: white; }
+        .cell.flagged { background-color: var(--md-sys-color-primary-container); }
+
+        .btn-restart {
+            background-color: var(--md-sys-color-primary);
+            color: var(--md-sys-color-on-primary);
+            border: none;
+            padding: 10px 24px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .n1 { color: #1976D2; } .n2 { color: #388E3C; } .n3 { color: #D32F2F; }
+        .n4 { color: #7B1FA2; } .n5 { color: #FF8F00; }
+    </style>
+</head>
+<body>
+
+<div class="game-container">
+    <div class="header">
+        <div class="stats">
+            <div class="stat-badge" id="mine-count">炸弹: 10</div>
+            <div class="stat-badge" id="timer">时间: 0s</div>
+        </div>
+        <button class="btn-restart" onclick="initGame()">重新开始</button>
+    </div>
+    <div id="grid" class="minefield"></div>
+</div>
+
+<script>
+    const ROWS = 10;
+    const COLS = 10;
+    const TOTAL_MINES = 10;
+    
+    let board = [];
+    let revealedCount = 0;
+    let timerInterval = null;
+    let seconds = 0;
+    let isGameOver = false;
+    let flagsPlaced = 0;
+
+    function initGame() {
+        clearInterval(timerInterval);
+        seconds = 0;
+        revealedCount = 0;
+        isGameOver = false;
+        flagsPlaced = 0;
+        
+        updateMineDisplay();
+        document.getElementById('timer').innerText = `时间: 0s`;
+        
+        createBoard();
+        renderBoard();
+        startTimer();
+    }
+
+    // 更新界面上的地雷计数器
+    function updateMineDisplay() {
+        const remaining = TOTAL_MINES - flagsPlaced;
+        document.getElementById('mine-count').innerText = `炸弹: ${remaining}`;
+    }
+
+    function createBoard() {
+        board = Array.from({ length: ROWS }, () => 
+            Array.from({ length: COLS }, () => ({
+                isMine: false,
+                isRevealed: false,
+                isFlagged: false,
+                neighborCount: 0
+            }))
+        );
+
+        let plantedMines = 0;
+        while (plantedMines < TOTAL_MINES) {
+            let r = Math.floor(Math.random() * ROWS);
+            let c = Math.floor(Math.random() * COLS);
+            if (!board[r][c].isMine) {
+                board[r][c].isMine = true;
+                plantedMines++;
+            }
+        }
+
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                if (!board[r][c].isMine) board[r][c].neighborCount = countNeighbors(r, c, 'isMine');
+            }
+        }
+    }
+
+    function countNeighbors(r, c, property) {
+        let count = 0;
+        for (let i = -1; i <= 1; i++) {
+            for (let j = -1; j <= 1; j++) {
+                if (i === 0 && j === 0) continue;
+                if (board[r + i]?.[c + j]?.[property]) count++;
+            }
+        }
+        return count;
+    }
+
+    function renderBoard() {
+        const gridElement = document.getElementById('grid');
+        gridElement.style.gridTemplateColumns = `repeat(${COLS}, 32px)`;
+        gridElement.innerHTML = '';
+
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.dataset.r = r;
+                cell.dataset.c = c;
+                
+                cell.addEventListener('click', () => {
+                    if (board[r][c].isRevealed) handleQuickExpand(r, c);
+                    else handleReveal(r, c);
+                });
+                
+                cell.addEventListener('dblclick', () => handleQuickExpand(r, c));
+
+                cell.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    handleFlag(r, c);
+                });
+
+                gridElement.appendChild(cell);
+            }
+        }
+    }
+
+    function handleQuickExpand(r, c) {
+        if (isGameOver || !board[r][c].isRevealed) return;
+        const cell = board[r][c];
+        const flagCount = countNeighbors(r, c, 'isFlagged');
+
+        if (flagCount === cell.neighborCount) {
+            for (let i = -1; i <= 1; i++) {
+                for (let j = -1; j <= 1; j++) {
+                    const nr = r + i, nc = c + j;
+                    if (board[nr]?.[nc] && !board[nr][nc].isRevealed && !board[nr][nc].isFlagged) {
+                        handleReveal(nr, nc);
+                    }
+                }
+            }
+        }
+    }
+
+    function handleReveal(r, c) {
+        if (isGameOver || board[r][c].isRevealed || board[r][c].isFlagged) return;
+        if (board[r][c].isMine) { endGame(false); return; }
+
+        revealCell(r, c);
+        if (revealedCount === (ROWS * COLS) - TOTAL_MINES) endGame(true);
+    }
+
+    function revealCell(r, c) {
+        if (r < 0 || r >= ROWS || c < 0 || c >= COLS || board[r][c].isRevealed || board[r][c].isFlagged) return;
+
+        const cell = board[r][c];
+        cell.isRevealed = true;
+        revealedCount++;
+
+        const domCell = document.querySelector(`[data-r="${r}"][data-c="${c}"]`);
+        domCell.classList.add('revealed');
+        
+        if (cell.neighborCount > 0) {
+            domCell.innerText = cell.neighborCount;
+            domCell.classList.add(`n${cell.neighborCount}`);
+        } else {
+            for (let i = -1; i <= 1; i++) {
+                for (let j = -1; j <= 1; j++) revealCell(r + i, c + j);
+            }
+        }
+    }
+
+    function handleFlag(r, c) {
+        if (isGameOver || board[r][c].isRevealed) return;
+        
+        const cell = board[r][c];
+        cell.isFlagged = !cell.isFlagged;
+        
+        // 增减已插旗总数
+        flagsPlaced += cell.isFlagged ? 1 : -1;
+        
+        const domCell = document.querySelector(`[data-r="${r}"][data-c="${c}"]`);
+        domCell.classList.toggle('flagged');
+        domCell.innerText = cell.isFlagged ? '🚩' : '';
+        
+        updateMineDisplay();
+    }
+
+    function endGame(isWin) {
+        isGameOver = true;
+        clearInterval(timerInterval);
+        board.forEach((row, r) => row.forEach((cell, c) => {
+            if (cell.isMine) {
+                const dom = document.querySelector(`[data-r="${r}"][data-c="${c}"]`);
+                dom.classList.add('mine');
+                dom.innerText = '💣';
+            }
+        }));
+        setTimeout(() => alert(isWin ? "胜利！" : "失败！"), 100);
+    }
+
+    function startTimer() {
+        timerInterval = setInterval(() => {
+            seconds++;
+            document.getElementById('timer').innerText = `时间: ${seconds}s`;
+        }, 1000);
+    }
+
+    initGame();
+</script>
+</body>
+</html>

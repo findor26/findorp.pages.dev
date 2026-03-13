@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Material 3 扫雷 - 智能版</title>
+    <title>Material 3 扫雷 - 实时计数版</title>
     <style>
         :root {
             --md-sys-color-primary: #0061a4;
@@ -53,6 +53,8 @@
             border-radius: 12px;
             font-weight: 500;
             font-size: 14px;
+            min-width: 80px;
+            text-align: center;
         }
 
         .minefield {
@@ -74,8 +76,10 @@
             align-items: center;
             cursor: pointer;
             font-weight: bold;
-            transition: background-color 0.2s;
+            transition: background-color 0.2s, transform 0.1s;
         }
+
+        .cell:active { transform: scale(0.9); }
 
         .cell.revealed {
             background-color: var(--md-sys-color-surface);
@@ -96,6 +100,7 @@
         }
 
         .n1 { color: #1976D2; } .n2 { color: #388E3C; } .n3 { color: #D32F2F; }
+        .n4 { color: #7B1FA2; } .n5 { color: #FF8F00; }
     </style>
 </head>
 <body>
@@ -103,10 +108,10 @@
 <div class="game-container">
     <div class="header">
         <div class="stats">
-            <div class="stat-badge" id="mine-count">剩余: 10</div>
+            <div class="stat-badge" id="mine-count">炸弹: 10</div>
             <div class="stat-badge" id="timer">时间: 0s</div>
         </div>
-        <button class="btn-restart" onclick="initGame()">重开</button>
+        <button class="btn-restart" onclick="initGame()">重新开始</button>
     </div>
     <div id="grid" class="minefield"></div>
 </div>
@@ -114,24 +119,34 @@
 <script>
     const ROWS = 10;
     const COLS = 10;
-    const MINES = 10;
+    const TOTAL_MINES = 10;
     
     let board = [];
     let revealedCount = 0;
     let timerInterval = null;
     let seconds = 0;
     let isGameOver = false;
+    let flagsPlaced = 0;
 
     function initGame() {
         clearInterval(timerInterval);
         seconds = 0;
         revealedCount = 0;
         isGameOver = false;
+        flagsPlaced = 0;
+        
+        updateMineDisplay();
         document.getElementById('timer').innerText = `时间: 0s`;
-        document.getElementById('mine-count').innerText = `剩余: ${MINES}`;
+        
         createBoard();
         renderBoard();
         startTimer();
+    }
+
+    // 更新界面上的地雷计数器
+    function updateMineDisplay() {
+        const remaining = TOTAL_MINES - flagsPlaced;
+        document.getElementById('mine-count').innerText = `炸弹: ${remaining}`;
     }
 
     function createBoard() {
@@ -145,8 +160,9 @@
         );
 
         let plantedMines = 0;
-        while (plantedMines < MINES) {
-            let r = Math.floor(Math.random() * ROWS), c = Math.floor(Math.random() * COLS);
+        while (plantedMines < TOTAL_MINES) {
+            let r = Math.floor(Math.random() * ROWS);
+            let c = Math.floor(Math.random() * COLS);
             if (!board[r][c].isMine) {
                 board[r][c].isMine = true;
                 plantedMines++;
@@ -184,7 +200,6 @@
                 cell.dataset.c = c;
                 
                 cell.addEventListener('click', () => {
-                    // 如果已揭开，执行双击扩展逻辑（单击已揭开区域通常也触发此功能）
                     if (board[r][c].isRevealed) handleQuickExpand(r, c);
                     else handleReveal(r, c);
                 });
@@ -201,16 +216,11 @@
         }
     }
 
-    // 核心：快速打开安全区逻辑
     function handleQuickExpand(r, c) {
         if (isGameOver || !board[r][c].isRevealed) return;
-
         const cell = board[r][c];
-        if (cell.neighborCount === 0) return;
-
         const flagCount = countNeighbors(r, c, 'isFlagged');
 
-        // 逻辑：如果周围旗帜数等于数字，则打开周围非旗帜格子
         if (flagCount === cell.neighborCount) {
             for (let i = -1; i <= 1; i++) {
                 for (let j = -1; j <= 1; j++) {
@@ -228,7 +238,7 @@
         if (board[r][c].isMine) { endGame(false); return; }
 
         revealCell(r, c);
-        if (revealedCount === (ROWS * COLS) - MINES) endGame(true);
+        if (revealedCount === (ROWS * COLS) - TOTAL_MINES) endGame(true);
     }
 
     function revealCell(r, c) {
@@ -253,13 +263,18 @@
 
     function handleFlag(r, c) {
         if (isGameOver || board[r][c].isRevealed) return;
-        board[r][c].isFlagged = !board[r][c].isFlagged;
+        
+        const cell = board[r][c];
+        cell.isFlagged = !cell.isFlagged;
+        
+        // 增减已插旗总数
+        flagsPlaced += cell.isFlagged ? 1 : -1;
+        
         const domCell = document.querySelector(`[data-r="${r}"][data-c="${c}"]`);
         domCell.classList.toggle('flagged');
-        domCell.innerText = board[r][c].isFlagged ? '🚩' : '';
+        domCell.innerText = cell.isFlagged ? '🚩' : '';
         
-        const currentFlags = board.flat().filter(x => x.isFlagged).length;
-        document.getElementById('mine-count').innerText = `剩余: ${Math.max(0, MINES - currentFlags)}`;
+        updateMineDisplay();
     }
 
     function endGame(isWin) {

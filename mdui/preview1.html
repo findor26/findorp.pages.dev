@@ -1,0 +1,48 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MDUI 2 组件预览</title>
+    <link rel="stylesheet" href="https://unpkg.com/mdui@2/mdui.css" />
+    <script type="module" src="https://unpkg.com/mdui@2/mdui.global.js"></script>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+</head>
+
+<body>
+    <div style="padding: 24px; display: flex; flex-direction: column; gap: 24px;">
+        <mdui-card>
+            <mdui-card-header title="MDUI 组件预览" subtitle="展示各种组件的外观和用法" />
+            <mdui-card-content>
+                <p>这是一个使用 MDUI 2 构建的组件预览页面，展示了按钮、图标、进度条等常用组件的样式和交互效果。</p>
+            </mdui-card-content>
+            <mdui-card-actions>
+                <mdui-dialog class="example-dialog" title="示例对话框">
+                    <div style="display: flex;">
+                        <p>这是一个示例对话框，展示了 MDUI 的对话框组件。</p>
+                        <mdui-checkbox label="选项 1" checked></mdui-checkbox>
+                    </div>
+                    <mdui-button variant="text" mdui-dialog-close class="cancel">取消</mdui-button>
+                    <mdui-button variant="text" mdui-dialog-close class="done">确定</mdui-button>
+
+                </mdui-dialog>
+                <mdui-button variant="text" class="opendialog-btn">了解更多</mdui-button>
+                <mdui-button variant="text">GitHub</mdui-button>
+            </mdui-card-actions>
+
+
+        </mdui-card>
+    </div>
+    <script>
+        const dialog = document.querySelector(".example-dialog");
+        const openButton = dialog.nextElementSibling;
+        const closeButton = dialog.querySelector(".cancel");
+        const closeButton1 = dialog.querySelector(".done");
+        openButton.addEventListener("click", () => dialog.open = true);
+        closeButton.addEventListener("click", () => dialog.open = false);
+        closeButton1.addEventListener("click", () => dialog.open = false);
+    </script>
+</body>
+
+</html>

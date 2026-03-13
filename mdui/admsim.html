@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MDUI 2 管理后台</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/material-design-icons/3.0.1/iconfont/material-icons.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/mdui@2/mdui.css">
+    <script type="module" src="https://unpkg.com/mdui@2/mdui.global.js"></script>
+    <style>
+        body { margin: 0; min-height: 100vh; background-color: var(--mdui-color-surface-container-low); }
+        .main-wrapper { display: flex; flex-direction: column; height: 100vh; }
+        .content-body { padding: 24px; flex-grow: 1; overflow-y: auto; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    </style>
+</head>
+<body class="mdui-theme-light">
+
+    <!-- 1. 响应式侧边栏 -->
+    <mdui-navigation-drawer id="drawer" modal>
+        <mdui-list>
+            <mdui-list-item icon="dashboard" active>仪表盘</mdui-list-item>
+            <mdui-list-item icon="people">用户管理</mdui-list-item>
+            <mdui-list-item icon="insert_chart">数据分析</mdui-list-item>
+            <mdui-divider></mdui-divider>
+            <mdui-list-item icon="settings">系统设置</mdui-list-item>
+        </mdui-list>
+    </mdui-navigation-drawer>
+
+    <!-- 2. 主体布局 -->
+    <div class="main-wrapper">
+        <mdui-top-app-bar>
+            <mdui-button-icon icon="menu" id="menu-btn"></mdui-button-icon>
+            <mdui-top-app-bar-title id="app-title">仪表盘</mdui-top-app-bar-title>
+            <div style="flex-grow: 1"></div>
+            <mdui-button-icon icon="notifications"></mdui-button-icon>
+            <mdui-avatar src="https://i.pravatar.cc/100"></mdui-avatar>
+        </mdui-top-app-bar>
+
+        <div class="content-body" id="page-content">
+            <!-- 初始内容：仪表盘 -->
+            <div class="stats-grid">
+                <mdui-card variant="elevated" style="padding: 16px;">
+                    <mdui-typography variant="label-large">今日访问量</mdui-typography>
+                    <mdui-typography variant="headline-medium">1,284</mdui-typography>
+                </mdui-card>
+                <mdui-card variant="elevated" style="padding: 16px;">
+                    <mdui-typography variant="label-large">活跃用户</mdui-typography>
+                    <mdui-typography variant="headline-medium">856</mdui-typography>
+                </mdui-card>
+            </div>
+            <mdui-card variant="outlined" style="padding: 16px;">
+                <mdui-typography variant="title-medium">仪表盘统计摘要</mdui-typography>
+                <p>这里显示系统的实时监控数据...</p>
+            </mdui-card>
+        </div>
+    </div>
+
+    <script>
+        const drawer = document.getElementById('drawer');
+        const menuBtn = document.getElementById('menu-btn');
+        const appTitle = document.getElementById('app-title');
+        const content = document.getElementById('page-content');
+
+        // 打开/关闭侧边栏
+        menuBtn.addEventListener('click', () => drawer.open = true);
+
+        // 导航切换逻辑
+        document.querySelectorAll('mdui-list-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                // 更新激活状态
+                document.querySelectorAll('mdui-list-item').forEach(i => i.active = false);
+                item.active = true;
+
+                // 更新标题
+                const title = item.textContent.trim();
+                appTitle.textContent = title;
+
+                // 模拟内容切换
+                if (title === '仪表盘') {
+                    content.innerHTML = `... (恢复上面的仪表盘HTML代码) ...`;
+                } else {
+                    content.innerHTML = `
+                        <mdui-card variant="outlined" style="padding: 24px;">
+                            <mdui-typography variant="title-large">${title} 页面</mdui-typography>
+                            <p>这是 ${title} 的功能模块，正在建设中...</p>
+                        </mdui-card>`;
+                }
+                
+                drawer.open = false; // 点击后自动收起
+            });
+        });
+    </script>
+</body>
+</html>

@@ -171,6 +171,32 @@
             >
           </mdui-card>
 
+          <mdui-card variant="elevated" style="padding: 16px">
+            <mdui-typography variant="title-medium" class="card-header"
+              >标签页演示</mdui-typography
+            >
+
+            <!-- Tabs 组件 -->
+            <mdui-tabs value="tab-1">
+              <mdui-tab value="tab-1" icon="info">概览</mdui-tab>
+              <mdui-tab value="tab-2" icon="settings">设置</mdui-tab>
+              <mdui-tab value="tab-3" icon="person">个人资料</mdui-tab>
+            </mdui-tabs>
+
+            <!-- 对应的内容区域 -->
+            <div style="padding: 16px 0">
+              <mdui-tab-panel slot="panel" value="tab-1"
+                >这是概览面板的内容。</mdui-tab-panel
+              >
+              <mdui-tab-panel slot="panel" value="tab-2"
+                >这里可以放置设置相关的选项。</mdui-tab-panel
+              >
+              <mdui-tab-panel slot="panel" value="tab-3"
+                >这是个人资料的详细信息。</mdui-tab-panel
+              >
+            </div>
+          </mdui-card>
+
           <mdui-card variant="outlined" style="padding: 16px">
             <mdui-typography variant="title-medium" class="card-header"
               >常见问题</mdui-typography

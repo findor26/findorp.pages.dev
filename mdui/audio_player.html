@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MDUI 2 本地音乐播放器</title>
+    <!-- 使用国内 CDN 引入图标，避免加载失败 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/material-design-icons/3.0.1/iconfont/material-icons.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/mdui@2/mdui.css">
+    <script type="module" src="https://unpkg.com/mdui@2/mdui.global.js"></script>
+    
+    <style>
+        body { display: flex; justify-content: center; align-items: center; min-height: 100vh; background-color: var(--mdui-color-surface-container-low); margin: 0; }
+        .player-card { width: 100%; max-width: 400px; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+        .album-art { width: 100%; aspect-ratio: 1 / 1; background: var(--mdui-color-primary-container); border-radius: 16px; display: flex; justify-content: center; align-items: center; }
+        .controls { display: flex; justify-content: center; align-items: center; gap: 16px; }
+    </style>
+</head>
+<body class="mdui-theme-light">
+
+    <!-- 隐藏的文件输入框 -->
+    <input type="file" id="file-input" accept="audio/*" style="display: none;">
+    <!-- 音频源 -->
+    <audio id="audio-player"></audio>
+
+    <mdui-card variant="elevated" class="player-card">
+        <div class="album-art">
+            <mdui-icon name="library_music" style="font-size: 80px;"></mdui-icon>
+        </div>
+        
+        <div id="file-info">
+            <mdui-typography variant="title-large">未选择文件</mdui-typography>
+            <mdui-typography variant="body-medium">请点击下方按钮选择本地音频</mdui-typography>
+        </div>
+
+        <mdui-slider id="progress-slider" min="0" max="100" value="0"></mdui-slider>
+
+        <div class="controls">
+            <!-- 选择文件按钮 -->
+            <mdui-button-icon icon="folder_open" id="upload-btn"></mdui-button-icon>
+            <mdui-fab variant="primary" icon="play_arrow" id="play-btn" disabled></mdui-fab>
+            <mdui-button-icon icon="replay" id="reset-btn"></mdui-button-icon>
+        </div>
+    </mdui-card>
+
+    <script>
+        const audio = document.getElementById('audio-player');
+        const playBtn = document.getElementById('play-btn');
+        const slider = document.getElementById('progress-slider');
+        const fileInput = document.getElementById('file-input');
+        const uploadBtn = document.getElementById('upload-btn');
+        const fileInfo = document.getElementById('file-info');
+
+        // 1. 触发文件选择
+        uploadBtn.addEventListener('click', () => fileInput.click());
+
+        // 2. 处理文件选中
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                // 更新音频源
+                audio.src = URL.createObjectURL(file);
+                // 更新UI
+                fileInfo.innerHTML = `
+                    <mdui-typography variant="title-large">${file.name}</mdui-typography>
+                    <mdui-typography variant="body-medium">本地文件</mdui-typography>
+                `;
+                playBtn.disabled = false;
+                audio.play();
+                playBtn.icon = 'pause';
+            }
+        });
+
+        // 3. 播放控制
+        playBtn.addEventListener('click', () => {
+            if (audio.paused) {
+                audio.play();
+                playBtn.icon = 'pause';
+            } else {
+                audio.pause();
+                playBtn.icon = 'play_arrow';
+            }
+        });
+
+        // 4. 进度条联动
+        audio.addEventListener('timeupdate', () => {
+            if (audio.duration) {
+                slider.value = (audio.currentTime / audio.duration) * 100;
+            }
+        });
+
+        slider.addEventListener('change', (e) => {
+            audio.currentTime = (e.target.value / 100) * audio.duration;
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MDUI 2 视频播放器</title>
+    <!-- 引入资源 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/material-design-icons/3.0.1/iconfont/material-icons.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/mdui@2/mdui.css">
+    <script type="module" src="https://unpkg.com/mdui@2/mdui.global.js"></script>
+    
+    <style>
+        body { display: flex; justify-content: center; align-items: center; min-height: 100vh; background-color: var(--mdui-color-surface-container-low); margin: 0; }
+        .video-card { width: 100%; max-width: 600px; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+        video { width: 100%; border-radius: 12px; background: #000; }
+        .controls { display: flex; align-items: center; gap: 8px; }
+        .progress { flex-grow: 1; }
+    </style>
+</head>
+<body class="mdui-theme-light">
+
+    <!-- 隐藏文件输入 -->
+    <input type="file" id="video-input" accept="video/*" style="display: none;">
+
+    <mdui-card variant="elevated" class="video-card">
+        <video id="video-player">
+            您的浏览器不支持视频标签。
+        </video>
+
+        <div class="controls">
+            <mdui-button-icon icon="folder_open" id="upload-btn"></mdui-button-icon>
+            <mdui-button-icon icon="play_arrow" id="play-btn"></mdui-button-icon>
+            
+            <mdui-slider class="progress" id="progress-slider" min="0" max="100" value="0"></mdui-slider>
+            
+            <mdui-button-icon icon="fullscreen" id="fullscreen-btn"></mdui-button-icon>
+            <mdui-button-icon icon="volume_up" id="mute-btn"></mdui-button-icon>
+        </div>
+    </mdui-card>
+
+    <script>
+        const video = document.getElementById('video-player');
+        const playBtn = document.getElementById('play-btn');
+        const slider = document.getElementById('progress-slider');
+        const videoInput = document.getElementById('video-input');
+        const uploadBtn = document.getElementById('upload-btn');
+        const fullscreenBtn = document.getElementById('fullscreen-btn');
+
+        // 1. 文件选择
+        uploadBtn.addEventListener('click', () => videoInput.click());
+        videoInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                video.src = URL.createObjectURL(file);
+                video.play();
+                playBtn.icon = 'pause';
+            }
+        });
+
+        // 2. 播放/暂停
+        playBtn.addEventListener('click', () => {
+            if (video.paused) {
+                video.play();
+                playBtn.icon = 'pause';
+            } else {
+                video.pause();
+                playBtn.icon = 'play_arrow';
+            }
+        });
+
+        // 3. 进度条联动
+        video.addEventListener('timeupdate', () => {
+            if (video.duration) {
+                slider.value = (video.currentTime / video.duration) * 100;
+            }
+        });
+
+        slider.addEventListener('change', (e) => {
+            video.currentTime = (e.target.value / 100) * video.duration;
+        });
+
+        // 4. 全屏功能
+        fullscreenBtn.addEventListener('click', () => {
+            if (video.requestFullscreen) {
+                video.requestFullscreen();
+            }
+        });
+    </script>
+</body>
+</html>

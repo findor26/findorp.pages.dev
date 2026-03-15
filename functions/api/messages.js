@@ -23,13 +23,28 @@ export async function onRequest(context) {
   if (request.method === "GET") {
     // 管理员获取统计数据
     if (url.searchParams.get("stats") === "true" && isAdmin) {
-      const stats = await env.DB.prepare(`
-        SELECT 
-          (SELECT COUNT(*) FROM messages WHERE parent_id IS NULL) as total,
-          (SELECT COUNT(*) FROM messages WHERE parent_id IS NULL AND date(created_at) = date('now')) as today,
-          (SELECT COUNT(*) FROM messages WHERE parent_id IS NOT NULL) as total_replies
-      `).first();
-      return Response.json(stats);
+      try {
+        const stats = await env.DB.prepare(`
+          SELECT 
+            (SELECT COUNT(*) FROM messages WHERE parent_id IS NULL) as total,
+            (SELECT COUNT(*) FROM messages WHERE parent_id IS NULL AND date(created_at) = date('now')) as today,
+            (SELECT COUNT(*) FROM messages WHERE parent_id IS NOT NULL) as total_replies
+        `).first();
+        return Response.json(stats);
+      } catch (statsErr) {
+        // 如果parent_id字段不存在，使用旧统计
+        if (statsErr.message && statsErr.message.includes("no such column: parent_id")) {
+          const stats = await env.DB.prepare(`
+            SELECT 
+              (SELECT COUNT(*) FROM messages) as total,
+              (SELECT COUNT(*) FROM messages WHERE date(created_at) = date('now')) as today,
+              0 as total_replies
+          `).first();
+          return Response.json(stats);
+        } else {
+          throw statsErr;
+        }
+      }
     }
 
     const page = parseInt(url.searchParams.get("page")) || 1;
@@ -47,21 +62,44 @@ export async function onRequest(context) {
       return Response.json(results || []);
     }
 
-    // 否则获取主留言列表（parent_id为NULL）
-    const query = isAdmin 
-      ? "SELECT * FROM messages WHERE parent_id IS NULL ORDER BY is_pinned DESC, created_at DESC LIMIT ? OFFSET ?"
-      : "SELECT * FROM messages WHERE parent_id IS NULL AND is_hidden = 0 ORDER BY is_pinned DESC, created_at DESC LIMIT ? OFFSET ?";
+    // 否则获取主留言列表
+    // 先尝试使用parent_id字段查询，如果失败则使用旧查询
+    let results;
+    try {
+      const query = isAdmin 
+        ? "SELECT * FROM messages WHERE parent_id IS NULL ORDER BY is_pinned DESC, created_at DESC LIMIT ? OFFSET ?"
+        : "SELECT * FROM messages WHERE parent_id IS NULL AND is_hidden = 0 ORDER BY is_pinned DESC, created_at DESC LIMIT ? OFFSET ?";
 
-    const { results } = await env.DB.prepare(query).bind(size, offset).all();
+      const queryResult = await env.DB.prepare(query).bind(size, offset).all();
+      results = queryResult.results || [];
+    } catch (queryErr) {
+      // 如果parent_id字段不存在，使用旧查询
+      if (queryErr.message && queryErr.message.includes("no such column: parent_id")) {
+        const query = isAdmin 
+          ? "SELECT * FROM messages ORDER BY is_pinned DESC, created_at DESC LIMIT ? OFFSET ?"
+          : "SELECT * FROM messages WHERE is_hidden = 0 ORDER BY is_pinned DESC, created_at DESC LIMIT ? OFFSET ?";
+
+        const queryResult = await env.DB.prepare(query).bind(size, offset).all();
+        results = queryResult.results || [];
+      } else {
+        throw queryErr;
+      }
+    }
     
-    // 为每个主留言获取回复数量（如果reply_count字段不存在，动态计算）
+    // 为每个主留言获取回复数量
     for (const message of results) {
-      // 检查是否有reply_count字段
-      if (message.reply_count === undefined) {
-        const replyCountResult = await env.DB.prepare(
-          "SELECT COUNT(*) as count FROM messages WHERE parent_id = ? AND (is_hidden = 0 OR ? = 1)"
-        ).bind(message.id, isAdmin ? 1 : 0).first();
-        message.reply_count = replyCountResult?.count || 0;
+      try {
+        // 先检查是否有reply_count字段
+        if (message.reply_count === undefined) {
+          // 尝试动态计算回复数量
+          const replyCountResult = await env.DB.prepare(
+            "SELECT COUNT(*) as count FROM messages WHERE parent_id = ? AND (is_hidden = 0 OR ? = 1)"
+          ).bind(message.id, isAdmin ? 1 : 0).first();
+          message.reply_count = replyCountResult?.count || 0;
+        }
+      } catch (countErr) {
+        // 如果查询失败，设置默认值
+        message.reply_count = 0;
       }
     }
     
@@ -101,22 +139,40 @@ export async function onRequest(context) {
       const ip = request.headers.get("CF-Connecting-IP") || "Unknown";
       const createdAt = new Date().toISOString();
 
-      // 插入留言
-      await env.DB.prepare(
-        "INSERT INTO messages (nickname, content, created_at, ip_address, parent_id) VALUES (?, ?, ?, ?, ?)"
-      ).bind(nickname, content, createdAt, ip, parent_id || null).run();
-
-      // 如果是回复，更新父留言的回复计数
-      if (parent_id) {
+      try {
+        // 尝试插入留言（包含parent_id字段）
         await env.DB.prepare(
-          "UPDATE messages SET reply_count = reply_count + 1 WHERE id = ?"
-        ).bind(parent_id).run();
+          "INSERT INTO messages (nickname, content, created_at, ip_address, parent_id) VALUES (?, ?, ?, ?, ?)"
+        ).bind(nickname, content, createdAt, ip, parent_id || null).run();
+      } catch (dbErr) {
+        // 如果parent_id字段不存在，尝试不带parent_id的插入
+        if (dbErr.message && dbErr.message.includes("no such column: parent_id")) {
+          await env.DB.prepare(
+            "INSERT INTO messages (nickname, content, created_at, ip_address) VALUES (?, ?, ?, ?)"
+          ).bind(nickname, content, createdAt, ip).run();
+        } else {
+          throw dbErr;
+        }
+      }
+
+      // 如果是回复，尝试更新父留言的回复计数
+      if (parent_id) {
+        try {
+          await env.DB.prepare(
+            "UPDATE messages SET reply_count = reply_count + 1 WHERE id = ?"
+          ).bind(parent_id).run();
+        } catch (updateErr) {
+          // 如果reply_count字段不存在，忽略这个错误
+          if (!updateErr.message || !updateErr.message.includes("no such column: reply_count")) {
+            console.error("更新回复计数失败:", updateErr);
+          }
+        }
       }
       
       return new Response("OK", { status: 201 });
     } catch (err) {
       console.error("发布失败:", err);
-      return new Response("发布失败", { status: 500 });
+      return new Response("发布失败: " + (err.message || "未知错误"), { status: 500 });
     }
   }
 

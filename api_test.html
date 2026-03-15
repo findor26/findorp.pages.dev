@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API测试页面</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test { margin: 10px 0; padding: 10px; border: 1px solid #ccc; }
+        .success { background: #d4edda; }
+        .error { background: #f8d7da; }
+        .loading { background: #fff3cd; }
+    </style>
+</head>
+<body>
+    <h1>留言板API测试</h1>
+    
+    <div class="test" id="test1">
+        <h3>测试1: 获取留言列表</h3>
+        <button onclick="testGetMessages()">测试GET /api/messages</button>
+        <div id="result1"></div>
+    </div>
+    
+    <div class="test" id="test2">
+        <h3>测试2: 发布留言</h3>
+        <button onclick="testPostMessage()">测试POST /api/messages</button>
+        <div id="result2"></div>
+    </div>
+    
+    <div class="test" id="test3">
+        <h3>测试3: 获取统计信息</h3>
+        <button onclick="testGetStats()">测试GET /api/messages?stats=true</button>
+        <div id="result3"></div>
+    </div>
+    
+    <script>
+        async function testGetMessages() {
+            const test = document.getElementById('test1');
+            const result = document.getElementById('result1');
+            test.className = 'test loading';
+            result.innerHTML = '正在测试...';
+            
+            try {
+                const response = await fetch('/api/messages');
+                const data = await response.json();
+                test.className = 'test success';
+                result.innerHTML = `
+                    <p>状态码: ${response.status}</p>
+                    <p>返回数据条数: ${data.length}</p>
+                    <pre>${JSON.stringify(data.slice(0, 3), null, 2)}</pre>
+                `;
+            } catch (error) {
+                test.className = 'test error';
+                result.innerHTML = `
+                    <p>错误: ${error.message}</p>
+                    <p>请检查控制台获取详细信息</p>
+                `;
+                console.error('GET测试失败:', error);
+            }
+        }
+        
+        async function testPostMessage() {
+            const test = document.getElementById('test2');
+            const result = document.getElementById('result2');
+            test.className = 'test loading';
+            result.innerHTML = '正在测试...';
+            
+            try {
+                const response = await fetch('/api/messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        nickname: '测试用户' + Date.now(),
+                        content: '这是一个测试留言，时间: ' + new Date().toLocaleString()
+                    })
+                });
+                
+                test.className = 'test success';
+                result.innerHTML = `
+                    <p>状态码: ${response.status}</p>
+                    <p>响应: ${await response.text()}</p>
+                `;
+            } catch (error) {
+                test.className = 'test error';
+                result.innerHTML = `
+                    <p>错误: ${error.message}</p>
+                    <p>请检查控制台获取详细信息</p>
+                `;
+                console.error('POST测试失败:', error);
+            }
+        }
+        
+        async function testGetStats() {
+            const test = document.getElementById('test3');
+            const result = document.getElementById('result3');
+            test.className = 'test loading';
+            result.innerHTML = '正在测试...';
+            
+            try {
+                // 需要管理员令牌，这里只测试基本访问
+                const response = await fetch('/api/messages?stats=true');
+                const data = await response.json();
+                test.className = 'test success';
+                result.innerHTML = `
+                    <p>状态码: ${response.status}</p>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                test.className = 'test error';
+                result.innerHTML = `
+                    <p>错误: ${error.message}</p>
+                    <p>注意: 统计接口需要管理员权限</p>
+                `;
+                console.error('统计测试失败:', error);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -245,65 +245,6 @@
         }
 
         footer { padding: 40px 0; text-align: center; font-size: 12px; color: var(--md-sys-color-outline-variant); }
-        
-        /* 回复相关样式 */
-        .replies-container {
-            margin-top: 16px;
-            margin-left: 24px;
-            border-left: 2px solid var(--md-sys-color-outline);
-            padding-left: 16px;
-        }
-
-        .reply-item {
-            background: var(--md-sys-color-surface-variant);
-            border-radius: 12px;
-            padding: 12px 16px;
-            margin-bottom: 8px;
-            border: 1px solid var(--md-sys-color-outline);
-        }
-
-        .reply-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 4px;
-        }
-
-        .reply-nickname {
-            font-weight: 500;
-            color: var(--md-sys-color-primary);
-            font-size: 14px;
-        }
-
-        .reply-time {
-            font-size: 11px;
-            color: var(--md-sys-color-outline-variant);
-        }
-
-        .reply-content {
-            font-size: 14px;
-            line-height: 1.5;
-            white-space: pre-wrap;
-            word-break: break-all;
-        }
-
-        .load-replies-btn {
-            background: none;
-            border: none;
-            color: var(--md-sys-color-primary);
-            font-size: 13px;
-            padding: 4px 12px;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            border-radius: 16px;
-            margin-top: 8px;
-        }
-
-        .load-replies-btn:hover {
-            background: rgba(0, 97, 164, 0.08);
-        }
         /* 互动工具栏 */
 .interaction-bar {
     display: flex;
@@ -365,8 +306,6 @@
         <div id="admin-stats-bar" class="stats-grid">
             <div class="stat-card"><span class="stat-value" id="count-total">0</span><span class="stat-label">总计留言</span></div>
             <div class="stat-card"><span class="stat-value" id="count-today">0</span><span class="stat-label">今日新增</span></div>
-            <div class="stat-card"><span class="stat-value">500</span><span class="stat-label">留言上限</span></div>
-            <div class="stat-card"><span class="stat-value" id="count-replies">0</span><span class="stat-label">回复总数</span></div>
         </div>
 
         <div class="card input-card">
@@ -375,12 +314,6 @@
             
             <textarea id="content" class="input-field" rows="4" placeholder="写下你的想法..." maxlength="500"></textarea>
             <div class="input-counter"><span id="cont-num">0</span>/500</div>
-            
-            <input type="hidden" id="parent_id" value="">
-            <div id="reply-info" style="display: none; margin-bottom: 12px; padding: 8px 12px; background: #e8f5e9; border-radius: 8px; font-size: 14px;">
-                <span>正在回复：<span id="reply-to-name"></span></span>
-                <button class="btn-text" onclick="cancelReply()" style="margin-left: 8px; font-size: 12px;">取消回复</button>
-            </div>
 
             <div style="display: flex; justify-content: flex-end;">
                 <button class="btn" id="post-btn" onclick="handleSendMessage()">
@@ -497,13 +430,7 @@
                             <span class="material-symbols-outlined">${myVote === 'down' ? 'thumb_down_filled' : 'thumb_down'}</span>
                             <span class="vote-count">${m.downvotes || 0}</span>
                         </div>
-                        <div class="vote-chip" onclick="handleReplyClick(${m.id}, '${safeText(m.nickname)}')">
-                            <span class="material-symbols-outlined">reply</span>
-                            <span class="vote-count">${m.reply_count || 0}</span>
-                        </div>
                     </div>
-                    
-                    <div id="replies-${m.id}" class="replies-container"></div>
 
                     ${isAdmin ? `
                         <div class="admin-tools">
@@ -658,130 +585,6 @@
             localStorage.removeItem('admin_token');
             location.reload();
         }
-
-        // --- 回复相关函数 ---
-        function handleReplyClick(parentId, nickname) {
-            const container = document.getElementById(`replies-${parentId}`);
-            const replyButton = event.target.closest('.vote-chip');
-            
-            if (container.innerHTML === '') {
-                // 第一次点击，加载回复
-                loadReplies(parentId);
-                replyButton.setAttribute('data-loaded', 'true');
-            } else {
-                // 已经加载过，显示回复表单
-                showReplyForm(parentId, nickname);
-            }
-        }
-
-        function showReplyForm(parentId, nickname) {
-            document.getElementById('parent_id').value = parentId;
-            document.getElementById('reply-to-name').textContent = nickname;
-            document.getElementById('reply-info').style.display = 'block';
-            document.getElementById('content').focus();
-            document.getElementById('content').placeholder = `回复 ${nickname}...`;
-        }
-
-        function cancelReply() {
-            document.getElementById('parent_id').value = '';
-            document.getElementById('reply-info').style.display = 'none';
-            document.getElementById('content').placeholder = '写下你的想法...';
-        }
-
-        async function loadReplies(parentId) {
-            try {
-                const res = await fetch(`/api/messages?parent_id=${parentId}`);
-                const replies = await res.json();
-                const container = document.getElementById(`replies-${parentId}`);
-                
-                if (!replies || replies.length === 0) {
-                    container.innerHTML = '<div style="font-size: 12px; color: var(--md-sys-color-outline-variant);">暂无回复</div>';
-                    return;
-                }
-                
-                let html = '';
-                replies.forEach(reply => {
-                    html += `
-                        <div class="reply-item">
-                            <div class="reply-header">
-                                <span class="reply-nickname">${safeText(reply.nickname)}</span>
-                                <span class="reply-time">${prettyDate(reply.created_at)}</span>
-                            </div>
-                            <div class="reply-content">${safeText(reply.content)}</div>
-                        </div>
-                    `;
-                });
-                container.innerHTML = html;
-            } catch (err) {
-                console.error('加载回复失败:', err);
-                const container = document.getElementById(`replies-${parentId}`);
-                container.innerHTML = '<div style="font-size: 12px; color: var(--md-sys-color-error);">加载回复失败</div>';
-            }
-        }
-
-        // 修改handleSendMessage以支持回复
-        const originalHandleSendMessage = handleSendMessage;
-        handleSendMessage = async function() {
-            const parentId = document.getElementById('parent_id').value;
-            const nickname = nickInp.value.trim();
-            const content = contInp.value.trim();
-            const btn = document.getElementById('post-btn');
-
-            if (!nickname || !content) return alert("称呼和内容都要填哦");
-            if (nickname.length > 20 || content.length > 500) return alert("字数超限啦");
-
-            btn.disabled = true;
-            try {
-                const res = await fetch('/api/messages', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ nickname, content, parent_id: parentId || null })
-                });
-                
-                if (res.ok) {
-                    contInp.value = '';
-                    document.getElementById('cont-num').textContent = '0';
-                    cancelReply();
-                    
-                    // 如果是回复，重新加载该留言的回复并更新计数
-                    if (parentId) {
-                        await loadReplies(parentId);
-                        // 更新回复计数显示
-                        const replyButton = document.querySelector(`[onclick*="handleReplyClick(${parentId},"]`);
-                        if (replyButton) {
-                            const countSpan = replyButton.querySelector('.vote-count');
-                            if (countSpan) {
-                                countSpan.textContent = parseInt(countSpan.textContent) + 1;
-                            }
-                        }
-                    } else {
-                        // 如果是主留言，刷新列表
-                        fetchMessages(true);
-                    }
-                } else {
-                    const error = await res.text();
-                    alert(error || '发布失败');
-                }
-            } finally {
-                btn.disabled = false;
-            }
-        };
-
-        // 修改fetchAdminStats以获取回复统计
-        const originalFetchAdminStats = fetchAdminStats;
-        fetchAdminStats = async function() {
-            if (!isAdmin) return;
-            const res = await fetch('/api/messages?stats=true', {
-                headers: { 'Admin-Token': localStorage.getItem('admin_token') }
-            });
-            if (res.ok) {
-                const stats = await res.json();
-                document.getElementById('count-total').textContent = stats.total;
-                document.getElementById('count-today').textContent = stats.today;
-                document.getElementById('count-replies').textContent = stats.total_replies || 0;
-                document.getElementById('admin-stats-bar').style.display = 'grid';
-            }
-        };
 
         // --- 辅助工具 ---
         function openModal(id) { document.getElementById(id).style.display = 'flex'; }

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Tanki Online Map Editor</title>
+    <title>Tanki Online Map Editor Demo</title>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -794,7 +794,29 @@ async function parseMapBin(buffer) {
 }
 
 function setupMobileFullscreen() {
-    // Fullscreen behavior removed per user request
+    const lockScreen = async () => {
+        const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
+        
+        if (!isFullscreen) {
+            try {
+                const doc = document.documentElement;
+                if (doc.requestFullscreen) {
+                    await doc.requestFullscreen();
+                } else if (doc.webkitRequestFullscreen) {
+                    await doc.webkitRequestFullscreen();
+                }
+                
+                if (screen.orientation && screen.orientation.lock) {
+                    await screen.orientation.lock("landscape");
+                }
+            } catch (e) {
+                console.warn("Fullscreen or orientation lock failed (possibly due to browser restrictions):", e.message);
+            }
+        }
+    };
+
+    document.body.addEventListener('click', lockScreen);
+    document.body.addEventListener('touchstart', lockScreen, { passive: true });
 }
 
 function setupMobileControls() {

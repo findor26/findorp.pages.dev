@@ -2088,11 +2088,8 @@ function setupUIEvents() {
                 let rotZ = deltaX * 0.02;
                 let rotX = deltaY * 0.02;
 
-                if (isSnapping) {
-                    const snap = Math.PI / 4;
-                    rotZ = Math.round(rotZ / snap) * snap;
-                    rotX = Math.round(rotX / snap) * snap;
-                }
+                const snap = Math.PI / 4;
+
 
                 // Get camera axes in world space
                 const camRightWorld = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
@@ -2102,22 +2099,31 @@ function setupUIEvents() {
                 const groupInv = editorGroup.matrixWorld.clone().invert();
                 const camRightLocal = camRightWorld.clone().transformDirection(groupInv).normalize();
                 const camUpLocal = camUpWorld.clone().transformDirection(groupInv).normalize();
-                const camForwardWorld = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-                const camForwardLocal = camForwardWorld.clone().transformDirection(groupInv).normalize();
 
                 if (window.rotateButtonMode === 'free') {
                     const qInitial = new THREE.Quaternion().setFromEuler(initialGhostRot);
-                    // Use +rotZ so that dragging right moves the facing side right
+                    
                     const qUp = new THREE.Quaternion().setFromAxisAngle(camUpLocal, rotZ); 
                     const qRight = new THREE.Quaternion().setFromAxisAngle(camRightLocal, rotX);
                     const finalQ = new THREE.Quaternion().copy(qUp).multiply(qRight).multiply(qInitial);
-                    ghost.quaternion.copy(finalQ);
-                } else {
-                    // Horizontal mode: rotate strictly around Map's Z-axis (local Z).
-                    // We must determine the correct sign based on whether the camera is looking from the "top" or "bottom"
-                    // In map space, Z is 'Up'. We project the camera's up vector onto Map Z.
-                    const isCameraInverted = camUpLocal.z < 0; 
                     
+                    if (isSnapping) {
+                 
+                        const euler = new THREE.Euler().setFromQuaternion(finalQ, ghost.rotation.order);
+                        euler.x = Math.round(euler.x / snap) * snap;
+                        euler.y = Math.round(euler.y / snap) * snap;
+                        euler.z = Math.round(euler.z / snap) * snap;
+                        ghost.rotation.copy(euler);
+                    } else {
+             
+                        ghost.quaternion.copy(finalQ);
+                    }
+                } else {
+                    if (isSnapping) {
+                        rotZ = Math.round(rotZ / snap) * snap;
+                    }
+                    
+                    const isCameraInverted = camUpLocal.z < 0; 
                     let finalRotZ = rotZ;
                     if (isCameraInverted) {
                         finalRotZ = -rotZ;

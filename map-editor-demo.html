@@ -1724,7 +1724,7 @@ function setupUIEvents() {
         () => {
             if (window.rotateButtonMode === 'horizontal') {
                 window.rotateButtonMode = 'free';
-                rotateBtn.querySelector('span').innerText = '360';
+                rotateBtn.querySelector('span').innerText = '3d_rotation';
                 rotateBtn.title = "Toggle Free Rotate (Long press to switch)";
                 showToast("Switched to Free Rotate Mode", false);
             } else {

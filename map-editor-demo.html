@@ -4,7 +4,8 @@
   <meta charset="UTF-8" /> 
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" /> 
   <title>Tanki Online Map Editor Demo</title> 
-  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&amp;family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&amp;display=swap" rel="stylesheet" /> 
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap" rel="stylesheet" /> 
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet" /> 
   <style>
         :root {
             --md-sys-color-primary: #76FF33;
@@ -438,12 +439,13 @@
    <div id="prefab-list"></div> 
   </div> 
   <div class="grid-floating-panel"> 
-   <button id="rotate-btn" class="m3-btn m3-btn-secondary" style="width:40px;padding:8px 0;" title="Rotate (45&deg;)"> <span class="material-symbols-rounded" style="font-size:20px;">rotate_right</span> </button> 
-   <button id="snap-btn" class="m3-btn m3-btn-primary" style="width:40px;padding:8px 0;" title="Toggle Grid Snap"> <span class="material-symbols-rounded" style="font-size:20px;">grid_on</span> </button> 
+   <button id="rotate-btn" class="m3-btn m3-btn-secondary" style="width:40px;padding:8px 0;" title="Toggle Horizontal Rotate (Long press to switch)"> <span class="material-symbols-rounded" style="font-size:20px;">rotate_right</span> </button> 
+   <button id="snap-btn" class="m3-btn m3-btn-primary" style="width:40px;padding:8px 0;" title="Toggle Grid Snap"> <span class="material-symbols-rounded" style="font-size:20px;">grid_on</span> </button>  
    <div style="width:1px; height:24px; background:var(--md-sys-color-outline); margin: 0 4px;"></div> 
-   <span style="font-size:14px;font-weight:500;color:var(--md-sys-color-on-surface);width:60px;">Grid Z:<br /><span id="grid-height-display" style="color:var(--md-sys-color-primary);font-size:16px;">0</span></span> 
-   <button id="grid-down-btn" class="m3-btn m3-btn-secondary" style="width:40px;padding:8px 0;" title="Lower Grid (-100)"> <span class="material-symbols-rounded" style="font-size:20px;">remove</span> </button> 
-   <button id="grid-up-btn" class="m3-btn m3-btn-secondary" style="width:40px;padding:8px 0;" title="Raise Grid (+100)"> <span class="material-symbols-rounded" style="font-size:20px;">add</span> </button> 
+   <button id="grid-z-btn" class="m3-btn m3-btn-secondary" style="width:56px;padding:4px 0;flex-direction:column;gap:0;" title="Toggle Grid Z Drag"> 
+       <span style="font-size:10px;font-weight:500;line-height:1;">Grid Z</span> 
+       <span id="grid-height-display" style="color:inherit;font-size:14px;font-weight:700;line-height:1.2;margin-top:2px;">0</span> 
+   </button> 
    <div style="width:1px; height:24px; background:var(--md-sys-color-outline); margin: 0 4px;"></div> 
    <button id="cancel-ghost-btn" class="m3-btn m3-btn-error" style="width:40px;padding:8px 0;" title="Cancel Placement"> <span class="material-symbols-rounded" style="font-size:20px;">close</span> </button> 
   </div> 
@@ -496,7 +498,7 @@ const modelCache = new Map();
 const textureCache = new Map();
 const prefabs = new Map();
 const globalLoadedProps = new Set();
-let thumbnailItems =[];
+let thumbnailItems = [];
 let propDictCache = null;
 
 let ghost = null;
@@ -507,6 +509,13 @@ let pointerDownPos = {x: 0, y: 0};
 let isUIOpen = window.innerWidth > 768;
 let isSnapping = true;
 let currentGridHeight = 0;
+
+window.dragMode = 'none'; // 'none', 'rotate', 'gridZ'
+window.rotateButtonMode = 'horizontal'; // 'horizontal' or 'free'
+window.isEditingDrag = false;
+let editDragStart = {x: 0, y: 0};
+let initialGhostRot = new THREE.Euler();
+let initialGridZ = 0;
 
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
@@ -593,7 +602,7 @@ class BinaryStream {
 }
 
 class BinaryWriter {
-    constructor() { this.chunks =[]; this.length = 0; }
+    constructor() { this.chunks = []; this.length = 0; }
     writeUint8(v) { this._add(new Uint8Array([v])); }
     writeUint16(v, le = false) { const b = new Uint8Array(2); new DataView(b.buffer).setUint16(0, v, le); this._add(b); }
     writeUint32(v, le = false) { const b = new Uint8Array(4); new DataView(b.buffer).setUint32(0, v, le); this._add(b); }
@@ -693,7 +702,7 @@ function parseA3D(buffer) {
     stream.readUint32(true);
     stream.readUint32(true);
 
-    const data = { meshes:[] };
+    const data = { meshes: [] };
 
     const matSig = stream.readUint32(true);
     const matLen = stream.readUint32(true); 
@@ -713,7 +722,7 @@ function parseA3D(buffer) {
         if(version===3) { stream.readLengthPrefixedStringA3D(); stream.offset += 28; }
         const vertexCount = stream.readUint32(true);
         const vBufCount = stream.readUint32(true);
-        const buffers =[];
+        const buffers = [];
         for(let b=0; b<vBufCount; b++) {
             const bType = stream.readUint32(true);
             const numFloats = A3D_VERTEXTYPE[bType];
@@ -724,7 +733,7 @@ function parseA3D(buffer) {
         }
         
         const submeshCount = stream.readUint32(true);
-        const submeshes =[];
+        const submeshes = [];
         for(let s=0; s<submeshCount; s++) {
             if(version===2) {
                 const fCount = stream.readUint32(true);
@@ -742,7 +751,7 @@ function parseA3D(buffer) {
         }
         
         const geo = new THREE.BufferGeometry();
-        let mainIndices =[];
+        let mainIndices = [];
         submeshes.forEach((sm, idx) => {
             const start = mainIndices.length;
             mainIndices.push(...sm.indices);
@@ -769,7 +778,7 @@ async function parseMapBin(buffer) {
     const packet = await unwrapPacket(stream);
     
     let headerEndOffset = 0;
-    const fullOriginalBits =[];
+    const fullOriginalBits = [];
     const flags = packet.readUint8();
     if ((flags & 0b10000000) === 0) {
         const intBits = flags << 3;
@@ -789,9 +798,9 @@ async function parseMapBin(buffer) {
     const popBit = () => { popCount++; return optMask.pop(); };
 
     const skipObjectArray = (p, cb) => { const len = p.readStringLength(); for(let i=0; i<len; i++) cb(p); };
-    const readV3 = () =>[packet.readFloat32(false), packet.readFloat32(false), packet.readFloat32(false)];
+    const readV3 = () => [packet.readFloat32(false), packet.readFloat32(false), packet.readFloat32(false)];
 
-    const result = { props:[], materials: {}, atlases: {} };
+    const result = { props: [], materials: {}, atlases: {} };
 
     if (popBit()) {
         const atlasLen = packet.readStringLength();
@@ -831,7 +840,7 @@ async function parseMapBin(buffer) {
         if (popBit()) skipObjectArray(packet, p => { p.readString(); p.offset+=4; });
         const shader = packet.readString();
 
-        const texParams =[];
+        const texParams = [];
         const texLen = packet.readStringLength();
         for(let j=0; j<texLen; j++) {
             let libName = null;
@@ -865,7 +874,7 @@ async function parseMapBin(buffer) {
         const name = packet.readString();
         const pos = readV3();
         const rot = popBit() ? readV3() : [0,0,0];
-        const scale = popBit() ? readV3() :[1,1,1];
+        const scale = popBit() ? readV3() : [1,1,1];
         
         result.props.push({ id, grpName, libName, matID, name, pos, rot, scale });
     }
@@ -941,14 +950,23 @@ function setupMobileControls() {
 
     const onPointerDown = (e) => {
         cameraPointers[e.pointerId] = { x: e.clientX, y: e.clientY };
-        if (Object.keys(cameraPointers).length === 2) {
+        window.cameraPointersCount = Object.keys(cameraPointers).length;
+        if (Object.keys(cameraPointers).length >= 2) {
             previousTwoFingerState = getTwoFingerState(Object.values(cameraPointers));
+            window.isEditingDrag = false;
+            window.wasMultiTouch = true;
         }
     };
 
     const onPointerMove = (e) => {
         const pointer = cameraPointers[e.pointerId];
         if (!pointer) return;
+
+        if (Object.keys(cameraPointers).length === 1 && window.dragMode !== 'none' && window.isEditingDrag) {
+            pointer.x = e.clientX;
+            pointer.y = e.clientY;
+            return;
+        }
 
         const deltaX = e.clientX - pointer.x;
         const deltaY = e.clientY - pointer.y;
@@ -968,8 +986,12 @@ function setupMobileControls() {
 
     const onPointerUpOrCancel = (e) => {
         delete cameraPointers[e.pointerId];
+        window.cameraPointersCount = Object.keys(cameraPointers).length;
         if (Object.keys(cameraPointers).length < 2) {
             previousTwoFingerState = null;
+        }
+        if (Object.keys(cameraPointers).length === 0) {
+            setTimeout(() => { window.wasMultiTouch = false; }, 50);
         }
     };
 
@@ -1271,7 +1293,7 @@ function addPrefabToUI(baseName, group) {
     const thumbModel = group.clone();
     
     thumbModel.updateMatrixWorld(true);
-    const box = new THREE.Box3().setFromObject(thumbModel);
+    const box = new THREE.Box3().setFromObject(thumbModel, true);
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y, size.z);
@@ -1293,6 +1315,7 @@ function addPrefabToUI(baseName, group) {
     item.onclick = () => {
         document.querySelectorAll('.prefab-item').forEach(b => b.classList.remove('active'));
         item.classList.add('active');
+        window.isGhostLockedToOriginal = false;
         window.selectPrefab(baseName);
         if (isTouchDevice) {
             isUIOpen = false;
@@ -1325,7 +1348,7 @@ async function processMap(mapData, buildWorld = false) {
         }
     }
 
-    const extraGroundTextures =['ground1', 'ground1_snow', 'Soil_Ground', 'grass1', 'grass1_snow', 'withered_grass', 'conc_tile', 'conc_tile2', 'conc_tile_snow'];
+    const extraGroundTextures = ['ground1', 'ground1_snow', 'Soil_Ground', 'grass1', 'grass1_snow', 'withered_grass', 'conc_tile', 'conc_tile2', 'conc_tile_snow'];
     for (const tex of extraGroundTextures) uniqueTexNames.add(tex);
 
     log(`Downloading models and textures...`);
@@ -1362,7 +1385,7 @@ async function processMap(mapData, buildWorld = false) {
             currentPrefabGroup = null;
             document.querySelector('.grid-floating-panel').style.display = 'none';
         }
-        const toRemove =[];
+        const toRemove = [];
         editorGroup.children.forEach(child => {
             toRemove.push(child);
         });
@@ -1405,7 +1428,7 @@ async function processMap(mapData, buildWorld = false) {
         const isSprite = matInfo && matInfo.shader.includes("Sprite");
 
         let controlTexName = null;
-        let tileTexNames =[];
+        let tileTexNames = [];
 
         if (pInfo && pInfo.textures && pInfo.textures.length > 0) {
             for (let t of pInfo.textures) {
@@ -1572,7 +1595,7 @@ async function processMap(mapData, buildWorld = false) {
                 grp.position.set(prop.pos[0], prop.pos[1], prop.pos[2]);
                 grp.rotation.set(prop.rot[0], prop.rot[1], prop.rot[2]);
                 grp.userData.baseName = baseName;
-                grp.userData.originalProps =[];
+                grp.userData.originalProps = [];
                 originalInstancesMap.set(instanceKey, grp);
             }
             
@@ -1590,7 +1613,7 @@ async function processMap(mapData, buildWorld = false) {
             
             if (!prefabs.has(baseName)) {
                 const group = new THREE.Group();
-                group.userData.originalProps =[];
+                group.userData.originalProps = [];
                 prefabs.set(baseName, group);
             }
             prefabs.get(baseName).userData.originalProps.push(prop);
@@ -1655,20 +1678,84 @@ function setupUIEvents() {
     const importBtn = document.getElementById('import-btn');
     const fileInput = document.getElementById('file-input');
     const clearBtn = document.getElementById('clear-btn');
-    const gridUpBtn = document.getElementById('grid-up-btn');
-    const gridDownBtn = document.getElementById('grid-down-btn');
     const gridHeightDisplay = document.getElementById('grid-height-display');
+    const gridZBtn = document.getElementById('grid-z-btn');
+
+    function updateDragModeUI() {
+        rotateBtn.className = window.dragMode === 'rotate' ? 'm3-btn m3-btn-primary' : 'm3-btn m3-btn-secondary';
+        gridZBtn.className = window.dragMode === 'gridZ' ? 'm3-btn m3-btn-primary' : 'm3-btn m3-btn-secondary';
+        if (controls) {
+            controls.dragToLook = window.dragMode === 'none';
+        }
+    }
+
+    function setupBtnPress(btn, onClick, onLongPress) {
+        let timer;
+        let isLongPress = false;
+        btn.addEventListener('pointerdown', (e) => {
+            if (e.button !== 0 && e.pointerType === 'mouse') return;
+            isLongPress = false;
+            if (e.pointerId) btn.setPointerCapture(e.pointerId);
+            timer = setTimeout(() => {
+                isLongPress = true;
+                onLongPress();
+                if ('vibrate' in navigator) navigator.vibrate(50);
+            }, 500);
+        });
+        btn.addEventListener('pointerup', (e) => {
+            if (e.button !== 0 && e.pointerType === 'mouse') return;
+            if (timer) clearTimeout(timer);
+            if (!isLongPress) onClick();
+            if (e.pointerId) btn.releasePointerCapture(e.pointerId);
+        });
+        btn.addEventListener('pointercancel', (e) => {
+            if (timer) clearTimeout(timer);
+            if (e.pointerId) btn.releasePointerCapture(e.pointerId);
+        });
+        // Prevent default click to avoid any double firing if browser synthesizes it
+        btn.addEventListener('click', (e) => e.preventDefault());
+    }
+
+    setupBtnPress(rotateBtn, 
+        () => {
+            window.dragMode = window.dragMode === 'rotate' ? 'none' : 'rotate';
+            updateDragModeUI();
+        },
+        () => {
+            if (window.rotateButtonMode === 'horizontal') {
+                window.rotateButtonMode = 'free';
+                rotateBtn.querySelector('span').innerText = '360';
+                rotateBtn.title = "Toggle Free Rotate (Long press to switch)";
+                showToast("Switched to Free Rotate Mode", false);
+            } else {
+                window.rotateButtonMode = 'horizontal';
+                rotateBtn.querySelector('span').innerText = 'rotate_right';
+                rotateBtn.title = "Toggle Horizontal Rotate (Long press to switch)";
+                showToast("Switched to Horizontal Rotate Mode", false);
+            }
+        }
+    );
+
+    setupBtnPress(gridZBtn, 
+        () => {
+            window.dragMode = window.dragMode === 'gridZ' ? 'none' : 'gridZ';
+            updateDragModeUI();
+        },
+        () => {
+            currentGridHeight = 0;
+            document.getElementById('grid-height-display').innerText = '0';
+            if (ghost) updateGhost(currentMousePos.x, currentMousePos.y, true);
+            showToast("Grid Z Reset", false);
+        }
+    );
 
     function updateGridHeight(delta) {
         currentGridHeight += delta;
-        gridHeightDisplay.innerText = currentGridHeight;
+        gridHeightDisplay.innerText = Math.round(currentGridHeight);
         if (ghost) {
-            updateGhost(currentMousePos.x, currentMousePos.y);
+            updateGhost(currentMousePos.x, currentMousePos.y, true);
         }
     }
-    
-    gridUpBtn.addEventListener('click', () => updateGridHeight(100));
-    gridDownBtn.addEventListener('click', () => updateGridHeight(-100));
 
     function updateUIState() {
         uiContainer.style.transform = isUIOpen ? 'translateX(0)' : 'translateX(100%)';
@@ -1741,7 +1828,7 @@ function setupUIEvents() {
 
     dialogConfirmBtn.addEventListener('click', () => {
         closeDialog();
-        const toRemove =[];
+        const toRemove = [];
         editorGroup.children.forEach(child => {
             toRemove.push(child);
         });
@@ -1749,6 +1836,7 @@ function setupUIEvents() {
         
         if (ghost) {
             ghost = null;
+            window.isGhostLockedToOriginal = false;
         }
         
         document.querySelector('.grid-floating-panel').style.display = 'none';
@@ -1760,6 +1848,7 @@ function setupUIEvents() {
             if (ghost) {
                 editorGroup.remove(ghost);
                 ghost = null;
+                window.isGhostLockedToOriginal = false;
                 document.querySelector('.grid-floating-panel').style.display = 'none';
             }
         });
@@ -1806,13 +1895,6 @@ function setupUIEvents() {
                 ghost.rotation.z -= Math.PI / 4; 
                 updateGhost(currentMousePos.x, currentMousePos.y);
             }
-        }
-    });
-
-    rotateBtn.addEventListener('click', () => {
-        if (ghost) {
-            ghost.rotation.z -= Math.PI / 4; 
-            updateGhost(currentMousePos.x, currentMousePos.y);
         }
     });
     
@@ -1885,6 +1967,7 @@ function setupUIEvents() {
                 name = pName.replace(/_sub\d+$/i, '').replace(/_?part[12]$/i, '');
             }
             const rot = selectedObjectForAction.rotation.clone();
+            const pos = selectedObjectForAction.position.clone();
             if (selectedObjectForAction.parent) {
                 selectedObjectForAction.parent.remove(selectedObjectForAction);
             } else {
@@ -1892,9 +1975,53 @@ function setupUIEvents() {
             }
             
             if (name) {
+                window.dragMode = 'none';
+                updateDragModeUI();
+                window.isGhostLockedToOriginal = true;
                 window.selectPrefab(name);
                 if (ghost) {
                     ghost.rotation.copy(rot);
+                    ghost.position.copy(pos);
+                    ghost.updateMatrixWorld(true);
+                    
+                    const box = new THREE.Box3().setFromObject(ghost, true);
+                    const originalWorldY = editorGroup.localToWorld(pos.clone()).y;
+                    let dip = 0;
+                    if (box.min.y !== Infinity) {
+                        dip = (originalWorldY - box.min.y) / editorGroup.scale.z;
+                    }
+                    
+                    editorGroup.remove(ghost);
+                    const originWorld = editorGroup.localToWorld(pos.clone());
+                    const downRay = new THREE.Raycaster(originWorld, new THREE.Vector3(0, -1, 0));
+                    const intersects = downRay.intersectObjects(editorGroup.children, true);
+                    let hitZ = 0;
+                    if (intersects.length > 0) {
+                        const pt = editorGroup.worldToLocal(intersects[0].point);
+                        hitZ = pt.z;
+                    } else {
+                        const zeroPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+                        const ptWorld = new THREE.Vector3();
+                        if (downRay.ray.intersectPlane(zeroPlane, ptWorld)) {
+                            hitZ = editorGroup.worldToLocal(ptWorld).z;
+                        }
+                    }
+                    editorGroup.add(ghost);
+                    
+                    let calculatedGridZ = (pos.z - dip) - hitZ;
+                    if (isSnapping) {
+                        calculatedGridZ = Math.round(calculatedGridZ / 100) * 100;
+                    } else {
+                        calculatedGridZ = Math.round(calculatedGridZ);
+                    }
+                    
+                    currentGridHeight = calculatedGridZ;
+                    const gridHeightDisplay = document.getElementById('grid-height-display');
+                    if (gridHeightDisplay) gridHeightDisplay.innerText = currentGridHeight;
+                    
+                    ghost.userData.baseHitPoint = pos.clone();
+                    ghost.userData.baseHitPoint.z = hitZ;
+                    updateGhost(currentMousePos.x, currentMousePos.y, true);
                 }
             }
         }
@@ -1912,6 +2039,7 @@ function setupUIEvents() {
             if (ghost) {
                 editorGroup.remove(ghost);
                 ghost = null;
+                window.isGhostLockedToOriginal = false;
                 document.querySelector('.grid-floating-panel').style.display = 'none';
             }
             return;
@@ -1921,6 +2049,19 @@ function setupUIEvents() {
             document.getElementById('context-menu').style.display = 'none';
         }
         
+        if (window.dragMode !== 'none' && ghost && (window.cameraPointersCount || 0) < 2) {
+            window.isEditingDrag = true;
+            editDragStart = {x: e.clientX, y: e.clientY};
+            initialGhostRot.copy(ghost.rotation);
+            initialGridZ = currentGridHeight;
+            window.hasSlidGridZ = false;
+            return; 
+        }
+
+        if (window.isGhostLockedToOriginal) {
+            window.isGhostLockedToOriginal = false;
+        }
+
         longPressTimer = setTimeout(() => handleLongPress(e.clientX, e.clientY), 500);
         updateGhost(e.clientX, e.clientY);
     });
@@ -1933,8 +2074,83 @@ function setupUIEvents() {
                     clearTimeout(longPressTimer);
                     longPressTimer = null;
                 }
+                if (window.isGhostLockedToOriginal && window.dragMode === 'none') {
+                    window.isGhostLockedToOriginal = false;
+                }
             }
         }
+        
+        if (window.isEditingDrag && window.dragMode !== 'none' && ghost) {
+            const deltaX = e.clientX - editDragStart.x;
+            const deltaY = e.clientY - editDragStart.y;
+
+            if (window.dragMode === 'rotate') {
+                let rotZ = deltaX * 0.02;
+                let rotX = deltaY * 0.02;
+
+                if (isSnapping) {
+                    const snap = Math.PI / 4;
+                    rotZ = Math.round(rotZ / snap) * snap;
+                    rotX = Math.round(rotX / snap) * snap;
+                }
+
+                // Get camera axes in world space
+                const camRightWorld = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+                const camUpWorld = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+
+                // Convert to editorGroup local space using proper vector transformation
+                const groupInv = editorGroup.matrixWorld.clone().invert();
+                const camRightLocal = camRightWorld.clone().transformDirection(groupInv).normalize();
+                const camUpLocal = camUpWorld.clone().transformDirection(groupInv).normalize();
+                const camForwardWorld = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+                const camForwardLocal = camForwardWorld.clone().transformDirection(groupInv).normalize();
+
+                if (window.rotateButtonMode === 'free') {
+                    const qInitial = new THREE.Quaternion().setFromEuler(initialGhostRot);
+                    // Use +rotZ so that dragging right moves the facing side right
+                    const qUp = new THREE.Quaternion().setFromAxisAngle(camUpLocal, rotZ); 
+                    const qRight = new THREE.Quaternion().setFromAxisAngle(camRightLocal, rotX);
+                    const finalQ = new THREE.Quaternion().copy(qUp).multiply(qRight).multiply(qInitial);
+                    ghost.quaternion.copy(finalQ);
+                } else {
+                    // Horizontal mode: rotate strictly around Map's Z-axis (local Z).
+                    // We must determine the correct sign based on whether the camera is looking from the "top" or "bottom"
+                    // In map space, Z is 'Up'. We project the camera's up vector onto Map Z.
+                    const isCameraInverted = camUpLocal.z < 0; 
+                    
+                    let finalRotZ = rotZ;
+                    if (isCameraInverted) {
+                        finalRotZ = -rotZ;
+                    }
+                    
+                    ghost.rotation.set(
+                        initialGhostRot.x,
+                        initialGhostRot.y,
+                        initialGhostRot.z + finalRotZ
+                    );
+                }
+            } else if (window.dragMode === 'gridZ') {
+                let deltaZ = -deltaY * 2;
+                let newZ = initialGridZ + deltaZ;
+                
+                if (Math.abs(deltaY) > 5) window.hasSlidGridZ = true;
+
+                if (isSnapping && window.hasSlidGridZ) {
+                    newZ = Math.round(newZ / 100) * 100;
+                } else if (isSnapping && !window.hasSlidGridZ) {
+                    newZ = initialGridZ; 
+                }
+
+                currentGridHeight = newZ;
+                document.getElementById('grid-height-display').innerText = Math.round(currentGridHeight);
+            }
+
+            updateGhost(editDragStart.x, editDragStart.y, true);
+            return;
+        }
+
+        if ((window.cameraPointersCount || 0) >= 2) return; // Do not move ghost X/Y if panning camera
+
         updateGhost(e.clientX, e.clientY);
     });
 
@@ -1945,18 +2161,30 @@ function setupUIEvents() {
             longPressTimer = null;
         }
         
+        if (window.isEditingDrag) {
+            window.isEditingDrag = false;
+            if (Math.abs(e.clientX - pointerDownPos.x) > 10 || Math.abs(e.clientY - pointerDownPos.y) > 10) {
+                return;
+            }
+        }
+        
+        if (window.wasMultiTouch) {
+            return;
+        }
+        
         if (!isDragging && ghost && (e.button === 0 || e.pointerType === 'touch')) {
-            updateGhost(e.clientX, e.clientY);
+            updateGhost(e.clientX, e.clientY, window.dragMode !== 'none' || window.isGhostLockedToOriginal);
             const instance = currentPrefabGroup.clone();
             instance.position.copy(ghost.position);
             instance.rotation.copy(ghost.rotation);
             
             instance.updateMatrixWorld(true);
-            instance.userData.worldBox = new THREE.Box3().setFromObject(instance);
+            instance.userData.worldBox = new THREE.Box3().setFromObject(instance, true);
             instance.userData.baseName = window.currentBaseName;
             
             editorGroup.add(instance);
-            updateGhost(e.clientX, e.clientY);
+            window.isGhostLockedToOriginal = false;
+            updateGhost(e.clientX, e.clientY, window.dragMode !== 'none');
         }
     });
 }
@@ -1964,9 +2192,9 @@ function setupUIEvents() {
 async function generateMapBin() {
     if (!window.repackingData) throw new Error("Repacking data not initialized");
     
-    const newPropBits =[];
+    const newPropBits = [];
     const bw = new BinaryWriter();
-    const propsToWrite =[];
+    const propsToWrite = [];
     
     let originalMapGrp = editorGroup.children.find(c => c.userData.isOriginalMapGroup);
     if (originalMapGrp) {
@@ -1975,8 +2203,8 @@ async function generateMapBin() {
                 for (const origProp of child.userData.originalProps) {
                     propsToWrite.push({
                         ...origProp,
-                        pos:[child.position.x, child.position.y, child.position.z],
-                        rot:[child.rotation.x, child.rotation.y, child.rotation.z]
+                        pos: [child.position.x, child.position.y, child.position.z],
+                        rot: [child.rotation.x, child.rotation.y, child.rotation.z]
                     });
                 }
             }
@@ -1999,8 +2227,8 @@ async function generateMapBin() {
                     ...origProp,
                     grpName: outGrpName,
                     id: idCounter++,
-                    pos:[child.position.x, child.position.y, child.position.z],
-                    rot:[child.rotation.x, child.rotation.y, child.rotation.z],
+                    pos: [child.position.x, child.position.y, child.position.z],
+                    rot: [child.rotation.x, child.rotation.y, child.rotation.z],
                     scale: origProp.scale 
                 });
             }
@@ -2047,7 +2275,7 @@ async function generateMapBin() {
         }
     }
     
-    const finalBits =[
+    const finalBits = [
         ...window.repackingData.consumedBitsBeforeProps, 
         ...newPropBits,
         ...window.repackingData.suffixBits
@@ -2081,6 +2309,7 @@ window.selectPrefab = function(baseName) {
     window.currentBaseName = baseName;
     if (currentPrefabGroup) {
         ghost = currentPrefabGroup.clone();
+        ghost.rotation.order = 'ZXY';
         ghost.traverse(child => {
             if (child.isMesh) {
                 child.material = child.material.clone();
@@ -2091,101 +2320,119 @@ window.selectPrefab = function(baseName) {
             }
         });
         editorGroup.add(ghost);
-        updateGhost(currentMousePos.x, currentMousePos.y);
+        if (!window.isGhostLockedToOriginal) {
+            updateGhost(currentMousePos.x, currentMousePos.y);
+        }
         document.querySelector('.grid-floating-panel').style.display = 'flex';
     }
 };
 
-function updateGhost(clientX, clientY) {
+function updateGhost(clientX, clientY, isLockedDrag = false) {
     currentMousePos.x = clientX;
     currentMousePos.y = clientY;
     if (!ghost) return;
 
-    mouse.x = (clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(clientY / window.innerHeight) * 2 + 1;
-    raycaster.setFromCamera(mouse, camera);
-    
-    const intersects = raycaster.intersectObjects(editorGroup.children, true);
-    let hitPoint = null;
+    if (!isLockedDrag && !window.isGhostLockedToOriginal) {
+        mouse.x = (clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        
+        const intersects = raycaster.intersectObjects(editorGroup.children, true);
+        let hitPoint = null;
 
-    let objHitPoint = null;
-    const validIntersects = intersects.filter(ix => {
-        let obj = ix.object;
-        while(obj) {
-            if (obj === ghost) return false;
-            obj = obj.parent;
+        let objHitPoint = null;
+        const validIntersects = intersects.filter(ix => {
+            let obj = ix.object;
+            while(obj) {
+                if (obj === ghost) return false;
+                obj = obj.parent;
+            }
+            return true;
+        });
+        if (validIntersects.length > 0) {
+            objHitPoint = validIntersects[0].point;
         }
-        return true;
-    });
-    if (validIntersects.length > 0) {
-        objHitPoint = validIntersects[0].point;
-    }
 
-    groundPlane.set(new THREE.Vector3(0, 1, 0), 0);
-    let zeroPlaneHitPoint = null;
-    const zeroIntersect = new THREE.Vector3();
-    if (raycaster.ray.intersectPlane(groundPlane, zeroIntersect)) {
-        zeroPlaneHitPoint = zeroIntersect;
-    }
+        groundPlane.set(new THREE.Vector3(0, 1, 0), 0);
+        let zeroPlaneHitPoint = null;
+        const zeroIntersect = new THREE.Vector3();
+        if (raycaster.ray.intersectPlane(groundPlane, zeroIntersect)) {
+            zeroPlaneHitPoint = zeroIntersect;
+        }
 
-    if (camera.position.y >= 0) {
-        if (objHitPoint && zeroPlaneHitPoint) {
-            if (camera.position.distanceTo(objHitPoint) < camera.position.distanceTo(zeroPlaneHitPoint)) {
+        if (camera.position.y >= 0) {
+            if (objHitPoint && zeroPlaneHitPoint) {
+                if (camera.position.distanceTo(objHitPoint) < camera.position.distanceTo(zeroPlaneHitPoint)) {
+                    hitPoint = objHitPoint;
+                } else {
+                    hitPoint = zeroPlaneHitPoint;
+                }
+            } else if (objHitPoint) {
                 hitPoint = objHitPoint;
-            } else {
+            } else if (zeroPlaneHitPoint) {
                 hitPoint = zeroPlaneHitPoint;
             }
-        } else if (objHitPoint) {
-            hitPoint = objHitPoint;
-        } else if (zeroPlaneHitPoint) {
-            hitPoint = zeroPlaneHitPoint;
+        } else {
+            if (objHitPoint) {
+                hitPoint = objHitPoint;
+            } else if (zeroPlaneHitPoint) {
+                hitPoint = zeroPlaneHitPoint;
+            }
         }
-    } else {
-        if (objHitPoint) {
-            hitPoint = objHitPoint;
-        } else if (zeroPlaneHitPoint) {
-            hitPoint = zeroPlaneHitPoint;
+
+        if (!hitPoint) {
+            hitPoint = raycaster.ray.at(1000, new THREE.Vector3());
+            if (camera.position.y >= 0) hitPoint.y = 0;
         }
-    }
 
-    if (!hitPoint) {
-        hitPoint = raycaster.ray.at(1000, new THREE.Vector3());
-        if (camera.position.y >= 0) hitPoint.y = 0;
-    }
+        if (hitPoint) {
+            editorGroup.worldToLocal(hitPoint);
+            
+            if (isSnapping && currentPrefabGroup) {
+                let snapped = false;
+                let snapX = 250;
+                let snapY = 250;
+                let snapZ = 100;
 
-    if (hitPoint) {
-        editorGroup.worldToLocal(hitPoint);
-        
-        hitPoint.z += currentGridHeight;
-        
-        if (isSnapping && currentPrefabGroup) {
-            let snapped = false;
-            let snapX = 250;
-            let snapY = 250;
-            let snapZ = 100;
-
-            for (let i = 0; i < editorGroup.children.length; i++) {
-                const child = editorGroup.children[i];
-                if (child === ghost || child.userData.isOriginalMapGroup) continue;
-                
-                const dist = child.position.distanceTo(hitPoint);
-                if (dist < 800.0) {
-                    const diff = hitPoint.clone().sub(child.position);
-                    hitPoint.x = child.position.x + Math.round(diff.x / snapX) * snapX;
-                    hitPoint.y = child.position.y + Math.round(diff.y / snapY) * snapY;
-                    hitPoint.z = child.position.z + Math.round(diff.z / snapZ) * snapZ;
-                    snapped = true;
-                    break;
+                for (let i = 0; i < editorGroup.children.length; i++) {
+                    const child = editorGroup.children[i];
+                    if (child === ghost || child.userData.isOriginalMapGroup) continue;
+                    
+                    const dist = child.position.distanceTo(hitPoint);
+                    if (dist < 800.0) {
+                        const diff = hitPoint.clone().sub(child.position);
+                        hitPoint.x = child.position.x + Math.round(diff.x / snapX) * snapX;
+                        hitPoint.y = child.position.y + Math.round(diff.y / snapY) * snapY;
+                        hitPoint.z = child.position.z + Math.round(diff.z / snapZ) * snapZ;
+                        snapped = true;
+                        break;
+                    }
+                }
+                if (!snapped) {
+                    hitPoint.x = Math.round(hitPoint.x / snapX) * snapX;
+                    hitPoint.y = Math.round(hitPoint.y / snapY) * snapY;
+                    hitPoint.z = Math.round(hitPoint.z / snapZ) * snapZ;
                 }
             }
-            if (!snapped) {
-                hitPoint.x = Math.round(hitPoint.x / snapX) * snapX;
-                hitPoint.y = Math.round(hitPoint.y / snapY) * snapY;
-                hitPoint.z = Math.round(hitPoint.z / snapZ) * snapZ;
+            ghost.userData.baseHitPoint = hitPoint.clone();
+        }
+    }
+
+    if (ghost.userData.baseHitPoint) {
+        const hp = ghost.userData.baseHitPoint.clone();
+        hp.z += currentGridHeight;
+        ghost.position.copy(hp);
+        
+        ghost.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(ghost, true);
+        const originalWorldY = editorGroup.localToWorld(hp.clone()).y;
+        
+        if (box.min.y !== Infinity) {
+            const dip = originalWorldY - box.min.y;
+            if (Math.abs(dip) > 0.001) {
+                ghost.position.z += dip / editorGroup.scale.z;
             }
         }
-
-        ghost.position.copy(hitPoint);
     }
 }
 

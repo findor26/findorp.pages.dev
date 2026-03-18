@@ -28,6 +28,9 @@
             padding: 0;
             width: 100%;
             height: 100%;
+            position: fixed; 
+            top: 0;
+            left: 0;
             overflow: hidden; 
             font-family: 'Rubik', system-ui, sans-serif; 
             background: #000; 
@@ -39,18 +42,21 @@
         }
 
         #canvas-container { 
-            width: 100vw; 
-            height: 100vh; 
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%; 
+            height: 100%; 
             display: block; 
             touch-action: none;
         }
 
         #loading-screen { 
-            position: absolute; 
+            position: fixed; 
             top: 0; 
             left: 0; 
-            width: 100vw; 
-            height: 100vh; 
+            width: 100%; 
+            height: 100%; 
             display: flex; 
             flex-direction: column; 
             justify-content: center; 
@@ -93,7 +99,7 @@
         }
 
         #menu-toggle {
-            position: absolute;
+            position: fixed;
             top: 16px;
             right: 16px;
             z-index: 200;
@@ -119,11 +125,11 @@
         }
         
         #ui-container {
-            position: absolute;
+            position: fixed;
             top: 0;
             right: 0;
             width: 280px;
-            max-width: 85vw;
+            max-width: 85%;
             height: 100%;
             background: var(--md-sys-color-surface);
             backdrop-filter: blur(16px);
@@ -241,7 +247,7 @@
         }
 
         #toast-msg {
-            position: absolute;
+            position: fixed;
             bottom: 24px;
             left: 50%;
             transform: translateX(-50%);
@@ -265,7 +271,7 @@
         }
 
         .grid-floating-panel {
-            position: absolute;
+            position: fixed;
             left: 24px;
             bottom: 24px;
             z-index: 200;
@@ -282,7 +288,7 @@
         }
         
         #context-menu {
-            position: absolute;
+            position: fixed;
             z-index: 1000;
             background: var(--md-sys-color-surface);
             border: 1px solid var(--md-sys-color-outline);
@@ -339,8 +345,8 @@
             position: fixed;
             top: 0;
             left: 0;
-            width: 100vw;
-            height: 100vh;
+            width: 100%;
+            height: 100%;
             background: rgba(0, 0, 0, 0.6);
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
@@ -490,7 +496,7 @@ const modelCache = new Map();
 const textureCache = new Map();
 const prefabs = new Map();
 const globalLoadedProps = new Set();
-let thumbnailItems = [];
+let thumbnailItems =[];
 let propDictCache = null;
 
 let ghost = null;
@@ -998,6 +1004,49 @@ function initThree() {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap; 
     document.getElementById('canvas-container').appendChild(renderer.domElement);
 
+    renderer.domElement.addEventListener('webglcontextlost', (event) => {
+        event.preventDefault();
+        console.warn("WebGL Context Lost! Pausing rendering...");
+        if (loadingTextEl) loadingTextEl.innerText = "Restoring WebGL Context...";
+        loadingScreen.style.display = 'flex';
+        loadingScreen.style.opacity = '1';
+    }, false);
+
+    renderer.domElement.addEventListener('webglcontextrestored', () => {
+        console.log("WebGL Context Restored! Re-initializing resources...");
+      
+        const pmremGenerator = new THREE.PMREMGenerator(renderer);
+        pmremGenerator.compileEquirectangularShader();
+        const environment = new RoomEnvironment();
+        scene.environment = pmremGenerator.fromScene(environment).texture;
+        environment.dispose();
+
+        if (thumbScene && thumbRenderer) {
+            const thumbPmrem = new THREE.PMREMGenerator(thumbRenderer);
+            thumbPmrem.compileEquirectangularShader();
+            const thumbEnv = new RoomEnvironment();
+            thumbScene.environment = thumbPmrem.fromScene(thumbEnv).texture;
+            thumbEnv.dispose();
+        }
+
+        textureCache.forEach(tex => {
+            if(tex) tex.needsUpdate = true;
+        });
+        defaultControl.needsUpdate = true;
+        defaultTile.needsUpdate = true;
+
+        scene.traverse((child) => {
+            if (child.isMesh && child.material) {
+                child.material.needsUpdate = true;
+            }
+        });
+        
+        setTimeout(() => {
+            window.dispatchEvent(new Event('resize'));
+            hideLoading();
+        }, 100);
+    }, false);
+
     clock = new THREE.Clock();
     
     if (!isTouchDevice) {
@@ -1071,12 +1120,18 @@ function initThree() {
     const outputPass = new OutputPass();
     composer.addPass(outputPass);
 
-    window.addEventListener('resize', () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
+    function onWindowResize() {
+        if(!camera || !renderer || !composer) return;
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+        camera.aspect = width / height;
         camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        composer.setSize(window.innerWidth, window.innerHeight); 
-    });
+        renderer.setSize(width, height);
+        composer.setSize(width, height); 
+    }
+    window.addEventListener('resize', onWindowResize);
+   
+    onWindowResize();
 
     initThumbnails();
     animate();
@@ -1307,7 +1362,7 @@ async function processMap(mapData, buildWorld = false) {
             currentPrefabGroup = null;
             document.querySelector('.grid-floating-panel').style.display = 'none';
         }
-        const toRemove = [];
+        const toRemove =[];
         editorGroup.children.forEach(child => {
             toRemove.push(child);
         });
@@ -1517,7 +1572,7 @@ async function processMap(mapData, buildWorld = false) {
                 grp.position.set(prop.pos[0], prop.pos[1], prop.pos[2]);
                 grp.rotation.set(prop.rot[0], prop.rot[1], prop.rot[2]);
                 grp.userData.baseName = baseName;
-                grp.userData.originalProps = [];
+                grp.userData.originalProps =[];
                 originalInstancesMap.set(instanceKey, grp);
             }
             
@@ -1535,7 +1590,7 @@ async function processMap(mapData, buildWorld = false) {
             
             if (!prefabs.has(baseName)) {
                 const group = new THREE.Group();
-                group.userData.originalProps = [];
+                group.userData.originalProps =[];
                 prefabs.set(baseName, group);
             }
             prefabs.get(baseName).userData.originalProps.push(prop);
@@ -1581,6 +1636,17 @@ async function loadMain() {
     }
 }
 
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        if (clock) clock.stop();
+    } else {
+        if (clock) clock.start();
+        setTimeout(() => {
+            window.dispatchEvent(new Event('resize'));
+        }, 100);
+    }
+});
+
 function setupUIEvents() {
     const uiContainer = document.getElementById('ui-container');
     const menuToggle = document.getElementById('menu-toggle');
@@ -1608,6 +1674,16 @@ function setupUIEvents() {
         uiContainer.style.transform = isUIOpen ? 'translateX(0)' : 'translateX(100%)';
     }
     updateUIState();
+    
+    window.addEventListener('resize', () => {
+        const w = window.innerWidth;
+        if(isTouchDevice && w < 768) {
+            isUIOpen = false;
+        } else if(!isTouchDevice && w >= 768) {
+            isUIOpen = true;
+        }
+        updateUIState();
+    });
     
     menuToggle.addEventListener('click', () => {
         isUIOpen = !isUIOpen;
@@ -1665,7 +1741,7 @@ function setupUIEvents() {
 
     dialogConfirmBtn.addEventListener('click', () => {
         closeDialog();
-        const toRemove = [];
+        const toRemove =[];
         editorGroup.children.forEach(child => {
             toRemove.push(child);
         });
@@ -1899,8 +1975,8 @@ async function generateMapBin() {
                 for (const origProp of child.userData.originalProps) {
                     propsToWrite.push({
                         ...origProp,
-                        pos: [child.position.x, child.position.y, child.position.z],
-                        rot: [child.rotation.x, child.rotation.y, child.rotation.z]
+                        pos:[child.position.x, child.position.y, child.position.z],
+                        rot:[child.rotation.x, child.rotation.y, child.rotation.z]
                     });
                 }
             }
@@ -1971,7 +2047,7 @@ async function generateMapBin() {
         }
     }
     
-    const finalBits = [
+    const finalBits =[
         ...window.repackingData.consumedBitsBeforeProps, 
         ...newPropBits,
         ...window.repackingData.suffixBits

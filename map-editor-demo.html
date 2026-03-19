@@ -1176,15 +1176,36 @@ function initThumbnails() {
     thumbCamera.position.set(0, 5, 12);
     thumbCamera.lookAt(0, 0, 0);
     
-    const pmremGenerator = new THREE.PMREMGenerator(thumbRenderer);
-    pmremGenerator.compileEquirectangularShader();
-    const environment = new RoomEnvironment();
-    thumbScene.environment = pmremGenerator.fromScene(environment).texture;
-    environment.dispose();
+    function setupThumbEnv() {
+        const pmremGenerator = new THREE.PMREMGenerator(thumbRenderer);
+        pmremGenerator.compileEquirectangularShader();
+        const environment = new RoomEnvironment();
+        thumbScene.environment = pmremGenerator.fromScene(environment).texture;
+        environment.dispose();
+    }
+    setupThumbEnv();
 
     const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
     dirLight.position.set(5, 8, 8); 
     thumbScene.add(dirLight);
+
+    thumbRenderer.domElement.addEventListener('webglcontextlost', (e) => {
+        e.preventDefault();
+        console.warn("Thumbnail WebGL Context Lost!");
+    }, false);
+
+    thumbRenderer.domElement.addEventListener('webglcontextrestored', () => {
+        console.log("Thumbnail WebGL Context Restored!");
+        setupThumbEnv();
+        
+        for (const item of thumbnailItems) {
+            item.model.traverse((child) => {
+                if (child.isMesh && child.material) {
+                    child.material.needsUpdate = true;
+                }
+            });
+        }
+    }, false);
 }
 
 function animate() {
@@ -1671,7 +1692,17 @@ document.addEventListener('visibilitychange', () => {
         if (clock) clock.start();
         setTimeout(() => {
             window.dispatchEvent(new Event('resize'));
-        }, 100);
+            
+            if (thumbnailItems && thumbnailItems.length > 0) {
+                for (const item of thumbnailItems) {
+                    item.model.traverse((child) => {
+                        if (child.isMesh && child.material) {
+                            child.material.needsUpdate = true;
+                        }
+                    });
+                }
+            }
+        }, 200);
     }
 });
 

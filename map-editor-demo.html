@@ -2331,6 +2331,8 @@ async function generateMapBin() {
     const bw = new BinaryWriter();
     const propsToWrite = [];
     
+    let globalIdCounter = 0; 
+    
     let originalMapGrp = editorGroup.children.find(c => c.userData.isOriginalMapGroup);
     if (originalMapGrp) {
         for (const child of originalMapGrp.children) {
@@ -2338,6 +2340,7 @@ async function generateMapBin() {
                 for (const origProp of child.userData.originalProps) {
                     propsToWrite.push({
                         ...origProp,
+                        id: globalIdCounter++,
                         pos: [child.position.x, child.position.y, child.position.z],
                         rot: [child.rotation.x, child.rotation.y, child.rotation.z]
                     });
@@ -2346,7 +2349,6 @@ async function generateMapBin() {
         }
     }
 
-    let idCounter = window.repackingData.maxPropId + 1;
     let instanceIndex = 1;
 
     for (const child of editorGroup.children) {
@@ -2361,7 +2363,7 @@ async function generateMapBin() {
                 propsToWrite.push({
                     ...origProp,
                     grpName: outGrpName,
-                    id: idCounter++,
+                    id: globalIdCounter++,
                     pos: [child.position.x, child.position.y, child.position.z],
                     rot: [child.rotation.x, child.rotation.y, child.rotation.z],
                     scale: origProp.scale 

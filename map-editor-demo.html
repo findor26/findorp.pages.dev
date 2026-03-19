@@ -1968,9 +1968,12 @@ function setupUIEvents() {
             }
             title.innerText = name || "Unknown Object";
             
-            cm.style.left = Math.min(clientX, window.innerWidth - 160) + 'px';
-            cm.style.top = Math.min(clientY, window.innerHeight - 150) + 'px';
             cm.style.display = 'flex';
+            const cmWidth = cm.offsetWidth;
+            const cmHeight = cm.offsetHeight;
+            
+            cm.style.left = Math.max(16, Math.min(clientX, window.innerWidth - cmWidth - 16)) + 'px';
+            cm.style.top = Math.max(16, Math.min(clientY, window.innerHeight - cmHeight - 16)) + 'px';
         }
     }
 

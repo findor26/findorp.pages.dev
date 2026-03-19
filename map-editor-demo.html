@@ -247,6 +247,7 @@
             text-overflow: ellipsis;
         }
 
+
         #toast-msg {
             position: fixed;
             bottom: 24px;
@@ -1515,15 +1516,44 @@ async function processMap(mapData, buildWorld = false) {
         } else if (/_?part[12]$/i.test(baseName)) {
             baseName = baseName.replace(/_?part[12]$/i, '');
         }
+
         const lowerName = baseName.toLowerCase();
-        if (lowerName === 'display' || lowerName === 'billboard') {
-            baseName = 'billboard';
-        } else if (['body', 'lb_track', 'lf_track', 'rb_track', 'rf_track'].includes(lowerName)) {
-            baseName = 'Body';
+        
+        const isDisplay = lowerName.startsWith('display');
+        const trackMatch = lowerName.match(/^(lb|lf|rb|rf)_track(.*)$/);
+
+        if (isDisplay || trackMatch) {
+            let originalMainName = null;
+            let expectedBodyLower = trackMatch ? 'body' + trackMatch[2] : '';
+
+            for (let j = 0; j < mapData.props.length; j++) {
+                let n = mapData.props[j].name;
+                if (/_sub\d+$/i.test(n)) n = n.replace(/_sub\d+$/i, '');
+                else if (/_?part[12]$/i.test(n)) n = n.replace(/_?part[12]$/i, '');
+                
+                const nLower = n.toLowerCase();
+                
+                if (isDisplay && nLower.startsWith('billboard')) {
+                 
+                    originalMainName = n;
+                    break;
+                } else if (trackMatch && nLower === expectedBodyLower) {
+                    originalMainName = n;
+                    break;
+                }
+            }
+            
+            if (originalMainName) {
+                baseName = originalMainName;
+            } else {
+          
+                baseName = isDisplay ? 'Billboard' : (expectedBodyLower.charAt(0).toUpperCase() + expectedBodyLower.slice(1));
+            }
         }
 
         const pInfo = propDict[`${prop.grpName}_${prop.name}`] || propDict[prop.name];
         const file = pInfo && pInfo.mesh ? pInfo.mesh.file : null;
+        
         let geometry = file ? modelCache.get(file) : null;
         if (!geometry) continue;
         
@@ -1531,21 +1561,22 @@ async function processMap(mapData, buildWorld = false) {
         const isSprite = matInfo && matInfo.shader.includes("Sprite");
 
         let controlTexName = null;
-        let tileTexNames = [];
+        let baseTexName = null;
+        if (matInfo && matInfo.texParams) {
+            const pControl = matInfo.texParams.find(p => p.name === '_Control');
+            if (pControl) controlTexName = pControl.texName;
 
-        if (pInfo && pInfo.textures && pInfo.textures.length > 0) {
-            for (let t of pInfo.textures) {
-                if (t.diffuseMap) {
-                    if (t.diffuseMap.includes('-control')) controlTexName = t.diffuseMap;
-                    else tileTexNames.push(t.diffuseMap);
-                }
-            }
-        } 
-        if (tileTexNames.length === 0 && matInfo && matInfo.texParams.length > 0) {
-            for (let t of matInfo.texParams) {
-                if (t.texName.includes('-control')) controlTexName = t.texName;
-                else tileTexNames.push(t.texName);
-            }
+            const pBase = matInfo.texParams.find(p => p.name === '_BaseMap' || p.name === '_MainTex');
+            if (pBase) baseTexName = pBase.texName;
+        }
+
+        if (!baseTexName && pInfo && pInfo.textures && pInfo.textures.length > 0) {
+            const fallbackTex = pInfo.textures.find(t => t.diffuseMap && !t.diffuseMap.includes('-control'));
+            if (fallbackTex) baseTexName = fallbackTex.diffuseMap;
+        }
+        if (!controlTexName && pInfo && pInfo.textures && pInfo.textures.length > 0) {
+            const fallbackCtrl = pInfo.textures.find(t => t.diffuseMap && t.diffuseMap.includes('-control'));
+            if (fallbackCtrl) controlTexName = fallbackCtrl.diffuseMap;
         }
 
         const instGeo = geometry.clone();
@@ -1553,115 +1584,13 @@ async function processMap(mapData, buildWorld = false) {
         const isTerrainMesh = file.toLowerCase().includes('terrain');
         const hasControlMap = !!controlTexName;
 
-        const matCacheKey = `${isTerrainMesh}_${controlTexName}_${tileTexNames.join(',')}_${prop.matID}_${prop.libName}_${prop.name}`;
+        const matCacheKey = `${isTerrainMesh}_${controlTexName}_${baseTexName}_${prop.matID}_${prop.libName}_${prop.name}`;
 
         if (materialCache.has(matCacheKey)) {
             mat = materialCache.get(matCacheKey);
         } else {
             if (isTerrainMesh || hasControlMap) {
-                let texR = null, texG = null, texB = null;
-                for (let t of tileTexNames) {
-                    let lower = t.toLowerCase();
-                    if (lower.includes('ground') || lower.includes('soil')) texR = textureCache.get(t);
-                    else if (lower.includes('grass') || lower.includes('withered')) texG = textureCache.get(t);
-                    else if (lower.includes('conc') || lower.includes('asph') || lower.includes('road')) texB = textureCache.get(t);
-                }
-                if (!texR && tileTexNames.length > 0) texR = textureCache.get(tileTexNames[0]);
-                let tControl = textureCache.get(controlTexName);
-                
-                const maxAniso = renderer.capabilities.getMaxAnisotropy();
-                if (texR && texR.anisotropy !== maxAniso) texR.anisotropy = maxAniso;
-                if (texG && texG.anisotropy !== maxAniso) texG.anisotropy = maxAniso;
-                if (texB && texB.anisotropy !== maxAniso) texB.anisotropy = maxAniso;
-
-                mat = new THREE.MeshStandardMaterial({
-                    roughness: 0.9,
-                    metalness: 0.05,
-                    side: THREE.DoubleSide
-                });
-
-                let customUniforms = {
-                    tControl: { value: tControl || defaultControl },
-                    tR: { value: texR || defaultTile }, 
-                    tG: { value: texG || defaultTile }, 
-                    tB: { value: texB || defaultTile }
-                };
-
-                mat.onBeforeCompile = (shader) => {
-                    shader.uniforms.tControl = customUniforms.tControl;
-                    shader.uniforms.tR = customUniforms.tR;
-                    shader.uniforms.tG = customUniforms.tG;
-                    shader.uniforms.tB = customUniforms.tB;
-
-                    shader.vertexShader = `
-                        varying vec2 vUvControl;
-                        varying vec3 vLocalPos;
-                        ${shader.vertexShader}
-                    `.replace(
-                        `#include <uv_vertex>`,
-                        `#include <uv_vertex>
-                         vUvControl = uv;
-                         vLocalPos = position;
-                        `
-                    );
-
-                    shader.fragmentShader = `
-                        uniform sampler2D tControl;
-                        uniform sampler2D tR;
-                        uniform sampler2D tG;
-                        uniform sampler2D tB;
-                        varying vec2 vUvControl;
-                        varying vec3 vLocalPos;
-                        ${shader.fragmentShader}
-                    `.replace(
-                        `#include <map_fragment>`,
-                        `
-                        vec4 control = texture2D(tControl, vUvControl);
-                        if (control.a < 0.1) discard;
-
-                        float w1 = control.r;
-                        float w2 = control.g;
-                        float w3 = control.b;
-                 
-                        vec3 dx = dFdx(vLocalPos);
-                        vec3 dy = dFdy(vLocalPos);
-                        vec3 geoNormal = normalize(cross(dx, dy));
-                 
-                        vec3 blendWeights = abs(geoNormal);
-                        blendWeights = pow(blendWeights, vec3(8.0));
-                        blendWeights /= dot(blendWeights, vec3(1.0));
-                        
-                        float texScale = 1.0 / 500.0;
-               
-                        vec2 uvX = vec2(vLocalPos.y, vLocalPos.z) * texScale;
-                        vec2 uvY = vec2(vLocalPos.x, vLocalPos.z) * texScale;
-                        vec2 uvZ = vec2(vLocalPos.x, vLocalPos.y) * texScale;
-                        
-                        vec4 colR = texture2D(tR, uvX) * blendWeights.x + 
-                                    texture2D(tR, uvY) * blendWeights.y + 
-                                    texture2D(tR, uvZ) * blendWeights.z;
-                                    
-                        vec4 colG = texture2D(tG, uvX) * blendWeights.x + 
-                                    texture2D(tG, uvY) * blendWeights.y + 
-                                    texture2D(tG, uvZ) * blendWeights.z;
-                                    
-                        vec4 colB = texture2D(tB, uvX) * blendWeights.x + 
-                                    texture2D(tB, uvY) * blendWeights.y + 
-                                    texture2D(tB, uvZ) * blendWeights.z;
-      
-                        vec4 splatColor = colR * w1 + colG * w2 + colB * w3;
-                        float sum = w1 + w2 + w3;
-                        if (sum > 0.001) {
-                            splatColor = splatColor / sum; 
-                        } else {
-                            splatColor = colR;
-                        }
-                        
-                        diffuseColor = vec4(splatColor.rgb, 1.0);
-                        `
-                    );
-                };
-
+         
             } else {
                 mat = new THREE.MeshStandardMaterial({ 
                     color: 0xffffff, 
@@ -1673,20 +1602,17 @@ async function processMap(mapData, buildWorld = false) {
                     depthWrite: true
                 });
 
-                let texName = tileTexNames.length > 0 ? tileTexNames[0] : null;
-                if (texName) {
-                    const diffTex = textureCache.get(texName);
+                if (baseTexName) {
+                    const diffTex = textureCache.get(baseTexName);
                     if (diffTex) mat.map = diffTex;
                 }
             }
             materialCache.set(matCacheKey, mat);
         }
 
-        let texName = tileTexNames.length > 0 ? tileTexNames[0] : null;
-
         let atlasRect = null, atlasInfo = null;
-        if (texName && mapData.atlases[texName]) {
-            atlasInfo = mapData.atlases[texName];
+        if (baseTexName && mapData.atlases[baseTexName]) {
+            atlasInfo = mapData.atlases[baseTexName];
             atlasRect = atlasInfo.rects[`${prop.libName}_${prop.name}`];
         }
 

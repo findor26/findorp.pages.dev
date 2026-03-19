@@ -447,6 +447,7 @@
        <span id="grid-height-display" style="color:inherit;font-size:14px;font-weight:700;line-height:1.2;margin-top:2px;">0</span> 
    </button> 
    <div style="width:1px; height:24px; background:var(--md-sys-color-outline); margin: 0 4px;"></div> 
+   <button id="continuous-copy-btn" class="m3-btn m3-btn-secondary" style="width:40px;padding:8px 0;" title="Toggle Continuous Copy"> <span class="material-symbols-rounded" style="font-size:20px;">repeat</span> </button> 
    <button id="cancel-ghost-btn" class="m3-btn m3-btn-error" style="width:40px;padding:8px 0;" title="Cancel Placement"> <span class="material-symbols-rounded" style="font-size:20px;">close</span> </button> 
   </div> 
   <div id="context-menu"> 
@@ -455,6 +456,7 @@
    </div> 
    <div style="display: flex; gap: 16px; padding: 8px 16px 16px; justify-content: center;"> 
     <button id="cm-move" title="Move" style="width: 48px; height: 48px; padding: 0;"><span class="material-symbols-rounded" style="font-size: 24px; margin: 0;">open_with</span></button> 
+    <button id="cm-copy" title="Copy" style="width: 48px; height: 48px; padding: 0;"><span class="material-symbols-rounded" style="font-size: 24px; margin: 0;">content_copy</span></button> 
     <button id="cm-delete" class="cm-danger" title="Delete" style="width: 48px; height: 48px; padding: 0;"><span class="material-symbols-rounded" style="font-size: 24px; margin: 0;">delete</span></button> 
    </div> 
   </div> 
@@ -513,6 +515,9 @@ let currentGridHeight = 0;
 window.dragMode = 'none'; // 'none', 'rotate', 'gridZ'
 window.rotateButtonMode = 'horizontal'; // 'horizontal' or 'free'
 window.isEditingDrag = false;
+window.originalObjectBeingMoved = null;
+window.originalObjectParent = null;
+window.isContinuousCopyEnabled = false;
 let editDragStart = {x: 0, y: 0};
 let initialGhostRot = new THREE.Euler();
 let initialGridZ = 0;
@@ -1688,6 +1693,7 @@ function setupUIEvents() {
             controls.dragToLook = window.dragMode === 'none';
         }
     }
+    window.updateDragModeUI = updateDragModeUI;
 
     function setupBtnPress(btn, onClick, onLongPress) {
         let timer;
@@ -1839,8 +1845,19 @@ function setupUIEvents() {
             window.isGhostLockedToOriginal = false;
         }
         
+        window.originalObjectBeingMoved = null;
+        window.originalObjectParent = null;
+        
         document.querySelector('.grid-floating-panel').style.display = 'none';
     });
+
+    const continuousCopyBtn = document.getElementById('continuous-copy-btn');
+    if (continuousCopyBtn) {
+        continuousCopyBtn.addEventListener('click', () => {
+            window.isContinuousCopyEnabled = !window.isContinuousCopyEnabled;
+            continuousCopyBtn.className = window.isContinuousCopyEnabled ? 'm3-btn m3-btn-primary' : 'm3-btn m3-btn-secondary';
+        });
+    }
 
     const cancelGhostBtn = document.getElementById('cancel-ghost-btn');
     if (cancelGhostBtn) {
@@ -1850,6 +1867,16 @@ function setupUIEvents() {
                 ghost = null;
                 window.isGhostLockedToOriginal = false;
                 document.querySelector('.grid-floating-panel').style.display = 'none';
+                
+                if (window.originalObjectBeingMoved) {
+                    if (window.originalObjectParent) {
+                        window.originalObjectParent.add(window.originalObjectBeingMoved);
+                    } else {
+                        editorGroup.add(window.originalObjectBeingMoved);
+                    }
+                    window.originalObjectBeingMoved = null;
+                    window.originalObjectParent = null;
+                }
             }
         });
     }
@@ -1968,6 +1995,10 @@ function setupUIEvents() {
             }
             const rot = selectedObjectForAction.rotation.clone();
             const pos = selectedObjectForAction.position.clone();
+            
+            window.originalObjectBeingMoved = selectedObjectForAction;
+            window.originalObjectParent = selectedObjectForAction.parent;
+            
             if (selectedObjectForAction.parent) {
                 selectedObjectForAction.parent.remove(selectedObjectForAction);
             } else {
@@ -1979,6 +2010,78 @@ function setupUIEvents() {
                 updateDragModeUI();
                 window.isGhostLockedToOriginal = true;
                 window.selectPrefab(name);
+                if (ghost) {
+                    ghost.rotation.copy(rot);
+                    ghost.position.copy(pos);
+                    ghost.updateMatrixWorld(true);
+                    
+                    const box = new THREE.Box3().setFromObject(ghost, true);
+                    const originalWorldY = editorGroup.localToWorld(pos.clone()).y;
+                    let dip = 0;
+                    if (box.min.y !== Infinity) {
+                        dip = (originalWorldY - box.min.y) / editorGroup.scale.z;
+                    }
+                    
+                    editorGroup.remove(ghost);
+                    const originWorld = editorGroup.localToWorld(pos.clone());
+                    const downRay = new THREE.Raycaster(originWorld, new THREE.Vector3(0, -1, 0));
+                    const intersects = downRay.intersectObjects(editorGroup.children, true);
+                    let hitZ = 0;
+                    if (intersects.length > 0) {
+                        const pt = editorGroup.worldToLocal(intersects[0].point);
+                        hitZ = pt.z;
+                    } else {
+                        const zeroPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+                        const ptWorld = new THREE.Vector3();
+                        if (downRay.ray.intersectPlane(zeroPlane, ptWorld)) {
+                            hitZ = editorGroup.worldToLocal(ptWorld).z;
+                        }
+                    }
+                    editorGroup.add(ghost);
+                    
+                    let calculatedGridZ = (pos.z - dip) - hitZ;
+                    if (isSnapping) {
+                        calculatedGridZ = Math.round(calculatedGridZ / 100) * 100;
+                    } else {
+                        calculatedGridZ = Math.round(calculatedGridZ);
+                    }
+                    
+                    currentGridHeight = calculatedGridZ;
+                    const gridHeightDisplay = document.getElementById('grid-height-display');
+                    if (gridHeightDisplay) gridHeightDisplay.innerText = currentGridHeight;
+                    
+                    ghost.userData.baseHitPoint = pos.clone();
+                    ghost.userData.baseHitPoint.z = hitZ;
+                    updateGhost(currentMousePos.x, currentMousePos.y, true);
+                }
+            }
+        }
+        document.getElementById('context-menu').style.display = 'none';
+        selectedObjectForAction = null;
+    };
+
+    document.getElementById('cm-copy').onclick = () => {
+        if (selectedObjectForAction) {
+            let name = selectedObjectForAction.userData.baseName;
+            if (!name && selectedObjectForAction.userData.originalProps && selectedObjectForAction.userData.originalProps.length > 0) {
+                let pName = selectedObjectForAction.userData.originalProps[0].name;
+                name = pName.replace(/_sub\d+$/i, '').replace(/_?part[12]$/i, '');
+            }
+            const rot = selectedObjectForAction.rotation.clone();
+            const pos = selectedObjectForAction.position.clone();
+            
+            window.originalObjectBeingMoved = null;
+            window.originalObjectParent = null;
+            
+            if (name) {
+                window.dragMode = 'none';
+                updateDragModeUI();
+                window.isGhostLockedToOriginal = true;
+                window.selectPrefab(name);
+                
+                window.isContinuousCopyEnabled = true;
+                const copyBtn = document.getElementById('continuous-copy-btn');
+                if (copyBtn) copyBtn.className = 'm3-btn m3-btn-primary';
                 if (ghost) {
                     ghost.rotation.copy(rot);
                     ghost.position.copy(pos);
@@ -2041,6 +2144,16 @@ function setupUIEvents() {
                 ghost = null;
                 window.isGhostLockedToOriginal = false;
                 document.querySelector('.grid-floating-panel').style.display = 'none';
+                
+                if (window.originalObjectBeingMoved) {
+                    if (window.originalObjectParent) {
+                        window.originalObjectParent.add(window.originalObjectBeingMoved);
+                    } else {
+                        editorGroup.add(window.originalObjectBeingMoved);
+                    }
+                    window.originalObjectBeingMoved = null;
+                    window.originalObjectParent = null;
+                }
             }
             return;
         }
@@ -2189,8 +2302,21 @@ function setupUIEvents() {
             instance.userData.baseName = window.currentBaseName;
             
             editorGroup.add(instance);
-            window.isGhostLockedToOriginal = false;
-            updateGhost(e.clientX, e.clientY, window.dragMode !== 'none');
+            
+            window.originalObjectBeingMoved = null;
+            window.originalObjectParent = null;
+
+            if (!window.isContinuousCopyEnabled) {
+                editorGroup.remove(ghost);
+                ghost = null;
+                window.isGhostLockedToOriginal = false;
+                document.querySelector('.grid-floating-panel').style.display = 'none';
+            } else {
+                window.isGhostLockedToOriginal = false;
+                window.dragMode = 'none';
+                if (window.updateDragModeUI) window.updateDragModeUI();
+                updateGhost(e.clientX, e.clientY, false);
+            }
         }
     });
 }
@@ -2310,7 +2436,24 @@ window.selectPrefab = function(baseName) {
     if (ghost) {
         editorGroup.remove(ghost);
         ghost = null;
+        if (window.originalObjectBeingMoved) {
+            if (window.originalObjectParent) {
+                window.originalObjectParent.add(window.originalObjectBeingMoved);
+            } else {
+                editorGroup.add(window.originalObjectBeingMoved);
+            }
+            window.originalObjectBeingMoved = null;
+            window.originalObjectParent = null;
+        }
     }
+    
+    window.isContinuousCopyEnabled = false;
+    const copyBtn = document.getElementById('continuous-copy-btn');
+    if (copyBtn) copyBtn.className = 'm3-btn m3-btn-secondary';
+    
+    window.dragMode = 'none';
+    if (window.updateDragModeUI) window.updateDragModeUI();
+
     currentPrefabGroup = prefabs.get(baseName);
     window.currentBaseName = baseName;
     if (currentPrefabGroup) {

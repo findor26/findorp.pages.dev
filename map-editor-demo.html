@@ -1834,6 +1834,21 @@ function setupUIEvents() {
             const buffer = await file.arrayBuffer();
             const mapData = await parseMapBin(buffer);
             await processMap(mapData, true);
+            
+            if (editorGroup) {
+                editorGroup.updateMatrixWorld(true);
+                const box = new THREE.Box3().setFromObject(editorGroup, true);
+                if (!box.isEmpty() && box.min.x !== Infinity) {
+                    const center = box.getCenter(new THREE.Vector3());
+                    const size = box.getSize(new THREE.Vector3());
+                    const maxDim = Math.max(size.x, size.z);
+                    const fov = camera.fov * (Math.PI / 180);
+                    let cameraDistance = Math.abs(maxDim / 2 / Math.tan(fov / 2));
+                    cameraDistance = Math.max(cameraDistance, 50) * 1.2;
+                    camera.position.set(center.x, center.y + cameraDistance * 0.6, center.z + cameraDistance);
+                    camera.lookAt(center);
+                }
+            }
         } catch (err) {
             log(`Import error: ${err.message}`);
             console.error(err);

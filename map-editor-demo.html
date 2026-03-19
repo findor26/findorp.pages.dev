@@ -770,9 +770,72 @@ function parseA3D(buffer) {
             else if(buf.type === 3) geo.setAttribute('normal', new THREE.BufferAttribute(buf.data, 3));
         });
         
-        if (!geo.attributes.normal) geo.computeVertexNormals();
+if (!geo.attributes.normal) geo.computeVertexNormals();
         data.meshes.push(geo);
     }
+    
+    try {
+        if (stream.offset < stream.buffer.byteLength) {
+            const transformSig = stream.readUint32(true);
+            if (transformSig === 3) { // A3D_TRANSFORMBLOCK_SIGNATURE
+                const transformLen = stream.readUint32(true);
+                const transformCount = stream.readUint32(true);
+                const transforms =[];
+                
+                for (let i = 0; i < transformCount; i++) {
+                    if (version === 3) stream.readLengthPrefixedStringA3D();
+                    const px = stream.readFloat32(true), py = stream.readFloat32(true), pz = stream.readFloat32(true);
+                    let rx = stream.readFloat32(true), ry = stream.readFloat32(true), rz = stream.readFloat32(true), rw = stream.readFloat32(true);
+                    let sx = stream.readFloat32(true), sy = stream.readFloat32(true), sz = stream.readFloat32(true);
+          
+                    if (sx === 0 && sy === 0 && sz === 0) {
+                        sx = 1; sy = 1; sz = 1;
+                    }
+                    if (rx === 0 && ry === 0 && rz === 0 && rw === 0) {
+                        rx = 0; ry = 0; rz = 0; rw = 1;
+                    }
+
+                    transforms.push({
+                        pos: new THREE.Vector3(px, py, pz),
+                        quat: new THREE.Quaternion(rx, ry, rz, rw),
+                        scale: new THREE.Vector3(sx, sy, sz)
+                    });
+                }
+                
+                for (let i = 0; i < transformCount; i++) stream.readInt32(true);
+                if (version === 3) stream.offset += (((transformLen + 3) >> 2) << 2) - transformLen;
+
+                const objectSig = stream.readUint32(true);
+                if (objectSig === 5) { // A3D_OBJECTBLOCK_SIGNATURE
+                    stream.readUint32(true); // objectLen
+                    const objectCount = stream.readUint32(true);
+                    const objects =[];
+                    
+                    for (let i = 0; i < objectCount; i++) {
+                        if (version === 2) {
+                            stream.readNullTerminatedString(); // name
+                            objects.push({ meshID: stream.readUint32(true), transformID: stream.readUint32(true) });
+                        } else {
+                            const mID = stream.readUint32(true), tID = stream.readUint32(true), mCount = stream.readUint32(true);
+                            for (let j = 0; j < mCount; j++) stream.readInt32(true); // matID
+                            objects.push({ meshID: mID, transformID: tID });
+                        }
+                    }
+
+                    for (const obj of objects) {
+                        if (obj.meshID < data.meshes.length && obj.transformID < transforms.length) {
+                            const tf = transforms[obj.transformID];
+                            const mat = new THREE.Matrix4().compose(tf.pos, tf.quat, tf.scale);
+                            data.meshes[obj.meshID].applyMatrix4(mat);
+                        }
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        console.warn("未能解析 A3D 局部 Transform:", e);
+    }
+
     return data;
 }
 
@@ -1631,7 +1694,7 @@ async function processMap(mapData, buildWorld = false) {
             if (!originalInstancesMap.has(instanceKey)) {
                 const grp = new THREE.Group();
                 grp.position.set(prop.pos[0], prop.pos[1], prop.pos[2]);
-                grp.rotation.set(prop.rot[0], prop.rot[1], prop.rot[2]);
+                grp.rotation.set(prop.rot[0], prop.rot[1], prop.rot[2], 'ZYX');
                 grp.userData.baseName = baseName;
                 grp.userData.originalProps = [];
                 originalInstancesMap.set(instanceKey, grp);
@@ -2521,7 +2584,7 @@ window.selectPrefab = function(baseName) {
     window.currentBaseName = baseName;
     if (currentPrefabGroup) {
         ghost = currentPrefabGroup.clone();
-        ghost.rotation.order = 'ZXY';
+        ghost.rotation.order = 'ZYX';
         ghost.traverse(child => {
             if (child.isMesh) {
                 child.material = child.material.clone();

@@ -1048,13 +1048,6 @@ function initThree() {
         scene.environment = pmremGenerator.fromScene(environment).texture;
         environment.dispose();
 
-        if (thumbScene && thumbRenderer) {
-            const thumbPmrem = new THREE.PMREMGenerator(thumbRenderer);
-            thumbPmrem.compileEquirectangularShader();
-            const thumbEnv = new RoomEnvironment();
-            thumbScene.environment = thumbPmrem.fromScene(thumbEnv).texture;
-            thumbEnv.dispose();
-        }
 
         textureCache.forEach(tex => {
             if(tex) tex.needsUpdate = true;
@@ -1196,12 +1189,31 @@ function initThumbnails() {
 
     thumbRenderer.domElement.addEventListener('webglcontextrestored', () => {
         console.log("Thumbnail WebGL Context Restored!");
+        
+        thumbRenderer.setSize(512, 512);
+      
         setupThumbEnv();
+        
+        if (defaultControl) defaultControl.needsUpdate = true;
+        if (defaultTile) defaultTile.needsUpdate = true;
+        textureCache.forEach(tex => {
+            if(tex) tex.needsUpdate = true;
+        });
         
         for (const item of thumbnailItems) {
             item.model.traverse((child) => {
-                if (child.isMesh && child.material) {
-                    child.material.needsUpdate = true;
+                if (child.isMesh) {
+                    if (child.material) {
+                        child.material.needsUpdate = true;
+                    }
+                    if (child.geometry) {
+                        for (const key in child.geometry.attributes) {
+                            child.geometry.attributes[key].needsUpdate = true;
+                        }
+                        if (child.geometry.index) {
+                            child.geometry.index.needsUpdate = true;
+                        }
+                    }
                 }
             });
         }

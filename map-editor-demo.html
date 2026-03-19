@@ -768,6 +768,8 @@ function parseA3D(buffer) {
             if(buf.type === 1) geo.setAttribute('position', new THREE.BufferAttribute(buf.data, 3));
             else if(buf.type === 2) geo.setAttribute('uv', new THREE.BufferAttribute(buf.data, 2));
             else if(buf.type === 3) geo.setAttribute('normal', new THREE.BufferAttribute(buf.data, 3));
+            else if(buf.type === 4) geo.setAttribute('uv2', new THREE.BufferAttribute(buf.data, 2));
+            else if(buf.type === 6 && !geo.attributes.normal) geo.setAttribute('normal', new THREE.BufferAttribute(buf.data, 3));
         });
         
 if (!geo.attributes.normal) geo.computeVertexNormals();
@@ -1593,13 +1595,13 @@ async function processMap(mapData, buildWorld = false) {
 
                     shader.vertexShader = `
                         varying vec2 vUvControl;
-                        varying vec2 vUvTile;
+                        varying vec3 vLocalPos;
                         ${shader.vertexShader}
                     `.replace(
                         `#include <uv_vertex>`,
                         `#include <uv_vertex>
                          vUvControl = uv;
-                         vUvTile = position.xy / 500.0;
+                         vLocalPos = position;
                         `
                     );
 
@@ -1609,7 +1611,7 @@ async function processMap(mapData, buildWorld = false) {
                         uniform sampler2D tG;
                         uniform sampler2D tB;
                         varying vec2 vUvControl;
-                        varying vec2 vUvTile;
+                        varying vec3 vLocalPos;
                         ${shader.fragmentShader}
                     `.replace(
                         `#include <map_fragment>`,
@@ -1620,18 +1622,39 @@ async function processMap(mapData, buildWorld = false) {
                         float w1 = control.r;
                         float w2 = control.g;
                         float w3 = control.b;
+                 
+                        vec3 dx = dFdx(vLocalPos);
+                        vec3 dy = dFdy(vLocalPos);
+                        vec3 geoNormal = normalize(cross(dx, dy));
+                 
+                        vec3 blendWeights = abs(geoNormal);
+                        blendWeights = pow(blendWeights, vec3(8.0));
+                        blendWeights /= dot(blendWeights, vec3(1.0));
                         
-                        vec4 splatColor = texture2D(tR, vUvTile) * w1 + 
-                                          texture2D(tG, vUvTile) * w2 + 
-                                          texture2D(tB, vUvTile) * w3;
-                                          
+                        float texScale = 1.0 / 500.0;
+               
+                        vec2 uvX = vec2(vLocalPos.y, vLocalPos.z) * texScale;
+                        vec2 uvY = vec2(vLocalPos.x, vLocalPos.z) * texScale;
+                        vec2 uvZ = vec2(vLocalPos.x, vLocalPos.y) * texScale;
+                        
+                        vec4 colR = texture2D(tR, uvX) * blendWeights.x + 
+                                    texture2D(tR, uvY) * blendWeights.y + 
+                                    texture2D(tR, uvZ) * blendWeights.z;
+                                    
+                        vec4 colG = texture2D(tG, uvX) * blendWeights.x + 
+                                    texture2D(tG, uvY) * blendWeights.y + 
+                                    texture2D(tG, uvZ) * blendWeights.z;
+                                    
+                        vec4 colB = texture2D(tB, uvX) * blendWeights.x + 
+                                    texture2D(tB, uvY) * blendWeights.y + 
+                                    texture2D(tB, uvZ) * blendWeights.z;
+      
+                        vec4 splatColor = colR * w1 + colG * w2 + colB * w3;
                         float sum = w1 + w2 + w3;
-                        vec4 baseColor = texture2D(tR, vUvTile);
                         if (sum > 0.001) {
                             splatColor = splatColor / sum; 
-                            splatColor = mix(baseColor, splatColor, clamp(sum, 0.0, 1.0));
                         } else {
-                            splatColor = baseColor;
+                            splatColor = colR;
                         }
                         
                         diffuseColor = vec4(splatColor.rgb, 1.0);

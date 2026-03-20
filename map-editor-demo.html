@@ -485,7 +485,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 const REPO_MAPS = "MapMakersAndProgrammers/tanki-bin-maps";
-const MAP_PATH = "remaster/sandboxmmRemaster";
+const MAP_PATH = "remaster/sandalmmRemaster";
 const REPO_PROPS = "MapMakersAndProgrammers/tanki-prop-libraries";
 const PROP_PATH = "html5/Remaster";
 
@@ -1514,8 +1514,8 @@ async function processMap(mapData, buildWorld = false) {
         let baseName = prop.name;
         if (/_sub\d+$/i.test(baseName)) {
             baseName = baseName.replace(/_sub\d+$/i, '');
-        } else if (/_?part[12]$/i.test(baseName)) {
-            baseName = baseName.replace(/_?part[12]$/i, '');
+        } else if (/_?part\d+[a-z]*$/i.test(baseName)) {
+            baseName = baseName.replace(/_?part\d+[a-z]*$/i, '');
         }
 
         const lowerName = baseName.toLowerCase();
@@ -1527,10 +1527,10 @@ async function processMap(mapData, buildWorld = false) {
             let originalMainName = null;
             let expectedBodyLower = trackMatch ? 'body' + trackMatch[2] : '';
 
-            for (let j = 0; j < mapData.props.length; j++) {
+                        for (let j = 0; j < mapData.props.length; j++) {
                 let n = mapData.props[j].name;
                 if (/_sub\d+$/i.test(n)) n = n.replace(/_sub\d+$/i, '');
-                else if (/_?part[12]$/i.test(n)) n = n.replace(/_?part[12]$/i, '');
+                else if (/_?part\d+[a-z]*$/i.test(n)) n = n.replace(/_?part\d+[a-z]*$/i, '');
                 
                 const nLower = n.toLowerCase();
                 
@@ -2159,7 +2159,7 @@ function setupUIEvents() {
             let name = hitObj.userData.baseName;
             if (!name && hitObj.userData.originalProps && hitObj.userData.originalProps.length > 0) {
                 let pName = hitObj.userData.originalProps[0].name;
-                name = pName.replace(/_sub\d+$/i, '').replace(/_?part[12]$/i, '');
+                name = pName.replace(/_sub\d+$/i, '').replace(/_?part\d+[a-z]*$/i, '');
             }
             title.innerText = name || "Unknown Object";
             
@@ -2189,7 +2189,7 @@ function setupUIEvents() {
             let name = selectedObjectForAction.userData.baseName;
             if (!name && selectedObjectForAction.userData.originalProps && selectedObjectForAction.userData.originalProps.length > 0) {
                 let pName = selectedObjectForAction.userData.originalProps[0].name;
-                name = pName.replace(/_sub\d+$/i, '').replace(/_?part[12]$/i, '');
+                name = pName.replace(/_sub\d+$/i, '').replace(/_?part\d+[a-z]*$/i, '');
             }
             const rot = selectedObjectForAction.rotation.clone();
             const pos = selectedObjectForAction.position.clone();
@@ -2263,7 +2263,7 @@ function setupUIEvents() {
             let name = selectedObjectForAction.userData.baseName;
             if (!name && selectedObjectForAction.userData.originalProps && selectedObjectForAction.userData.originalProps.length > 0) {
                 let pName = selectedObjectForAction.userData.originalProps[0].name;
-                name = pName.replace(/_sub\d+$/i, '').replace(/_?part[12]$/i, '');
+                name = pName.replace(/_sub\d+$/i, '').replace(/_?part\d+[a-z]*$/i, '');
             }
             const rot = selectedObjectForAction.rotation.clone();
             const pos = selectedObjectForAction.position.clone();

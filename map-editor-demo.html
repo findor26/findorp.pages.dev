@@ -1789,10 +1789,37 @@ async function processMap(mapData, buildWorld = false) {
             if (!prefabs.has(baseName)) {
                 const group = new THREE.Group();
                 group.userData.originalProps = [];
+                group.userData.rootPos = new THREE.Vector3(prop.pos[0], prop.pos[1], prop.pos[2]);
+                group.userData.rootRot = new THREE.Euler(prop.rot[0], prop.rot[1], prop.rot[2], 'ZYX');
                 prefabs.set(baseName, group);
             }
-            prefabs.get(baseName).userData.originalProps.push(prop);
-            prefabs.get(baseName).add(prefabMesh);
+            
+            const group = prefabs.get(baseName);
+            group.userData.originalProps.push(prop);
+
+            const rootMatrix = new THREE.Matrix4().compose(
+                group.userData.rootPos,
+                new THREE.Quaternion().setFromEuler(group.userData.rootRot),
+                new THREE.Vector3(1, 1, 1)
+            );
+            
+            const propMatrix = new THREE.Matrix4().compose(
+                new THREE.Vector3(prop.pos[0], prop.pos[1], prop.pos[2]),
+                new THREE.Quaternion().setFromEuler(new THREE.Euler(prop.rot[0], prop.rot[1], prop.rot[2], 'ZYX')),
+                new THREE.Vector3(1, 1, 1)
+            );
+
+            const localMatrix = propMatrix.premultiply(rootMatrix.invert());
+            
+            const localPos = new THREE.Vector3();
+            const localQuat = new THREE.Quaternion();
+            const localScale = new THREE.Vector3();
+            localMatrix.decompose(localPos, localQuat, localScale);
+
+            prefabMesh.position.copy(localPos);
+            prefabMesh.quaternion.copy(localQuat);
+            
+            group.add(prefabMesh);
         }
     }
     

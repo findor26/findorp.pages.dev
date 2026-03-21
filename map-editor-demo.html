@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
- <head> 
-  <meta charset="UTF-8" /> 
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" /> 
-  <title>Tanki Online Map Editor Demo</title> 
-  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap" rel="stylesheet" /> 
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet" /> 
-  <style>
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Tanki Online Map Editor Demo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet" />
+    <style>
         :root {
             --md-sys-color-primary: #76FF33;
             --md-sys-color-on-primary: rgba(0, 25, 38, 0.9);
@@ -444,78 +444,102 @@
             text-overflow: ellipsis;
             margin-top: 2px;
         }
-    </style> 
-  <script type="importmap">
+    </style>
+    <script type="importmap">
         {
             "imports": {
                 "three": "https://cdn.jsdelivr.net/npm/three/build/three.module.js",
                 "three/addons/": "https://cdn.jsdelivr.net/npm/three/examples/jsm/"
             }
         }
-    </script> 
- </head> 
- <body> 
-  <div id="loading-screen"> 
-   <div class="m3-spinner"></div> 
-   <div id="loading-text">
-    Initializing Editor...
-   </div> 
-  </div> 
-  <button id="menu-toggle" title="Menu"><span class="material-symbols-rounded">menu</span></button> 
-  <div id="ui-container"> 
-   <div class="m3-header"> 
-    <h2 class="m3-title">Props</h2> 
-    <div class="m3-subtitle"> 
-     <span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle;">touch_app</span> Place 
-     <span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle;margin-left:4px;">drag_pan</span> Look 
-    </div> 
-    <div style="display:flex;gap:6px;justify-content:space-between;margin-top:4px;"> 
-     <button id="import-btn" class="m3-btn m3-btn-secondary" title="Import map.bin"> <span class="material-symbols-rounded">upload_file</span> </button> 
-     <button id="export-btn" class="m3-btn m3-btn-secondary" title="Export map.bin"> <span class="material-symbols-rounded">save</span> </button> 
-     <button id="clear-btn" class="m3-btn m3-btn-error" title="Clear Scene"> <span class="material-symbols-rounded">delete</span> </button> 
-    </div> 
-    <input type="file" id="file-input" accept=".bin" style="display: none;" /> 
-   </div> 
-   <div id="prefab-list"></div> 
-  </div> 
-  <div class="grid-floating-panel"> 
-   <button id="rotate-btn" class="m3-btn m3-btn-secondary" style="width:40px;padding:8px 0;" title="Toggle Horizontal Rotate (Long press to switch)"> <span class="material-symbols-rounded" style="font-size:20px;">rotate_right</span> </button> 
-   <button id="snap-btn" class="m3-btn m3-btn-primary" style="width:40px;padding:8px 0;" title="Toggle Grid Snap"> <span class="material-symbols-rounded" style="font-size:20px;">grid_on</span> </button>  
-   <div style="width:1px; height:24px; background:var(--md-sys-color-outline); margin: 0 4px;"></div> 
-   <button id="grid-z-btn" class="m3-btn m3-btn-secondary" style="width:56px;padding:4px 0;flex-direction:column;gap:0;" title="Toggle Grid Z Drag"> 
-       <span style="font-size:10px;font-weight:500;line-height:1;">Grid Z</span> 
-       <span id="grid-height-display" style="color:inherit;font-size:14px;font-weight:700;line-height:1.2;margin-top:2px;">0</span> 
-   </button> 
-   <div style="width:1px; height:24px; background:var(--md-sys-color-outline); margin: 0 4px;"></div> 
-   <button id="continuous-copy-btn" class="m3-btn m3-btn-secondary" style="width:40px;padding:8px 0;" title="Toggle Continuous Copy"> <span class="material-symbols-rounded" style="font-size:20px;">repeat</span> </button> 
-   <button id="cancel-ghost-btn" class="m3-btn m3-btn-error" style="width:40px;padding:8px 0;" title="Cancel Placement"> <span class="material-symbols-rounded" style="font-size:20px;">close</span> </button> 
-  </div> 
-  <div id="context-menu"> 
-   <div class="cm-title" id="cm-title">
-    Model Name
-   </div> 
-   <div style="display: flex; gap: 16px; padding: 8px 16px 16px; justify-content: center;"> 
-    <button id="cm-move" title="Move" style="width: 48px; height: 48px; padding: 0;"><span class="material-symbols-rounded" style="font-size: 24px; margin: 0;">open_with</span></button> 
-    <button id="cm-copy" title="Copy" style="width: 48px; height: 48px; padding: 0;"><span class="material-symbols-rounded" style="font-size: 24px; margin: 0;">content_copy</span></button> 
-    <button id="cm-delete" class="cm-danger" title="Delete" style="width: 48px; height: 48px; padding: 0;"><span class="material-symbols-rounded" style="font-size: 24px; margin: 0;">delete</span></button> 
-   </div> 
-  </div> 
-  <div id="m3-dialog-overlay"> 
-   <div id="m3-dialog"> 
-    <h3 class="m3-dialog-title"><span class="material-symbols-rounded" style="color:var(--md-sys-color-error);">warning</span> Clear Scene</h3> 
-    <div class="m3-dialog-text">
-     Are you sure you want to delete all objects in the scene? This action cannot be undone.
-    </div> 
-    <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px;"> 
-     <button id="dialog-cancel-btn" class="m3-btn-text">Cancel</button> 
-     <button id="dialog-confirm-btn" class="m3-btn-text danger">Delete</button> 
-    </div> 
-   </div> 
-  </div> 
-  <div id="toast-msg"></div> 
-  <div id="canvas-container"></div> 
-  <script type="module">
-import * as THREE from 'three';
+    </script>
+</head>
+<body>
+    <div id="loading-screen">
+        <div class="m3-spinner"></div>
+        <div id="loading-text">
+            Initializing Editor...
+        </div>
+    </div>
+    <button id="menu-toggle" title="Menu">
+        <span class="material-symbols-rounded">menu</span>
+    </button>
+    <div id="ui-container">
+        <div class="m3-header">
+            <h2 class="m3-title">Props</h2>
+            <div class="m3-subtitle">
+                <span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle;">touch_app</span> Place
+                <span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle;margin-left:4px;">drag_pan</span> Look
+            </div>
+            <div style="display:flex;gap:6px;justify-content:space-between;margin-top:4px;">
+                <button id="import-btn" class="m3-btn m3-btn-secondary" title="Import map.bin">
+                    <span class="material-symbols-rounded">upload_file</span>
+                </button>
+                <button id="export-btn" class="m3-btn m3-btn-secondary" title="Export map.bin">
+                    <span class="material-symbols-rounded">save</span>
+                </button>
+                <button id="clear-btn" class="m3-btn m3-btn-error" title="Clear Scene">
+                    <span class="material-symbols-rounded">delete</span>
+                </button>
+            </div>
+            <input type="file" id="file-input" accept=".bin" style="display: none;" />
+        </div>
+        <div id="prefab-list"></div>
+    </div>
+    <div class="grid-floating-panel">
+        <button id="rotate-btn" class="m3-btn m3-btn-secondary" style="width:40px;padding:8px 0;" title="Toggle Horizontal Rotate (Long press to switch)">
+            <span class="material-symbols-rounded" style="font-size:20px;">rotate_right</span>
+        </button>
+        <button id="snap-btn" class="m3-btn m3-btn-primary" style="width:40px;padding:8px 0;" title="Toggle Grid Snap">
+            <span class="material-symbols-rounded" style="font-size:20px;">grid_on</span>
+        </button>
+        <div style="width:1px; height:24px; background:var(--md-sys-color-outline); margin: 0 4px;"></div>
+        <button id="grid-z-btn" class="m3-btn m3-btn-secondary" style="width:56px;padding:4px 0;flex-direction:column;gap:0;" title="Toggle Grid Z Drag">
+            <span style="font-size:10px;font-weight:500;line-height:1;">Grid Z</span>
+            <span id="grid-height-display" style="color:inherit;font-size:14px;font-weight:700;line-height:1.2;margin-top:2px;">0</span>
+        </button>
+        <div style="width:1px; height:24px; background:var(--md-sys-color-outline); margin: 0 4px;"></div>
+        <button id="continuous-copy-btn" class="m3-btn m3-btn-secondary" style="width:40px;padding:8px 0;" title="Toggle Continuous Copy">
+            <span class="material-symbols-rounded" style="font-size:20px;">repeat</span>
+        </button>
+        <button id="cancel-ghost-btn" class="m3-btn m3-btn-error" style="width:40px;padding:8px 0;" title="Cancel Placement">
+            <span class="material-symbols-rounded" style="font-size:20px;">close</span>
+        </button>
+    </div>
+    <div id="context-menu">
+        <div class="cm-title" id="cm-title">
+            Model Name
+        </div>
+        <div style="display: flex; gap: 16px; padding: 8px 16px 16px; justify-content: center;">
+            <button id="cm-move" title="Move" style="width: 48px; height: 48px; padding: 0;">
+                <span class="material-symbols-rounded" style="font-size: 24px; margin: 0;">open_with</span>
+            </button>
+            <button id="cm-copy" title="Copy" style="width: 48px; height: 48px; padding: 0;">
+                <span class="material-symbols-rounded" style="font-size: 24px; margin: 0;">content_copy</span>
+            </button>
+            <button id="cm-delete" class="cm-danger" title="Delete" style="width: 48px; height: 48px; padding: 0;">
+                <span class="material-symbols-rounded" style="font-size: 24px; margin: 0;">delete</span>
+            </button>
+        </div>
+    </div>
+    <div id="m3-dialog-overlay">
+        <div id="m3-dialog">
+            <h3 class="m3-dialog-title">
+                <span class="material-symbols-rounded" style="color:var(--md-sys-color-error);">warning</span> Clear Scene
+            </h3>
+            <div class="m3-dialog-text">
+                Are you sure you want to delete all objects in the scene? This action cannot be undone.
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px;">
+                <button id="dialog-cancel-btn" class="m3-btn-text">Cancel</button>
+                <button id="dialog-confirm-btn" class="m3-btn-text danger">Delete</button>
+            </div>
+        </div>
+    </div>
+    <div id="toast-msg"></div>
+    <div id="canvas-container"></div>
+    <script type="module">
+        import * as THREE from 'three';
 import { FlyControls } from 'three/addons/controls/FlyControls.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -524,9 +548,8 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 const REPO_MAPS = "MapMakersAndProgrammers/tanki-bin-maps";
-const MAP_PATH = "remaster/sandboxmmRemasterWinter";
+const MAP_PATH = "remaster/sandalmmRemasterAutumEvent";
 const REPO_PROPS = "MapMakersAndProgrammers/tanki-prop-libraries";
-const PROP_PATH = "html5/Remaster";
 
 const loadingScreen = document.getElementById('loading-screen');
 const loadingTextEl = document.getElementById('loading-text');
@@ -1395,20 +1418,36 @@ async function loadTexture(repo, branch, path, silent = false, isLinear = false)
     });
 }
 
-async function getPropDict() {
-    if (!propDictCache) {
-        log("Fetching Prop Library index...");
-        const libJson = await fetchRawFile(REPO_PROPS, 'main', `${PROP_PATH}/library.json`, 'json');
-        propDictCache = {};
-        for(const grp of libJson.groups) {
-            for(const p of grp.props) {
-                if (p.mesh && p.mesh.file) {
-                    propDictCache[`${grp.name}_${p.name}`] = p;
-                    propDictCache[p.name] = p; 
+window.loadedLibraries = new Set();
+
+async function getPropDict(mapData) {
+    if (!propDictCache) propDictCache = {};
+
+    const uniqueLibs = new Set();
+    for (const prop of mapData.props) {
+        if (prop.libName) uniqueLibs.add(prop.libName);
+    }
+
+    for (const lib of uniqueLibs) {
+        if (window.loadedLibraries.has(lib)) continue;
+        
+        log(`Fetching Prop Library index: ${lib}...`);
+        try {
+            const libJson = await fetchRawFile(REPO_PROPS, 'main', `html5/${lib}/library.json`, 'json');
+            for(const grp of libJson.groups) {
+                for(const p of grp.props) {
+                    if (p.mesh && p.mesh.file) {
+                        propDictCache[`${grp.name}_${p.name}`] = p;
+                        propDictCache[p.name] = p; 
+                    }
                 }
             }
+            window.loadedLibraries.add(lib);
+        } catch (e) {
+            console.warn(`[Library Warning] Could not load library.json for ${lib}:`, e.message);
         }
     }
+    
     return propDictCache;
 }
 
@@ -1485,56 +1524,54 @@ function addErrorToUI(fileName, errorMsg) {
     listContainer.insertBefore(item, listContainer.firstChild);
 }
 async function processMap(mapData, buildWorld = false) {
-    const propDict = await getPropDict();
+const propDict = await getPropDict(mapData); 
 
-    const uniqueModelFiles = new Set();
-    const uniqueTexNames = new Set();
+const uniqueModelToLib = new Map(); 
+const uniqueTexToLib = new Map();
 
-    for (const prop of mapData.props) {
-        const pInfo = propDict[`${prop.grpName}_${prop.name}`] || propDict[prop.name];
-        if (pInfo) {
-            if (pInfo.mesh && pInfo.mesh.file) uniqueModelFiles.add(pInfo.mesh.file);
-            if (pInfo.textures) {
-                for (let t of pInfo.textures) {
-                    if (t.diffuseMap) uniqueTexNames.add(t.diffuseMap);
-                }
+for (const prop of mapData.props) {
+    const pInfo = propDict[`${prop.grpName}_${prop.name}`] || propDict[prop.name];
+    if (pInfo) {
+        if (pInfo.mesh && pInfo.mesh.file) {
+            uniqueModelToLib.set(pInfo.mesh.file, prop.libName);
+        }
+        if (pInfo.textures) {
+            for (let t of pInfo.textures) {
+                if (t.diffuseMap) uniqueTexToLib.set(t.diffuseMap, prop.libName);
             }
         }
     }
+}
 
     for (const mat of Object.values(mapData.materials)) {
         for (const param of mat.texParams) {
-            uniqueTexNames.add(param.texName);
+            uniqueTexToLib.set(param.texName, param.libName);
         }
     }
 
-    const extraGroundTextures = ['ground1', 'ground1_snow', 'Soil_Ground', 'grass1', 'grass1_snow', 'withered_grass', 'conc_tile', 'conc_tile2', 'conc_tile_snow'];
-    for (const tex of extraGroundTextures) uniqueTexNames.add(tex);
 
     log(`Downloading models and textures...`);
     
-    const modelPromises = Array.from(uniqueModelFiles).map(async (file) => {
+    const modelPromises = Array.from(uniqueModelToLib.entries()).map(async ([file, libName]) => {
         if (!modelCache.has(file)) {
             try {
                 if (file.toLowerCase().endsWith('.a3d')) {
                     let a3dBuf;
                     try {
-                 
-                        a3dBuf = await fetchRawFile(REPO_PROPS, 'main', `${PROP_PATH}/${file}`);
+                    
+                        a3dBuf = await fetchRawFile(REPO_PROPS, 'main', `html5/${libName}/${file}`);
                     } catch (fetchErr) {
-        
                         const lowerFile = file.toLowerCase();
                         if (file !== lowerFile) {
                             console.warn(`[Case Fallback] Cannot find ${file}, trying lowercase: ${lowerFile}`);
-                            a3dBuf = await fetchRawFile(REPO_PROPS, 'main', `${PROP_PATH}/${lowerFile}`);
+               
+                            a3dBuf = await fetchRawFile(REPO_PROPS, 'main', `html5/${libName}/${lowerFile}`);
                         } else {
-          
                             throw fetchErr; 
                         }
                     }
                     
                     const a3dData = parseA3D(a3dBuf);
-                 
                     if (a3dData.meshes.length > 0) modelCache.set(file, a3dData.meshes[0]);
                 }
             } catch (e) {
@@ -1544,12 +1581,19 @@ async function processMap(mapData, buildWorld = false) {
         }
     });
 
-    const texPromises = Array.from(uniqueTexNames).map(async (texName) => {
+    const texPromises = Array.from(uniqueTexToLib.entries()).map(async ([texName, libName]) => {
         if (!textureCache.has(texName)) {
-            const isControl = texName.includes('-control');
-            let tex = await loadTexture(REPO_MAPS, 'master', `${MAP_PATH}/${texName}.webp`, true, isControl);
-            if (!tex) tex = await loadTexture(REPO_PROPS, 'main', `html5/Remaster/${texName}.webp`, true, isControl);
-            if (!tex && isControl) tex = await loadTexture(REPO_MAPS, 'master', `${MAP_PATH}/${texName}.png`, true, isControl);
+            const isControl = texName.includes('-control'); 
+            let tex = null;
+
+            if (libName) {
+                tex = await loadTexture(REPO_PROPS, 'main', `html5/${libName}/${texName}.webp`, true, isControl);
+            }
+
+            if (!tex) {
+                tex = await loadTexture(REPO_MAPS, 'master', `${MAP_PATH}/${texName}.webp`, true, isControl);
+            }
+
             if (tex) textureCache.set(texName, tex);
         }
     });
@@ -2930,6 +2974,6 @@ function updateGhost(clientX, clientY, isLockedDrag = false) {
 }
 
 loadMain();
-</script>  
- </body>
+</script>
+</body>
 </html>

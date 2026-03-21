@@ -548,7 +548,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 const REPO_MAPS = "MapMakersAndProgrammers/tanki-bin-maps";
-const MAP_PATH = "remaster/sandalmmRemasterAutumEvent";
+const MAP_PATH = "remaster/parmammRemaster";
 const REPO_PROPS = "MapMakersAndProgrammers/tanki-prop-libraries";
 
 const loadingScreen = document.getElementById('loading-screen');
@@ -1391,7 +1391,7 @@ function setupEditorGroup() {
     }
 }
 
-async function loadTexture(repo, branch, path, silent = false, isLinear = false) {
+async function loadTexture(repo, branch, path, silent = false, isLinear = false, isRepeating = false) {
     const url = `https://raw.githubusercontent.com/${repo}/${branch}/${path}`;
     const loader = new THREE.TextureLoader();
     
@@ -1400,8 +1400,7 @@ async function loadTexture(repo, branch, path, silent = false, isLinear = false)
             tex.colorSpace = isLinear ? THREE.LinearSRGBColorSpace : THREE.SRGBColorSpace;
             tex.flipY = false;
             
-            if (path.toLowerCase().includes('ground') || path.toLowerCase().includes('grass') || 
-                path.toLowerCase().includes('soil') || path.toLowerCase().includes('conc')) {
+            if (isRepeating) {
                 tex.wrapS = THREE.RepeatWrapping;
                 tex.wrapT = THREE.RepeatWrapping;
             } else {
@@ -1524,31 +1523,34 @@ function addErrorToUI(fileName, errorMsg) {
     listContainer.insertBefore(item, listContainer.firstChild);
 }
 async function processMap(mapData, buildWorld = false) {
-const propDict = await getPropDict(mapData); 
+    const propDict = await getPropDict(mapData); 
 
-const uniqueModelToLib = new Map(); 
-const uniqueTexToLib = new Map();
-
-for (const prop of mapData.props) {
-    const pInfo = propDict[`${prop.grpName}_${prop.name}`] || propDict[prop.name];
-    if (pInfo) {
-        if (pInfo.mesh && pInfo.mesh.file) {
-            uniqueModelToLib.set(pInfo.mesh.file, prop.libName);
-        }
-        if (pInfo.textures) {
-            for (let t of pInfo.textures) {
-                if (t.diffuseMap) uniqueTexToLib.set(t.diffuseMap, prop.libName);
+    const uniqueModelToLib = new Map(); 
+    const uniqueTexToLib = new Map();
+    const repeatingTextures = new Set(); 
+    for (const prop of mapData.props) {
+        const pInfo = propDict[`${prop.grpName}_${prop.name}`] || propDict[prop.name];
+        if (pInfo) {
+            if (pInfo.mesh && pInfo.mesh.file) {
+                uniqueModelToLib.set(pInfo.mesh.file, prop.libName);
+            }
+            if (pInfo.textures) {
+                for (let t of pInfo.textures) {
+                    if (t.diffuseMap) uniqueTexToLib.set(t.diffuseMap, prop.libName);
+                }
             }
         }
     }
-}
 
     for (const mat of Object.values(mapData.materials)) {
         for (const param of mat.texParams) {
             uniqueTexToLib.set(param.texName, param.libName);
+        
+            if (param.name.startsWith('_Splat')) {
+                repeatingTextures.add(param.texName);
+            }
         }
     }
-
 
     log(`Downloading models and textures...`);
     
@@ -1584,14 +1586,17 @@ for (const prop of mapData.props) {
     const texPromises = Array.from(uniqueTexToLib.entries()).map(async ([texName, libName]) => {
         if (!textureCache.has(texName)) {
             const isControl = texName.includes('-control'); 
+            const isRepeat = repeatingTextures.has(texName);
             let tex = null;
 
             if (libName) {
-                tex = await loadTexture(REPO_PROPS, 'main', `html5/${libName}/${texName}.webp`, true, isControl);
+                
+                tex = await loadTexture(REPO_PROPS, 'main', `html5/${libName}/${texName}.webp`, true, isControl, isRepeat);
             }
 
             if (!tex) {
-                tex = await loadTexture(REPO_MAPS, 'master', `${MAP_PATH}/${texName}.webp`, true, isControl);
+                
+                tex = await loadTexture(REPO_MAPS, 'master', `${MAP_PATH}/${texName}.webp`, true, isControl, isRepeat);
             }
 
             if (tex) textureCache.set(texName, tex);

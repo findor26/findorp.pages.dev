@@ -601,23 +601,7 @@ function getCleanBaseName(rawName) {
     let cleaned = rawName;
     if (/[-_]sub[-_]?\d+$/i.test(cleaned)) {
         cleaned = cleaned.replace(/[-_]sub[-_]?\d+$/i, '');
-    } else if (/(.*)(_?part\d+[a-z]*)(.*)/i.test(cleaned)) {
-        cleaned = cleaned.replace(/_?part\d+[a-z]*/i, '');
-        cleaned = cleaned.replace(/__+/g, '_');
-        if (cleaned.endsWith('_')) {
-            cleaned = cleaned.slice(0, -1);
-        }
     }
-    const tmpLower = cleaned.toLowerCase();
-    const grabUnIdx = tmpLower.indexOf('grab_un_tower');
-    if (grabUnIdx !== -1) return cleaned.substring(0, grabUnIdx + 'grab_un_tower'.length);
-
-    const grabFlIdx = tmpLower.indexOf('grab_fl_tower');
-    if (grabFlIdx !== -1) return cleaned.substring(0, grabFlIdx + 'grab_fl_tower'.length);
-
-    const riseAIdx = tmpLower.indexOf('rise_a');
-    if (riseAIdx !== -1) return cleaned.substring(0, riseAIdx + 'rise_a'.length);
-
     return cleaned;
 }
 
@@ -1755,44 +1739,8 @@ async function processMap(mapData, buildWorld = false) {
         const prop = mapData.props[i];
         
         let baseName = getCleanBaseName(prop.name);
-        const lowerName = baseName.toLowerCase();
-        
-        const isDisplay = lowerName.startsWith('display');
-        const trackMatch = lowerName.match(/^(lb|lf|rb|rf)_track(.*)$/);
-
         let parentRawPos = prop.pos;
         let parentRawRot = prop.rot;
-
-        if (isDisplay || trackMatch) {
-            let originalMainName = null;
-            let expectedBodyLower = trackMatch ? 'body' + trackMatch[2] : '';
-            let minDist = Infinity;
-
-            for (let j = 0; j < mapData.props.length; j++) {
-                let p2 = mapData.props[j];
-                let n = getCleanBaseName(p2.name);
-                const nLower = n.toLowerCase();
-                
-                if ((isDisplay && nLower.startsWith('billboard')) || (trackMatch && nLower === expectedBodyLower)) {
-                    let dx = p2.pos[0] - prop.pos[0];
-                    let dy = p2.pos[1] - prop.pos[1];
-                    let dz = p2.pos[2] - prop.pos[2];
-                    let dist = dx*dx + dy*dy + dz*dz;
-                    if (dist < minDist) { 
-                        minDist = dist;
-                        originalMainName = n;
-                        parentRawPos = p2.pos;
-                        parentRawRot = p2.rot;
-                    }
-                }
-            }
-            
-            if (originalMainName) {
-                baseName = originalMainName;
-            } else {
-                baseName = isDisplay ? 'Billboard' : (expectedBodyLower.charAt(0).toUpperCase() + expectedBodyLower.slice(1));
-            }
-        }
 
         let geometry = null;
         let pInfo = null;

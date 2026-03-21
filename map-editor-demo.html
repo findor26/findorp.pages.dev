@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Tanki Online Map Editor Demo</title>
+    <title>Tanki Online Map Editor Remaster</title>
     <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet" />
     <style>
@@ -575,6 +575,7 @@ const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
 let scene, camera, renderer, controls, clock, composer;
 let thumbRenderer, thumbScene, thumbCamera;
+let hemiLight, dirLight;
 let editorGroup;
 const modelCache = new Map();
 const textureCache = new Map();
@@ -1077,6 +1078,88 @@ async function parseMapBin(buffer) {
     return result;
 }
 
+function decodeIntColorToHex(intColor) {
+    const r = (intColor >> 16) & 255;
+    const g = (intColor >> 8) & 255;
+    const b = intColor & 255;
+    return (r << 16) | (g << 8) | b;
+}
+
+function parseLightmapData(buffer) {
+    const stream = new BinaryStream(buffer);
+    const version = stream.readUint32(true);
+    if (version !== 2) {
+        console.warn("Unsupported LightmapData version:", version);
+        return null;
+    }
+
+    const lightColorInt = stream.readUint32(true);
+    const ambientColorInt = stream.readUint32(true);
+    const lightAngleX = stream.readFloat32(true);
+    const lightAngleZ = stream.readFloat32(true);
+
+    const lightmapCount = stream.readUint32(true);
+    const lightmaps =[];
+    for (let i = 0; i < lightmapCount; i++) {
+        lightmaps.push(stream.readString());
+    }
+
+    const mapObjectCount = stream.readUint32(true);
+    const mapObjects =[];
+    for (let i = 0; i < mapObjectCount; i++) {
+        const index = stream.readInt32(true);
+        const lightmapIndex = stream.readInt32(true);
+        let lightmapScaleOffset = null;
+        let uv1 = [], uv2 =[];
+        
+        if (lightmapIndex >= 0) {
+            lightmapScaleOffset =[
+                stream.readFloat32(true), stream.readFloat32(true),
+                stream.readFloat32(true), stream.readFloat32(true)
+            ];
+            const hasUVs = stream.readUint8();
+            if (hasUVs > 0) {
+                const vertexCount = stream.readUint32(true);
+                for (let v = 0; v < Math.floor(vertexCount / 2); v++) {
+                    uv1.push([stream.readFloat32(true), stream.readFloat32(true)]);
+                    uv2.push([stream.readFloat32(true), stream.readFloat32(true)]);
+                }
+            }
+        }
+        const castShadows = stream.readUint8() > 0;
+        const receiveShadows = stream.readUint8() > 0;
+
+        mapObjects.push({
+            index, lightmapIndex, lightmapScaleOffset, uv1, uv2, castShadows, receiveShadows
+        });
+    }
+
+    return {
+        version, lightColorInt, ambientColorInt, lightAngleX, lightAngleZ, lightmaps, mapObjects
+    };
+}
+
+function applyLightmapData(data) {
+    if (!data) return;
+    
+    const lightColor = decodeIntColorToHex(data.lightColorInt);
+    const ambientColor = decodeIntColorToHex(data.ambientColorInt);
+
+    if (dirLight) {
+        dirLight.color.setHex(lightColor);
+        const euler = new THREE.Euler(data.lightAngleX, 0, data.lightAngleZ, 'XYZ');
+        dirLight.position.set(0, 0, 1000).applyEuler(euler);
+        dirLight.lookAt(0, 0, 0);
+    }
+
+    if (hemiLight) {
+        hemiLight.color.setHex(ambientColor);
+        hemiLight.groundColor.setHex(ambientColor);
+    } else {
+        scene.background = new THREE.Color(ambientColor);
+    }
+}
+
 function setupMobileFullscreen() {
     const lockScreen = async () => {
         const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
@@ -1261,11 +1344,11 @@ function initThree() {
     
     scene.environmentIntensity = 0.8; 
 
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+    hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
     hemiLight.position.set(0, 1000, 0);
     scene.add(hemiLight);
 
-    const dirLight = new THREE.DirectionalLight(0xffffff, 2.0); 
+    dirLight = new THREE.DirectionalLight(0xffffff, 2.0); 
     dirLight.position.set(-800, 1500, -500);
     dirLight.castShadow = true;
     
@@ -1590,8 +1673,15 @@ function addErrorToUI(fileName, errorMsg) {
     listContainer.insertBefore(item, listContainer.firstChild);
 }
 
-async function processMap(mapData, buildWorld = false, onProgress = null) {
+async function processMap(mapData, buildWorld = false, onProgress = null, lightmapData = null) {
     const propDict = await getPropDict(mapData); 
+
+    let shadowSettings = {};
+    if (lightmapData) {
+        lightmapData.mapObjects.forEach(mo => {
+            shadowSettings[mo.index] = { cast: mo.castShadows, receive: mo.receiveShadows };
+        });
+    }
 
     const uniqueModelToLib = new Map(); 
     const uniqueTexToLib = new Map();
@@ -1945,6 +2035,10 @@ async function processMap(mapData, buildWorld = false, onProgress = null) {
             instanceGroup.userData.originalProps.push(prop);
             
             const sceneMesh = prefabMesh.clone();
+            if (shadowSettings[prop.id]) {
+    sceneMesh.castShadow = shadowSettings[prop.id].cast;
+    sceneMesh.receiveShadow = shadowSettings[prop.id].receive;
+}
             
             const rootMatrix = new THREE.Matrix4().compose(
                 instanceGroup.position,
@@ -2119,12 +2213,21 @@ async function loadMapLibrary(mapName, itemElement) {
             updateUI(p * 0.15); 
         });
 
-        const mapData = await parseMapBin(mapBuf);
-        window.defaultMapProps = mapData.props;
+const mapData = await parseMapBin(mapBuf);
+window.defaultMapProps = mapData.props;
 
-        await processMap(mapData, false, (p) => {
-            updateUI(0.15 + p * 0.85); 
-        });
+let lightmapData = null;
+try {
+    const lmBuf = await fetchFile(`${baseUrl}/lightmapdata`);
+    lightmapData = parseLightmapData(lmBuf);
+    applyLightmapData(lightmapData);
+} catch (e) {
+    console.warn("No lightmapdata found or failed to parse:", e);
+}
+
+await processMap(mapData, false, (p) => {
+    updateUI(0.15 + p * 0.85); 
+}, lightmapData);
 
         updateUI(1);
 
@@ -2583,6 +2686,7 @@ function setupUIEvents() {
         try {
             const mapFile = files.find(f => f.name === 'map.bin' || f.name.endsWith('.bin'));
             const a3dFile = files.find(f => f.name === 'models.a3d' || f.name.endsWith('.a3d'));
+            const lmFile = files.find(f => f.name === 'lightmapdata' || f.name.endsWith('.lightmapdata'));
             
             if (a3dFile) {
                 const a3dBuf = await a3dFile.arrayBuffer();
@@ -2602,11 +2706,21 @@ function setupUIEvents() {
                     }
                 }
             }
-            
-            if (mapFile) {
-                const buffer = await mapFile.arrayBuffer();
-                const mapData = await parseMapBin(buffer);
-                await processMap(mapData, true);
+let lightmapData = null;
+if (lmFile) {
+    try {
+        const lmBuf = await lmFile.arrayBuffer();
+        lightmapData = parseLightmapData(lmBuf);
+        applyLightmapData(lightmapData);
+    } catch (err) {
+        console.warn("Failed to parse local lightmapdata", err);
+    }
+}
+
+if (mapFile) {
+    const buffer = await mapFile.arrayBuffer();
+    const mapData = await parseMapBin(buffer);
+    await processMap(mapData, true, null, lightmapData);
                 
                 if (editorGroup) {
                     editorGroup.updateMatrixWorld(true);

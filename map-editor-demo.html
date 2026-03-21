@@ -471,7 +471,7 @@
                 <span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle;margin-left:4px;">drag_pan</span> Look
             </div>
             <div style="display:flex;gap:6px;justify-content:space-between;margin-top:4px;">
-                <button id="import-btn" class="m3-btn m3-btn-secondary" title="Import map.bin">
+                <button id="import-btn" class="m3-btn m3-btn-secondary" title="Import map.bin / models">
                     <span class="material-symbols-rounded">upload_file</span>
                 </button>
                 <button id="export-btn" class="m3-btn m3-btn-secondary" title="Export map.bin">
@@ -547,8 +547,11 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 const REPO_MAPS = "MapMakersAndProgrammers/tanki-bin-maps";
-const MAP_PATH = "remaster/parmammRemaster";
+const MAP_PATH = "remaster/sandalmmRemaster";
 const REPO_PROPS = "MapMakersAndProgrammers/tanki-prop-libraries";
+
+const MAP_BASE_URL = "https://res.3dtank.com/570/174542/371/104/31526471323603";
+window.currentMapBaseUrl = MAP_BASE_URL;
 
 const loadingScreen = document.getElementById('loading-screen');
 const loadingTextEl = document.getElementById('loading-text');
@@ -562,7 +565,7 @@ const modelCache = new Map();
 const textureCache = new Map();
 const prefabs = new Map();
 const globalLoadedProps = new Set();
-let thumbnailItems = [];
+let thumbnailItems =[];
 let propDictCache = null;
 
 let ghost = null;
@@ -595,20 +598,9 @@ defaultTile.colorSpace = THREE.SRGBColorSpace;
 defaultTile.needsUpdate = true;
 
 function getCleanBaseName(rawName) {
-    const tmpLower = rawName.toLowerCase();
-    
-    const grabUnIdx = tmpLower.indexOf('grab_un_tower');
-    if (grabUnIdx !== -1) return rawName.substring(0, grabUnIdx + 'grab_un_tower'.length);
-
-    const grabFlIdx = tmpLower.indexOf('grab_fl_tower');
-    if (grabFlIdx !== -1) return rawName.substring(0, grabFlIdx + 'grab_fl_tower'.length);
-
-    const riseAIdx = tmpLower.indexOf('rise_a');
-    if (riseAIdx !== -1) return rawName.substring(0, riseAIdx + 'rise_a'.length);
-
     let cleaned = rawName;
-    if (/_sub\d+$/i.test(cleaned)) {
-        cleaned = cleaned.replace(/_sub\d+$/i, '');
+    if (/[-_]sub[-_]?\d+$/i.test(cleaned)) {
+        cleaned = cleaned.replace(/[-_]sub[-_]?\d+$/i, '');
     } else if (/(.*)(_?part\d+[a-z]*)(.*)/i.test(cleaned)) {
         cleaned = cleaned.replace(/_?part\d+[a-z]*/i, '');
         cleaned = cleaned.replace(/__+/g, '_');
@@ -616,6 +608,16 @@ function getCleanBaseName(rawName) {
             cleaned = cleaned.slice(0, -1);
         }
     }
+    const tmpLower = cleaned.toLowerCase();
+    const grabUnIdx = tmpLower.indexOf('grab_un_tower');
+    if (grabUnIdx !== -1) return cleaned.substring(0, grabUnIdx + 'grab_un_tower'.length);
+
+    const grabFlIdx = tmpLower.indexOf('grab_fl_tower');
+    if (grabFlIdx !== -1) return cleaned.substring(0, grabFlIdx + 'grab_fl_tower'.length);
+
+    const riseAIdx = tmpLower.indexOf('rise_a');
+    if (riseAIdx !== -1) return cleaned.substring(0, riseAIdx + 'rise_a'.length);
+
     return cleaned;
 }
 
@@ -645,15 +647,19 @@ function showToast(msg, isError = true) {
     setTimeout(() => { toastEl.style.opacity = '0'; }, 2500);
 }
 
-async function fetchRawFile(repo, branch, path, type = 'arraybuffer') {
-    const url = `https://raw.githubusercontent.com/${repo}/${branch}/${path}`;
+async function fetchFile(url, type = 'arraybuffer') {
     try {
         const res = await fetch(url);
-        if (!res.ok) throw new Error(`HTTP ${res.status}: ${path}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${url}`);
         return type === 'json' ? await res.json() : await res.arrayBuffer();
     } catch (err) {
         throw new Error(`${err.message} (Network Error)`);
     }
+}
+
+async function fetchRawFile(repo, branch, path, type = 'arraybuffer') {
+    const url = `https://raw.githubusercontent.com/${repo}/${branch}/${path}`;
+    return fetchFile(url, type);
 }
 
 class BinaryStream {
@@ -694,7 +700,7 @@ class BinaryStream {
 }
 
 class BinaryWriter {
-    constructor() { this.chunks = []; this.length = 0; }
+    constructor() { this.chunks =[]; this.length = 0; }
     writeUint8(v) { this._add(new Uint8Array([v])); }
     writeUint16(v, le = false) { const b = new Uint8Array(2); new DataView(b.buffer).setUint16(0, v, le); this._add(b); }
     writeUint32(v, le = false) { const b = new Uint8Array(4); new DataView(b.buffer).setUint32(0, v, le); this._add(b); }
@@ -795,17 +801,31 @@ function parseA3D(buffer) {
     stream.readUint32(true);
     stream.readUint32(true);
 
-    const data = { meshes: [] };
+    const data = { meshes:[] };
 
     const matSig = stream.readUint32(true);
     const matLen = stream.readUint32(true); 
     const matCount = stream.readUint32(true);
+    
+    const a3dMaterials =[];
 
     for(let i=0; i<matCount; i++) {
-        if(version===3) { stream.readLengthPrefixedStringA3D(); stream.offset+=12; stream.readLengthPrefixedStringA3D(); }
-        else { stream.readNullTerminatedString(); stream.offset+=12; stream.readNullTerminatedString(); }
+        let matName = "";
+        let texName = "";
+        if(version===3) { 
+            matName = stream.readLengthPrefixedStringA3D(); 
+            stream.offset+=12; 
+            texName = stream.readLengthPrefixedStringA3D(); 
+        } else { 
+            matName = stream.readNullTerminatedString(); 
+            stream.offset+=12; 
+            texName = stream.readNullTerminatedString(); 
+        }
+        a3dMaterials.push({ matName, texName });
     }
     if(version===3) stream.offset += (((matLen + 3) >> 2) << 2) - matLen; 
+    
+    data.a3dMaterials = a3dMaterials;
 
     const meshSig = stream.readUint32(true);
     const meshLen = stream.readUint32(true); 
@@ -815,7 +835,7 @@ function parseA3D(buffer) {
         if(version===3) { stream.readLengthPrefixedStringA3D(); stream.offset += 28; }
         const vertexCount = stream.readUint32(true);
         const vBufCount = stream.readUint32(true);
-        const buffers = [];
+        const buffers =[];
         for(let b=0; b<vBufCount; b++) {
             const bType = stream.readUint32(true);
             const numFloats = A3D_VERTEXTYPE[bType];
@@ -826,14 +846,18 @@ function parseA3D(buffer) {
         }
         
         const submeshCount = stream.readUint32(true);
-        const submeshes = [];
+        const submeshes =[];
+        const v2MatIds =[];
+        
         for(let s=0; s<submeshCount; s++) {
             if(version===2) {
                 const fCount = stream.readUint32(true);
                 const iCount = fCount * 3;
                 const sliceBuf = stream.buffer.slice(stream.offset, stream.offset + iCount * 2);
                 stream.offset += iCount * 2 + fCount * 4; 
-                submeshes.push({ indices: new Uint16Array(sliceBuf.buffer, sliceBuf.byteOffset, iCount), matId: stream.readUint16(true) });
+                const matId = stream.readUint16(true);
+                v2MatIds.push(matId);
+                submeshes.push({ indices: new Uint16Array(sliceBuf.buffer, sliceBuf.byteOffset, iCount), matId: matId });
             } else {
                 const iCount = stream.readUint32(true);
                 const sliceBuf = stream.buffer.slice(stream.offset, stream.offset + iCount * 2);
@@ -844,7 +868,7 @@ function parseA3D(buffer) {
         }
         
         const geo = new THREE.BufferGeometry();
-        let mainIndices = [];
+        let mainIndices =[];
         submeshes.forEach((sm, idx) => {
             const start = mainIndices.length;
             for (let k = 0; k < sm.indices.length; k++) {
@@ -853,6 +877,7 @@ function parseA3D(buffer) {
             geo.addGroup(start, sm.indices.length, idx);
         });
         geo.setIndex(mainIndices);
+        geo.userData.v2MatIds = v2MatIds;
 
         buffers.forEach(buf => {
             if(buf.type === 1) geo.setAttribute('position', new THREE.BufferAttribute(buf.data, 3));
@@ -862,7 +887,8 @@ function parseA3D(buffer) {
             else if(buf.type === 6 && !geo.attributes.normal) geo.setAttribute('normal', new THREE.BufferAttribute(buf.data, 3));
         });
         
-if (!geo.attributes.normal) geo.computeVertexNormals();
+        if (!geo.attributes.uv && geo.attributes.uv2) geo.setAttribute('uv', geo.attributes.uv2);
+        if (!geo.attributes.normal) geo.computeVertexNormals();
         data.meshes.push(geo);
     }
     
@@ -904,21 +930,51 @@ if (!geo.attributes.normal) geo.computeVertexNormals();
                     const objects =[];
                     
                     for (let i = 0; i < objectCount; i++) {
+                        let name = "";
+                        let mID = 0;
+                        let tID = 0;
+                        let matIds =[];
                         if (version === 2) {
-                            stream.readNullTerminatedString(); 
-                            objects.push({ meshID: stream.readUint32(true), transformID: stream.readUint32(true) });
+                            name = stream.readNullTerminatedString(); 
+                            mID = stream.readUint32(true);
+                            tID = stream.readUint32(true);
                         } else {
-                            const mID = stream.readUint32(true), tID = stream.readUint32(true), mCount = stream.readUint32(true);
-                            for (let j = 0; j < mCount; j++) stream.readInt32(true); 
-                            objects.push({ meshID: mID, transformID: tID });
+                            name = stream.readLengthPrefixedStringA3D();
+                            mID = stream.readUint32(true);
+                            tID = stream.readUint32(true);
+                            const mCount = stream.readUint32(true);
+                            for (let j = 0; j < mCount; j++) {
+                                matIds.push(stream.readInt32(true));
+                            }
                         }
+                        objects.push({ name, meshID: mID, transformID: tID, matIds });
                     }
 
-                    for (const obj of objects) {
-                        if (obj.meshID < data.meshes.length && obj.transformID < transforms.length) {
+                    data.namedMeshes = {};
+                    const transformedMeshes =[];
+                    for (let i = 0; i < data.meshes.length; i++) {
+                        transformedMeshes[i] = data.meshes[i].clone();
+                    }
+
+                    for (let i = 0; i < objects.length; i++) {
+                        const obj = objects[i];
+                        if (obj.meshID < transformedMeshes.length && obj.transformID < transforms.length) {
                             const tf = transforms[obj.transformID];
                             const mat = new THREE.Matrix4().compose(tf.pos, tf.quat, tf.scale);
-                            data.meshes[obj.meshID].applyMatrix4(mat);
+                            const geo = transformedMeshes[obj.meshID].clone();
+                            geo.applyMatrix4(mat);
+                            
+                            geo.userData.matIds = obj.matIds;
+                            if (version === 2) {
+                                geo.userData.matIds = geo.userData.v2MatIds ||[];
+                            }
+                            
+                            data.namedMeshes[obj.name] = geo;
+                            data.namedMeshes[`mesh_${i}`] = geo;
+                            
+                            if (i === 0) {
+                                data.meshes[0] = geo;
+                            }
                         }
                     }
                 }
@@ -938,7 +994,7 @@ async function parseMapBin(buffer) {
     const packet = await unwrapPacket(stream);
     
     let headerEndOffset = 0;
-    const fullOriginalBits = [];
+    const fullOriginalBits =[];
     const flags = packet.readUint8();
     if ((flags & 0b10000000) === 0) {
         const intBits = flags << 3;
@@ -953,14 +1009,14 @@ async function parseMapBin(buffer) {
     }
     headerEndOffset = packet.offset;
 
-    const optMask = [...fullOriginalBits].reverse();
+    const optMask =[...fullOriginalBits].reverse();
     let popCount = 0;
     const popBit = () => { popCount++; return optMask.pop(); };
 
     const skipObjectArray = (p, cb) => { const len = p.readStringLength(); for(let i=0; i<len; i++) cb(p); };
-    const readV3 = () => [packet.readFloat32(false), packet.readFloat32(false), packet.readFloat32(false)];
+    const readV3 = () =>[packet.readFloat32(false), packet.readFloat32(false), packet.readFloat32(false)];
 
-    const result = { props: [], materials: {}, atlases: {} };
+    const result = { props:[], materials: {}, atlases: {} };
 
     if (popBit()) {
         const atlasLen = packet.readStringLength();
@@ -1000,7 +1056,7 @@ async function parseMapBin(buffer) {
         if (popBit()) skipObjectArray(packet, p => { p.readString(); p.offset+=4; });
         const shader = packet.readString();
 
-        const texParams = [];
+        const texParams =[];
         const texLen = packet.readStringLength();
         for(let j=0; j<texLen; j++) {
             let libName = null;
@@ -1033,7 +1089,7 @@ async function parseMapBin(buffer) {
         const matID = packet.readUint32(false);
         const name = packet.readString();
         const pos = readV3();
-        const rot = popBit() ? readV3() : [0,0,0];
+        const rot = popBit() ? readV3() :[0,0,0];
         const scale = popBit() ? readV3() : [1,1,1];
         
         result.props.push({ id, grpName, libName, matID, name, pos, rot, scale });
@@ -1417,8 +1473,11 @@ function setupEditorGroup() {
 
 async function loadTexture(repo, branch, path, silent = false, isLinear = false, isRepeating = false) {
     const url = `https://raw.githubusercontent.com/${repo}/${branch}/${path}`;
+    return loadTextureDirect(url, silent, isLinear, isRepeating);
+}
+
+function loadTextureDirect(url, silent = false, isLinear = false, isRepeating = false) {
     const loader = new THREE.TextureLoader();
-    
     return new Promise((resolve) => {
         loader.load(url, (tex) => {
             tex.colorSpace = isLinear ? THREE.LinearSRGBColorSpace : THREE.SRGBColorSpace;
@@ -1525,12 +1584,9 @@ function addPrefabToUI(baseName, group) {
         item.classList.add('active');
         window.isGhostLockedToOriginal = false;
         window.selectPrefab(baseName);
-        if (isTouchDevice) {
-            isUIOpen = false;
-            document.getElementById('ui-container').style.transform = 'translateX(100%)';
-        }
     };
 }
+
 function addErrorToUI(fileName, errorMsg) {
     const listContainer = document.getElementById('prefab-list');
     const item = document.createElement('div');
@@ -1553,31 +1609,42 @@ async function processMap(mapData, buildWorld = false) {
     const uniqueModelToLib = new Map(); 
     const uniqueTexToLib = new Map();
     const repeatingTextures = new Set(); 
+    let needsModelsA3D = false;
+
     for (const prop of mapData.props) {
-        const pInfo = propDict[`${prop.grpName}_${prop.name}`] || propDict[prop.name];
-        if (pInfo) {
-            if (pInfo.mesh && pInfo.mesh.file) {
-                uniqueModelToLib.set(pInfo.mesh.file, prop.libName);
-            }
-            if (pInfo.textures) {
-                for (let t of pInfo.textures) {
-                    if (t.diffuseMap) uniqueTexToLib.set(t.diffuseMap, prop.libName);
+        if (!prop.libName) {
+            needsModelsA3D = true;
+        } else {
+            const pInfo = propDict[`${prop.grpName}_${prop.name}`] || propDict[prop.name];
+            if (pInfo) {
+                if (pInfo.mesh && pInfo.mesh.file) {
+                    uniqueModelToLib.set(pInfo.mesh.file, prop.libName);
+                }
+                if (pInfo.textures) {
+                    for (let t of pInfo.textures) {
+                        if (t.diffuseMap) uniqueTexToLib.set(t.diffuseMap, prop.libName);
+                    }
                 }
             }
+        }
+    }
+
+    if (mapData.atlases) {
+        for (const atlasName of Object.keys(mapData.atlases)) {
+            uniqueTexToLib.set(atlasName, null);
         }
     }
 
     for (const mat of Object.values(mapData.materials)) {
         for (const param of mat.texParams) {
             uniqueTexToLib.set(param.texName, param.libName);
-        
-            if (param.name.startsWith('_Splat')) {
+            if (param.name.toLowerCase().includes('splat')) {
                 repeatingTextures.add(param.texName);
             }
         }
     }
 
-    log(`Downloading models and textures...`);
+    log(`Loading models and textures...`);
     
     const modelPromises = Array.from(uniqueModelToLib.entries()).map(async ([file, libName]) => {
         if (!modelCache.has(file)) {
@@ -1585,19 +1652,27 @@ async function processMap(mapData, buildWorld = false) {
                 if (file.toLowerCase().endsWith('.a3d')) {
                     let a3dBuf;
                     try {
-                        a3dBuf = await fetchRawFile(REPO_PROPS, 'main', `html5/${libName}/${file}`);
+                        if (libName) {
+                            a3dBuf = await fetchRawFile(REPO_PROPS, 'main', `html5/${libName}/${file}`);
+                        } else {
+                            a3dBuf = await fetchFile(`${window.currentMapBaseUrl}/${file}`);
+                        }
                     } catch (fetchErr) {
                         const lowerFile = file.toLowerCase();
                         if (file !== lowerFile) {
                             console.warn(`[Case Fallback] Cannot find ${file}, trying lowercase: ${lowerFile}`);
-                            a3dBuf = await fetchRawFile(REPO_PROPS, 'main', `html5/${libName}/${lowerFile}`);
+                            if (libName) {
+                                a3dBuf = await fetchRawFile(REPO_PROPS, 'main', `html5/${libName}/${lowerFile}`);
+                            } else {
+                                a3dBuf = await fetchFile(`${window.currentMapBaseUrl}/${lowerFile}`);
+                            }
                         } else {
                             throw fetchErr; 
                         }
                     }
                     
                     const a3dData = parseA3D(a3dBuf);
-                    if (a3dData.meshes.length > 0) modelCache.set(file, a3dData.meshes[0]);
+                    modelCache.set(file, a3dData);
                 }
             } catch (e) {
                 console.error(`[Missing Model] ${file} -> ${e.message}`);
@@ -1606,21 +1681,45 @@ async function processMap(mapData, buildWorld = false) {
         }
     });
 
+    if (needsModelsA3D && !modelCache.has('models.a3d')) {
+        modelPromises.push((async () => {
+            try {
+                const mapBaseUrl = window.currentMapBaseUrl || MAP_BASE_URL;
+                const a3dBuf = await fetchFile(`${mapBaseUrl}/models.a3d`);
+                const a3dData = parseA3D(a3dBuf);
+                modelCache.set('models.a3d', a3dData);
+            } catch (e) {
+                console.error(`Failed to load models.a3d:`, e.message);
+                addErrorToUI('models.a3d', e.message);
+            }
+        })());
+    }
+
     const texPromises = Array.from(uniqueTexToLib.entries()).map(async ([texName, libName]) => {
         if (!textureCache.has(texName)) {
-            const isControl = texName.includes('-control'); 
+            const isControl = texName.includes('-control') || texName.includes('_Control'); 
             const isRepeat = repeatingTextures.has(texName);
             let tex = null;
 
+            let cleanTexName = texName;
+            if (cleanTexName.toLowerCase().endsWith('.webp') || cleanTexName.toLowerCase().endsWith('.png') || cleanTexName.toLowerCase().endsWith('.jpg') || cleanTexName.toLowerCase().endsWith('.ktx')) {
+                cleanTexName = cleanTexName.substring(0, cleanTexName.lastIndexOf('.'));
+            }
+
             if (libName) {
-                tex = await loadTexture(REPO_PROPS, 'main', `html5/${libName}/${texName}.webp`, true, isControl, isRepeat);
+                tex = await loadTexture(REPO_PROPS, 'main', `html5/${libName}/${cleanTexName}.webp`, true, isControl, isRepeat);
             }
 
             if (!tex) {
-                tex = await loadTexture(REPO_MAPS, 'master', `${MAP_PATH}/${texName}.webp`, true, isControl, isRepeat);
+                const mapBaseUrl = window.currentMapBaseUrl || MAP_BASE_URL;
+                tex = await loadTextureDirect(`${mapBaseUrl}/${cleanTexName}.webp`, true, isControl, isRepeat);
             }
 
-            if (tex) textureCache.set(texName, tex);
+            if (!tex) {
+                tex = await loadTexture(REPO_MAPS, 'master', `${MAP_PATH}/${cleanTexName}.webp`, true, isControl, isRepeat);
+            }
+
+            if (tex) textureCache.set(texName, tex); 
         }
     });
 
@@ -1634,7 +1733,7 @@ async function processMap(mapData, buildWorld = false) {
             currentPrefabGroup = null;
             document.querySelector('.grid-floating-panel').style.display = 'none';
         }
-        const toRemove = [];
+        const toRemove =[];
         editorGroup.children.forEach(child => {
             toRemove.push(child);
         });
@@ -1661,20 +1760,30 @@ async function processMap(mapData, buildWorld = false) {
         const isDisplay = lowerName.startsWith('display');
         const trackMatch = lowerName.match(/^(lb|lf|rb|rf)_track(.*)$/);
 
+        let parentRawPos = prop.pos;
+        let parentRawRot = prop.rot;
+
         if (isDisplay || trackMatch) {
             let originalMainName = null;
             let expectedBodyLower = trackMatch ? 'body' + trackMatch[2] : '';
+            let minDist = Infinity;
 
             for (let j = 0; j < mapData.props.length; j++) {
-                let n = getCleanBaseName(mapData.props[j].name);
+                let p2 = mapData.props[j];
+                let n = getCleanBaseName(p2.name);
                 const nLower = n.toLowerCase();
                 
-                if (isDisplay && nLower.startsWith('billboard')) {
-                    originalMainName = n;
-                    break;
-                } else if (trackMatch && nLower === expectedBodyLower) {
-                    originalMainName = n;
-                    break;
+                if ((isDisplay && nLower.startsWith('billboard')) || (trackMatch && nLower === expectedBodyLower)) {
+                    let dx = p2.pos[0] - prop.pos[0];
+                    let dy = p2.pos[1] - prop.pos[1];
+                    let dz = p2.pos[2] - prop.pos[2];
+                    let dist = dx*dx + dy*dy + dz*dz;
+                    if (dist < minDist) { 
+                        minDist = dist;
+                        originalMainName = n;
+                        parentRawPos = p2.pos;
+                        parentRawRot = p2.rot;
+                    }
                 }
             }
             
@@ -1685,41 +1794,122 @@ async function processMap(mapData, buildWorld = false) {
             }
         }
 
-        const pInfo = propDict[`${prop.grpName}_${prop.name}`] || propDict[prop.name];
-        const file = pInfo && pInfo.mesh ? pInfo.mesh.file : null;
-        
-        let geometry = file ? modelCache.get(file) : null;
+        let geometry = null;
+        let pInfo = null;
+        let file = null;
+        let a3dData = null;
+
+        if (!prop.libName) {
+            a3dData = modelCache.get('models.a3d');
+            if (a3dData && a3dData.namedMeshes) {
+                geometry = a3dData.namedMeshes[prop.name];
+                if (!geometry) {
+                    const matchedKey = Object.keys(a3dData.namedMeshes).find(k => k.toLowerCase() === prop.name.toLowerCase());
+                    if (matchedKey) geometry = a3dData.namedMeshes[matchedKey];
+                }
+            }
+        } else {
+            pInfo = propDict[`${prop.grpName}_${prop.name}`] || propDict[prop.name];
+            file = pInfo && pInfo.mesh ? pInfo.mesh.file : null;
+            if (file && modelCache.has(file)) {
+                a3dData = modelCache.get(file);
+                if (a3dData) {
+                    if (a3dData.namedMeshes && Object.keys(a3dData.namedMeshes).length > 0) {
+                        geometry = Object.values(a3dData.namedMeshes)[0];
+                    } else if (a3dData.meshes && a3dData.meshes.length > 0) {
+                        geometry = a3dData.meshes[0];
+                    }
+                }
+            }
+        }
+
         if (!geometry) continue;
         
         const matInfo = mapData.materials[prop.matID];
-        const isSprite = matInfo && matInfo.shader.includes("Sprite");
 
         let controlTexName = null;
         let baseTexName = null;
         if (matInfo && matInfo.texParams) {
-            const pControl = matInfo.texParams.find(p => p.name === '_Control');
+            const pControl = matInfo.texParams.find(p => p.name === '_Control' || p.name === '_ControlTex');
             if (pControl) controlTexName = pControl.texName;
 
-            const pBase = matInfo.texParams.find(p => p.name === '_BaseMap' || p.name === '_MainTex');
-            if (pBase) baseTexName = pBase.texName;
+            const pBase = matInfo.texParams.find(p => {
+                const n = p.name.toLowerCase();
+                return n.includes('base') || n.includes('main') || n.includes('albedo') || n.includes('diffuse') || n === 'tex' || n === '_map';
+            });
+            if (pBase) {
+                baseTexName = pBase.texName;
+            } else if (matInfo.texParams.length > 0) {
+                const fallback = matInfo.texParams.find(p => {
+                    const n = p.name.toLowerCase();
+                    return !n.includes('splat') && !n.includes('control') && !n.includes('normal') && !n.includes('bump');
+                });
+                if (fallback) baseTexName = fallback.texName;
+                else baseTexName = matInfo.texParams[0].texName;
+            }
         }
 
-        if (!baseTexName && pInfo && pInfo.textures && pInfo.textures.length > 0) {
+        if (!baseTexName && prop.libName && pInfo && pInfo.textures && pInfo.textures.length > 0) {
             const fallbackTex = pInfo.textures.find(t => t.diffuseMap && !t.diffuseMap.includes('-control'));
             if (fallbackTex) baseTexName = fallbackTex.diffuseMap;
         }
-        if (!controlTexName && pInfo && pInfo.textures && pInfo.textures.length > 0) {
+        if (!controlTexName && prop.libName && pInfo && pInfo.textures && pInfo.textures.length > 0) {
             const fallbackCtrl = pInfo.textures.find(t => t.diffuseMap && t.diffuseMap.includes('-control'));
             if (fallbackCtrl) controlTexName = fallbackCtrl.diffuseMap;
         }
 
-        const instGeo = geometry.clone();
-        let mat;
-        const isTerrainMesh = file.toLowerCase().includes('terrain');
+        const isTerrainMesh = (file && file.toLowerCase().includes('terrain')) || prop.name.toLowerCase().includes('terrain');
         const hasControlMap = !!controlTexName;
 
-        const matCacheKey = `${isTerrainMesh}_${controlTexName}_${baseTexName}_${prop.matID}_${prop.libName}_${prop.name}`;
+        let targetTexName = baseTexName;
+        let atlasRect = null;
+        let atlasInfo = null;
 
+        let matName1 = null;
+        let matName2 = null;
+        if (a3dData && geometry && geometry.userData) {
+            let matIds = geometry.userData.matIds;
+            if (!matIds || matIds.length === 0) matIds = geometry.userData.v2MatIds;
+            if (matIds && matIds.length > 0) {
+                const mObj = a3dData.a3dMaterials ? a3dData.a3dMaterials[matIds[0]] : null;
+                if (mObj) {
+                    matName1 = mObj.matName;
+                    matName2 = mObj.texName;
+                }
+            }
+        }
+
+        const cleanStr = (s) => {
+            if (!s) return null;
+            let c = s.replace(/\\/g, '/').split('/').pop();
+            if (c.indexOf('.') !== -1) c = c.substring(0, c.lastIndexOf('.'));
+            return c;
+        };
+        matName1 = cleanStr(matName1);
+        matName2 = cleanStr(matName2);
+
+        const possibleKeys =[
+            matName1, matName2, prop.name, baseName, baseTexName
+        ].filter(Boolean).map(s => s.toLowerCase());
+
+        if (mapData.atlases) {
+            for (const [aName, aInfo] of Object.entries(mapData.atlases)) {
+                for (const [rectKey, rect] of Object.entries(aInfo.rects)) {
+                    const lowerKey = rectKey.toLowerCase();
+                    if (possibleKeys.some(pk => lowerKey === pk || lowerKey === `_${pk}` || lowerKey.endsWith(pk))) {
+                        atlasRect = rect;
+                        atlasInfo = aInfo;
+                        targetTexName = aName; 
+                        break;
+                    }
+                }
+                if (atlasRect) break;
+            }
+        }
+
+        const matCacheKey = `${isTerrainMesh}_${controlTexName}_${targetTexName}_${prop.matID}_${prop.libName}_${prop.name}`;
+
+        let mat;
         if (materialCache.has(matCacheKey)) {
             mat = materialCache.get(matCacheKey);
         } else {
@@ -1863,26 +2053,30 @@ async function processMap(mapData, buildWorld = false) {
                     depthWrite: true
                 });
 
-                if (baseTexName) {
-                    const diffTex = textureCache.get(baseTexName);
-                    if (diffTex) mat.map = diffTex;
+                if (targetTexName) {
+                    const diffTex = textureCache.get(targetTexName);
+                    if (diffTex) {
+                        mat.map = diffTex;
+                    } else {
+                        mat.color.setHex(0xaaaaaa);
+                        mat.map = defaultTile; 
+                    }
+                } else {
+                    mat.color.setHex(0xaaaaaa);
+                    mat.map = defaultTile;
                 }
             }
             materialCache.set(matCacheKey, mat);
         }
 
-        let atlasRect = null, atlasInfo = null;
-        if (baseTexName && mapData.atlases[baseTexName]) {
-            atlasInfo = mapData.atlases[baseTexName];
-            atlasRect = atlasInfo.rects[`${prop.libName}_${prop.name}`];
-        }
+        const instGeo = geometry.clone();
 
         if (instGeo.attributes.uv && atlasRect && atlasInfo) {
             const uv = instGeo.attributes.uv.clone();
             let sx = atlasRect.w / atlasInfo.width;
             let sy = atlasRect.h / atlasInfo.height;
             let ox = atlasRect.x / atlasInfo.width;
-            let oy = atlasRect.y / atlasInfo.height;
+            let oy = atlasRect.y / atlasInfo.height; 
             
             for(let u=0; u<uv.array.length; u+=2) {
                 uv.array[u] = uv.array[u] * sx + ox;
@@ -1896,98 +2090,73 @@ async function processMap(mapData, buildWorld = false) {
         prefabMesh.receiveShadow = true;
         prefabMesh.scale.set(prop.scale[0], prop.scale[1], prop.scale[2]);
 
-        if (buildWorld && originalMapGroup) {
-            let instanceKey;
-            if (prop.grpName && prop.grpName.trim() !== "") {
-                instanceKey = `${baseName}_grp_${prop.grpName}`;
-            } else {
-                let snap = 1;
-                const lowerBase = baseName.toLowerCase();
-                if (lowerBase === 'rise_a' || lowerBase === 'grab_un_tower' || lowerBase === 'grab_fl_tower') {
-                    snap = 2000;
-                }
-                
-                const px = Math.round(prop.pos[0] / snap) * snap;
-                const py = Math.round(prop.pos[1] / snap) * snap;
-                const pz = Math.round(prop.pos[2] / snap) * snap;
-                instanceKey = `${baseName}_${px}_${py}_${pz}`;
-            }
-            
-            if (!originalInstancesMap.has(instanceKey)) {
+        let targetInstanceGroup = null;
+
+        if (prop.grpName && prop.grpName.trim() !== "") {
+            const key = `${baseName}_grp_${prop.grpName}`;
+            if (!originalInstancesMap.has(key)) {
                 const grp = new THREE.Group();
                 grp.position.set(prop.pos[0], prop.pos[1], prop.pos[2]);
                 grp.rotation.set(prop.rot[0], prop.rot[1], prop.rot[2], 'ZYX');
                 grp.userData.baseName = baseName;
-                grp.userData.originalProps = [];
-                originalInstancesMap.set(instanceKey, grp);
+                grp.userData.originalProps =[];
+                grp.userData.isGroupedByName = true;
+                originalInstancesMap.set(key, grp);
             }
-            
-            const instanceGroup = originalInstancesMap.get(instanceKey);
-            instanceGroup.userData.originalProps.push(prop);
-            
-            const sceneMesh = prefabMesh.clone();
-            
-            const rootMatrix = new THREE.Matrix4().compose(
-                instanceGroup.position,
-                instanceGroup.quaternion,
-                new THREE.Vector3(1, 1, 1)
-            );
-            const propMatrix = new THREE.Matrix4().compose(
-                new THREE.Vector3(prop.pos[0], prop.pos[1], prop.pos[2]),
-                new THREE.Quaternion().setFromEuler(new THREE.Euler(prop.rot[0], prop.rot[1], prop.rot[2], 'ZYX')),
-                new THREE.Vector3(1, 1, 1)
-            );
-            const localMatrix = propMatrix.premultiply(rootMatrix.invert());
-            
-            localMatrix.decompose(sceneMesh.position, sceneMesh.quaternion, new THREE.Vector3());
-            instanceGroup.add(sceneMesh);
+            targetInstanceGroup = originalInstancesMap.get(key);
+        } else {
+            const px = Math.round(parentRawPos[0]);
+            const py = Math.round(parentRawPos[1]);
+            const pz = Math.round(parentRawPos[2]);
+            const key = `${baseName}_${px}_${py}_${pz}`;
+
+            if (!originalInstancesMap.has(key)) {
+                const grp = new THREE.Group();
+                grp.position.set(parentRawPos[0], parentRawPos[1], parentRawPos[2]);
+                grp.rotation.set(parentRawRot[0], parentRawRot[1], parentRawRot[2], 'ZYX');
+                grp.userData.baseName = baseName;
+                grp.userData.originalProps =[];
+                grp.userData.isGroupedByName = false;
+                originalInstancesMap.set(key, grp);
+            }
+            targetInstanceGroup = originalInstancesMap.get(key);
         }
 
-        if (!globalLoadedProps.has(prop.name)) {
-            if (!prefabs.has(baseName)) {
-                const group = new THREE.Group();
-                group.userData.originalProps = [];
-                group.userData.rootPos = new THREE.Vector3(prop.pos[0], prop.pos[1], prop.pos[2]);
-                group.userData.rootRot = new THREE.Euler(prop.rot[0], prop.rot[1], prop.rot[2], 'ZYX');
-                prefabs.set(baseName, group);
-            }
-            
-            const group = prefabs.get(baseName);
-            const currentPos = new THREE.Vector3(prop.pos[0], prop.pos[1], prop.pos[2]);
-            const dist = group.userData.rootPos.distanceTo(currentPos);
-            
-            if (dist < 3000) {
-                globalLoadedProps.add(prop.name);
-                group.userData.originalProps.push(prop);
-
-                const rootMatrix = new THREE.Matrix4().compose(
-                    group.userData.rootPos,
-                    new THREE.Quaternion().setFromEuler(group.userData.rootRot),
-                    new THREE.Vector3(1, 1, 1)
-                );
-                
-                const propMatrix = new THREE.Matrix4().compose(
-                    currentPos,
-                    new THREE.Quaternion().setFromEuler(new THREE.Euler(prop.rot[0], prop.rot[1], prop.rot[2], 'ZYX')),
-                    new THREE.Vector3(1, 1, 1)
-                );
-
-                const localMatrix = propMatrix.premultiply(rootMatrix.invert());
-                
-                const localPos = new THREE.Vector3();
-                const localQuat = new THREE.Quaternion();
-                localMatrix.decompose(localPos, localQuat, new THREE.Vector3());
-
-                prefabMesh.position.copy(localPos);
-                prefabMesh.quaternion.copy(localQuat);
-                
-                group.add(prefabMesh);
-            }
-        }
+        targetInstanceGroup.userData.originalProps.push(prop);
+        
+        const sceneMesh = prefabMesh.clone();
+        const rootMatrix = new THREE.Matrix4().compose(
+            targetInstanceGroup.position,
+            targetInstanceGroup.quaternion,
+            new THREE.Vector3(1, 1, 1)
+        );
+        const propMatrix = new THREE.Matrix4().compose(
+            new THREE.Vector3(prop.pos[0], prop.pos[1], prop.pos[2]),
+            new THREE.Quaternion().setFromEuler(new THREE.Euler(prop.rot[0], prop.rot[1], prop.rot[2], 'ZYX')),
+            new THREE.Vector3(1, 1, 1)
+        );
+        const localMatrix = propMatrix.premultiply(rootMatrix.invert());
+        localMatrix.decompose(sceneMesh.position, sceneMesh.quaternion, new THREE.Vector3());
+        targetInstanceGroup.add(sceneMesh);
     }
-    if (buildWorld && originalMapGroup) {
-        for (const grp of originalInstancesMap.values()) {
+    
+    for (const grp of originalInstancesMap.values()) {
+        if (buildWorld && originalMapGroup) {
             originalMapGroup.add(grp);
+        }
+        
+        const bName = grp.userData.baseName;
+        if (!prefabs.has(bName)) {
+            const prefabTemplate = new THREE.Group();
+            prefabTemplate.userData.originalProps = JSON.parse(JSON.stringify(grp.userData.originalProps));
+            prefabTemplate.userData.rootPos = new THREE.Vector3(0,0,0);
+            prefabTemplate.userData.rootRot = new THREE.Euler(0,0,0);
+            
+            grp.children.forEach(mesh => {
+                prefabTemplate.add(mesh.clone());
+            });
+            
+            prefabs.set(bName, prefabTemplate);
         }
     }
     
@@ -2005,7 +2174,17 @@ async function loadMain() {
         setupEditorGroup();
         
         await showLoading("Fetching default map catalog...");
-        const mapBuf = await fetchRawFile(REPO_MAPS, 'master', `${MAP_PATH}/map.bin`);
+        
+        let mapBuf;
+        try {
+            mapBuf = await fetchFile(`${MAP_BASE_URL}/map.bin`);
+            window.currentMapBaseUrl = MAP_BASE_URL;
+        } catch (e) {
+            console.warn("Failed to fetch from 3dtank, falling back to GitHub...");
+            mapBuf = await fetchRawFile(REPO_MAPS, 'master', `${MAP_PATH}/map.bin`);
+            window.currentMapBaseUrl = `https://raw.githubusercontent.com/${REPO_MAPS}/master/${MAP_PATH}`;
+        }
+        
         const mapData = await parseMapBin(mapBuf);
         window.defaultMapProps = mapData.props;
         
@@ -2043,6 +2222,82 @@ document.addEventListener('visibilitychange', () => {
         }, 200);
     }
 });
+
+window.selectPrefab = function(baseName) {
+    try {
+        if (ghost) {
+            editorGroup.remove(ghost);
+            ghost = null;
+            if (window.originalObjectBeingMoved) {
+                if (window.originalObjectParent) {
+                    window.originalObjectParent.add(window.originalObjectBeingMoved);
+                } else {
+                    editorGroup.add(window.originalObjectBeingMoved);
+                }
+                window.originalObjectBeingMoved = null;
+                window.originalObjectParent = null;
+            }
+        }
+        
+        window.isContinuousCopyEnabled = false;
+        const copyBtn = document.getElementById('continuous-copy-btn');
+        if (copyBtn) copyBtn.className = 'm3-btn m3-btn-secondary';
+        
+        window.dragMode = 'none';
+        if (window.updateDragModeUI) window.updateDragModeUI();
+
+        currentPrefabGroup = prefabs.get(baseName);
+        window.currentBaseName = baseName;
+        
+        if (currentPrefabGroup) {
+            ghost = currentPrefabGroup.clone();
+            ghost.rotation.order = 'ZYX';
+            
+            ghost.traverse(child => {
+                if (child.isMesh && child.material) {
+                    try {
+                        const origMat = child.material;
+                        if (Array.isArray(origMat)) {
+                            child.material = origMat.map(m => {
+                                const c = m.clone();
+                                if (m.onBeforeCompile) c.onBeforeCompile = m.onBeforeCompile;
+                                if (m.customProgramCacheKey) c.customProgramCacheKey = m.customProgramCacheKey;
+                                c.transparent = true; c.opacity = 0.7; c.depthWrite = false;
+                                return c;
+                            });
+                            child.userData.origColor = 0xffffff; 
+                        } else {
+                            child.material = origMat.clone();
+                            if (origMat.onBeforeCompile) child.material.onBeforeCompile = origMat.onBeforeCompile;
+                            if (origMat.customProgramCacheKey) child.material.customProgramCacheKey = origMat.customProgramCacheKey;
+                            child.material.transparent = true;
+                            child.material.opacity = 0.7;
+                            child.material.depthWrite = false;
+                            child.userData.origColor = child.material.color ? child.material.color.getHex() : 0xffffff;
+                        }
+                    } catch (matErr) {
+                        console.warn("Material cloning bypassed for safety", matErr);
+                    }
+                }
+            });
+            editorGroup.add(ghost);
+            if (!window.isGhostLockedToOriginal) {
+                updateGhost(currentMousePos.x, currentMousePos.y);
+            }
+            const fp = document.querySelector('.grid-floating-panel');
+            if (fp) fp.style.display = 'flex';
+        }
+
+        if (isTouchDevice) {
+            isUIOpen = false;
+            const ui = document.getElementById('ui-container');
+            if (ui) ui.style.transform = 'translateX(100%)';
+        }
+    } catch(err) {
+        console.error("Critical error in selectPrefab:", err);
+        showToast(`Error: ${err.message}`);
+    }
+};
 
 function setupUIEvents() {
     const uiContainer = document.getElementById('ui-container');
@@ -2163,28 +2418,54 @@ function setupUIEvents() {
     });
     
     fileInput.addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
         
         await showLoading("Loading custom map...");
         try {
-            const buffer = await file.arrayBuffer();
-            const mapData = await parseMapBin(buffer);
-            await processMap(mapData, true);
+            const mapFile = files.find(f => f.name === 'map.bin' || f.name.endsWith('.bin'));
+            const a3dFile = files.find(f => f.name === 'models.a3d' || f.name.endsWith('.a3d'));
             
-            if (editorGroup) {
-                editorGroup.updateMatrixWorld(true);
-                const box = new THREE.Box3().setFromObject(editorGroup, true);
-                if (!box.isEmpty() && box.min.x !== Infinity) {
-                    const center = box.getCenter(new THREE.Vector3());
-                    const size = box.getSize(new THREE.Vector3());
-                    const maxDim = Math.max(size.x, size.z);
-                    const fov = camera.fov * (Math.PI / 180);
-                    let cameraDistance = Math.abs(maxDim / 2 / Math.tan(fov / 2));
-                    cameraDistance = Math.max(cameraDistance, 50) * 1.2;
-                    camera.position.set(center.x, center.y + cameraDistance * 0.6, center.z + cameraDistance);
-                    camera.lookAt(center);
+            if (a3dFile) {
+                const a3dBuf = await a3dFile.arrayBuffer();
+                const a3dData = parseA3D(a3dBuf);
+                modelCache.set('models.a3d', a3dData);
+            }
+
+            for (const file of files) {
+                if (file.name.endsWith('.webp') || file.name.endsWith('.png') || file.name.endsWith('.jpg')) {
+                    const url = URL.createObjectURL(file);
+                    let texName = file.name;
+                    texName = texName.substring(0, texName.lastIndexOf('.'));
+                    const isCtrl = texName.includes('-control') || texName.includes('_Control');
+                    const tex = await loadTextureDirect(url, false, isCtrl, false);
+                    if (tex) {
+                        textureCache.set(texName, tex);
+                    }
                 }
+            }
+            
+            if (mapFile) {
+                const buffer = await mapFile.arrayBuffer();
+                const mapData = await parseMapBin(buffer);
+                await processMap(mapData, true);
+                
+                if (editorGroup) {
+                    editorGroup.updateMatrixWorld(true);
+                    const box = new THREE.Box3().setFromObject(editorGroup, true);
+                    if (!box.isEmpty() && box.min.x !== Infinity) {
+                        const center = box.getCenter(new THREE.Vector3());
+                        const size = box.getSize(new THREE.Vector3());
+                        const maxDim = Math.max(size.x, size.z);
+                        const fov = camera.fov * (Math.PI / 180);
+                        let cameraDistance = Math.abs(maxDim / 2 / Math.tan(fov / 2));
+                        cameraDistance = Math.max(cameraDistance, 50) * 1.2;
+                        camera.position.set(center.x, center.y + cameraDistance * 0.6, center.z + cameraDistance);
+                        camera.lookAt(center);
+                    }
+                }
+            } else {
+                showToast("No map.bin selected!");
             }
         } catch (err) {
             log(`Import error: ${err.message}`);
@@ -2217,7 +2498,7 @@ function setupUIEvents() {
 
     dialogConfirmBtn.addEventListener('click', () => {
         closeDialog();
-        const toRemove = [];
+        const toRemove =[];
         editorGroup.children.forEach(child => {
             toRemove.push(child);
         });
@@ -2704,191 +2985,6 @@ function setupUIEvents() {
     });
 }
 
-async function generateMapBin() {
-    if (!window.repackingData) throw new Error("Repacking data not initialized");
-    
-    const newPropBits =[];
-    const bw = new BinaryWriter();
-    const propsToWrite =[];
-  
-    let globalIdCounter = 0; 
-  
-    let originalMapGrp = editorGroup.children.find(c => c.userData.isOriginalMapGroup);
-    if (originalMapGrp) {
-        for (const child of originalMapGrp.children) {
-            if (child.userData.originalProps && child.userData.originalProps.length > 0) {
-                let meshIdx = 0;
-                for (const origProp of child.userData.originalProps) {
-                   
-                    const mesh = child.children[meshIdx++];
-                    const partMatrix = new THREE.Matrix4().multiplyMatrices(child.matrixWorld, mesh.matrix);
-                    const rawMatrix = partMatrix.premultiply(editorGroup.matrixWorld.clone().invert());
-                    
-                    const pos = new THREE.Vector3();
-                    const quat = new THREE.Quaternion();
-                    rawMatrix.decompose(pos, quat, new THREE.Vector3());
-                    const euler = new THREE.Euler().setFromQuaternion(quat, 'ZYX');
-
-                    propsToWrite.push({
-                        ...origProp,
-                        id: globalIdCounter++,
-                        pos:[pos.x, pos.y, pos.z],
-                        rot:[euler.x, euler.y, euler.z]
-                    });
-                }
-            }
-        }
-    }
-
-    let instanceIndex = 1;
-    for (const child of editorGroup.children) {
-        if (child === ghost || child.userData.isOriginalMapGroup) continue;  
-        
-        if (child.userData.originalProps) {
-            let meshIdx = 0;
-            for (const origProp of child.userData.originalProps) {
-                const mesh = child.children[meshIdx++];
-                const partMatrix = new THREE.Matrix4().multiplyMatrices(child.matrixWorld, mesh.matrix);
-                const rawMatrix = partMatrix.premultiply(editorGroup.matrixWorld.clone().invert());
-                
-                const pos = new THREE.Vector3();
-                const quat = new THREE.Quaternion();
-                rawMatrix.decompose(pos, quat, new THREE.Vector3());
-                const euler = new THREE.Euler().setFromQuaternion(quat, 'ZYX');
-
-                let outGrpName = origProp.grpName;
-                if (outGrpName && outGrpName !== "") {
-                    outGrpName = outGrpName + "_inst" + instanceIndex;
-                }
-                propsToWrite.push({
-                    ...origProp,
-                    grpName: outGrpName,
-                    id: globalIdCounter++,
-                    pos:[pos.x, pos.y, pos.z],
-                    rot:[euler.x, euler.y, euler.z],
-                    scale: origProp.scale 
-                });
-            }
-            instanceIndex++;
-        }
-    }
-    
-    bw.writeStringLength(propsToWrite.length);
-    for (const p of propsToWrite) {
-        if (p.grpName && p.grpName !== "") {
-            newPropBits.push(true);
-            bw.writeString(p.grpName);
-        } else {
-            newPropBits.push(false);
-        }
-        
-        bw.writeUint32(p.id, false);
-        bw.writeString(p.libName);
-        bw.writeUint32(p.matID, false);
-        bw.writeString(p.name);
-        
-        bw.writeFloat32(p.pos[0], false);
-        bw.writeFloat32(p.pos[1], false);
-        bw.writeFloat32(p.pos[2], false);
-  
-        const isRotZero = (Math.abs(p.rot[0]) < 1e-5 && Math.abs(p.rot[1]) < 1e-5 && Math.abs(p.rot[2]) < 1e-5);
-        if (!isRotZero) {
-            newPropBits.push(true);
-            bw.writeFloat32(p.rot[0], false);
-            bw.writeFloat32(p.rot[1], false);
-            bw.writeFloat32(p.rot[2], false);
-        } else {
-            newPropBits.push(false);
-        }
-  
-        const isScaleOne = (Math.abs(p.scale[0]-1) < 1e-5 && Math.abs(p.scale[1]-1) < 1e-5 && Math.abs(p.scale[2]-1) < 1e-5);
-        if (!isScaleOne) {
-            newPropBits.push(true);
-            bw.writeFloat32(p.scale[0], false);
-            bw.writeFloat32(p.scale[1], false);
-            bw.writeFloat32(p.scale[2], false);
-        } else {
-            newPropBits.push(false);
-        }
-    }
-    
-    const finalBits =[
-        ...window.repackingData.consumedBitsBeforeProps, 
-        ...newPropBits,
-        ...window.repackingData.suffixBits
-    ];
-    const header = packHeader(finalBits);
-    
-    const uncompressedLen = header.headerPrefix.length + 
-                            header.extBytes.length + 
-                            window.repackingData.prefixBytes.length + 
-                            bw.length + 
-                            window.repackingData.suffixBytes.length; 
-    
-    const uncompressed = new Uint8Array(uncompressedLen);
-    let offset = 0;
-    
-    uncompressed.set(header.headerPrefix, offset); offset += header.headerPrefix.length;
-    uncompressed.set(header.extBytes, offset); offset += header.extBytes.length;
-    uncompressed.set(window.repackingData.prefixBytes, offset); offset += window.repackingData.prefixBytes.length;
-    uncompressed.set(bw.toUint8Array(), offset); offset += bw.length; 
-    uncompressed.set(window.repackingData.suffixBytes, offset); 
-    
-    return await wrapPacketCompressed(uncompressed);
-}
-
-window.selectPrefab = function(baseName) {
-    if (ghost) {
-        editorGroup.remove(ghost);
-        ghost = null;
-        if (window.originalObjectBeingMoved) {
-            if (window.originalObjectParent) {
-                window.originalObjectParent.add(window.originalObjectBeingMoved);
-            } else {
-                editorGroup.add(window.originalObjectBeingMoved);
-            }
-            window.originalObjectBeingMoved = null;
-            window.originalObjectParent = null;
-        }
-    }
-    
-    window.isContinuousCopyEnabled = false;
-    const copyBtn = document.getElementById('continuous-copy-btn');
-    if (copyBtn) copyBtn.className = 'm3-btn m3-btn-secondary';
-    
-    window.dragMode = 'none';
-    if (window.updateDragModeUI) window.updateDragModeUI();
-
-    currentPrefabGroup = prefabs.get(baseName);
-    window.currentBaseName = baseName;
-    if (currentPrefabGroup) {
-        ghost = currentPrefabGroup.clone();
-        ghost.rotation.order = 'ZYX';
-        ghost.traverse(child => {
-            if (child.isMesh) {
-                const origMat = child.material;
-                child.material = origMat.clone();
-                if (origMat.onBeforeCompile) {
-                    child.material.onBeforeCompile = origMat.onBeforeCompile;
-                }
-                if (origMat.customProgramCacheKey) {
-                    child.material.customProgramCacheKey = origMat.customProgramCacheKey;
-                }
-
-                child.material.transparent = true;
-                child.material.opacity = 0.7;
-                child.material.depthWrite = false;
-                child.userData.origColor = child.material.color ? child.material.color.getHex() : 0xffffff;
-            }
-        });
-        editorGroup.add(ghost);
-        if (!window.isGhostLockedToOriginal) {
-            updateGhost(currentMousePos.x, currentMousePos.y);
-        }
-        document.querySelector('.grid-floating-panel').style.display = 'flex';
-    }
-};
-
 function updateGhost(clientX, clientY, isLockedDrag = false) {
     currentMousePos.x = clientX;
     currentMousePos.y = clientY;
@@ -2997,7 +3093,6 @@ function updateGhost(clientX, clientY, isLockedDrag = false) {
         }
     }
 }
-
 loadMain();
 </script>
 </body>

@@ -1840,10 +1840,13 @@ async function processMap(mapData, buildWorld = false) {
                         } else {
                             discard;
                         }
-                        
-                        diffuseColor = vec4(splatColor.rgb, 1.0);
+                     
+                        diffuseColor = vec4(splatColor.rgb, diffuseColor.a);
                         `
                     );
+                };
+                mat.customProgramCacheKey = function() {
+                    return "terrain_" + matCacheKey;
                 };
             } else {
                 mat = new THREE.MeshStandardMaterial({ 
@@ -2854,7 +2857,15 @@ window.selectPrefab = function(baseName) {
         ghost.rotation.order = 'ZYX';
         ghost.traverse(child => {
             if (child.isMesh) {
-                child.material = child.material.clone();
+                const origMat = child.material;
+                child.material = origMat.clone();
+                if (origMat.onBeforeCompile) {
+                    child.material.onBeforeCompile = origMat.onBeforeCompile;
+                }
+                if (origMat.customProgramCacheKey) {
+                    child.material.customProgramCacheKey = origMat.customProgramCacheKey;
+                }
+
                 child.material.transparent = true;
                 child.material.opacity = 0.7;
                 child.material.depthWrite = false;

@@ -52,53 +52,6 @@
             touch-action: none;
         }
 
-        #loading-screen { 
-            position: fixed; 
-            top: 0; 
-            left: 0; 
-            width: 100%; 
-            height: 100%; 
-            display: flex; 
-            flex-direction: column; 
-            justify-content: center; 
-            align-items: center; 
-            background: radial-gradient(circle at center, rgba(0, 43, 64, 0.9) 0%, rgba(0, 10, 15, 0.98) 100%);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            z-index: 9999; 
-            transition: opacity 0.5s ease;
-        }
-
-        .m3-spinner {
-            width: 56px;
-            height: 56px;
-            border: 4px solid rgba(255, 255, 255, 0.15);
-            border-radius: 50%;
-            border-top-color: var(--md-sys-color-primary);
-            animation: spin 1s cubic-bezier(0.5, 0, 0.5, 1) infinite;
-            box-shadow: 0 0 24px rgba(118, 255, 51, 0.2);
-        }
-        
-        @keyframes spin { 
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); } 
-        }
-
-        #loading-text { 
-            margin-top: 24px; 
-            font-size: 15px; 
-            font-weight: 500; 
-            color: #E1E8ED; 
-            letter-spacing: 1px;
-            text-align: center;
-            animation: text-pulse 1.5s ease-in-out infinite;
-        }
-
-        @keyframes text-pulse {
-            0%, 100% { opacity: 0.6; }
-            50% { opacity: 1; text-shadow: 0 0 12px rgba(255, 255, 255, 0.4); }
-        }
-
         #menu-toggle {
             position: fixed;
             top: 16px;
@@ -196,6 +149,53 @@
         .m3-btn-tertiary { background: var(--md-sys-color-surface-variant); color: var(--md-sys-color-on-surface-variant); }
         .m3-btn-error { background: var(--md-sys-color-error); color: var(--md-sys-color-on-error); }
         .m3-btn-error:active { opacity: 0.8; transform: scale(0.96); }
+
+        #map-list::-webkit-scrollbar { width: 6px; }
+        #map-list::-webkit-scrollbar-thumb { background: var(--md-sys-color-outline); border-radius: 3px; }
+
+        .map-item {
+            background: var(--md-sys-color-surface-variant);
+            border: 1px solid var(--md-sys-color-outline);
+            border-radius: 12px;
+            padding: 14px 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .map-item:hover { filter: brightness(1.2); border-color: var(--md-sys-color-tertiary); }
+        .map-item.loading { pointer-events: none; opacity: 0.9; border-color: var(--md-sys-color-primary); background: rgba(0, 43, 64, 0.8); }
+        .map-item-title { font-size: 13px; font-weight: 500; color: var(--md-sys-color-on-surface); word-break: break-all; }
+        
+        .circular-progress {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: conic-gradient(var(--md-sys-color-primary) 0%, transparent 0%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            box-shadow: 0 0 8px rgba(0,0,0,0.5);
+        }
+        .circular-progress::after {
+            content: '';
+            position: absolute;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background: var(--md-sys-color-surface-variant);
+        }
+        .circular-progress-text {
+            position: relative;
+            z-index: 1;
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--md-sys-color-on-surface);
+        }
 
         #prefab-list {
             flex: 1;
@@ -454,37 +454,51 @@
     </script>
 </head>
 <body>
-    <div id="loading-screen">
-        <div class="m3-spinner"></div>
-        <div id="loading-text">
-            Initializing Editor...
-        </div>
-    </div>
     <button id="menu-toggle" title="Menu">
         <span class="material-symbols-rounded">menu</span>
     </button>
     <div id="ui-container">
-        <div class="m3-header">
-            <h2 class="m3-title">Props</h2>
-            <div class="m3-subtitle">
-                <span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle;">touch_app</span> Place
-                <span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle;margin-left:4px;">drag_pan</span> Look
+        <!-- MAP LIST VIEW -->
+        <div id="view-maps" style="display: flex; flex-direction: column; height: 100%;">
+            <div class="m3-header">
+                <h2 class="m3-title">Map Libraries</h2>
+                <div class="m3-subtitle">Select a map library to load props</div>
             </div>
-            <div style="display:flex;gap:6px;justify-content:space-between;margin-top:4px;">
-                <button id="import-btn" class="m3-btn m3-btn-secondary" title="Import map.bin / models">
-                    <span class="material-symbols-rounded">upload_file</span>
-                </button>
-                <button id="export-btn" class="m3-btn m3-btn-secondary" title="Export map.bin">
-                    <span class="material-symbols-rounded">save</span>
-                </button>
-                <button id="clear-btn" class="m3-btn m3-btn-error" title="Clear Scene">
-                    <span class="material-symbols-rounded">delete</span>
-                </button>
+            <div id="map-list" style="flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px;">
+                <!-- Auto Generated via JS -->
             </div>
-            <input type="file" id="file-input" accept=".bin" style="display: none;" />
         </div>
-        <div id="prefab-list"></div>
+
+        <!-- PROPS VIEW -->
+        <div id="view-props" style="display: none; flex-direction: column; height: 100%;">
+            <div class="m3-header">
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 4px; padding-right: 48px;">
+                    <button id="back-to-maps-btn" class="m3-btn-secondary" title="Back to Map Library" style="width: 36px; height: 36px; padding: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: transparent; border: 1px solid var(--md-sys-color-outline); flex-shrink: 0;">
+                        <span class="material-symbols-rounded" style="font-size: 20px; color: var(--md-sys-color-on-surface);">arrow_back</span>
+                    </button>
+                    <h2 class="m3-title" style="margin: 0;">Props</h2>
+                </div>
+                <div class="m3-subtitle">
+                    <span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle;">touch_app</span> Place
+                    <span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle;margin-left:4px;">drag_pan</span> Look
+                </div>
+                <div style="display:flex;gap:6px;justify-content:space-between;margin-top:8px;">
+                    <button id="import-btn" class="m3-btn m3-btn-secondary" title="Import map.bin / models">
+                        <span class="material-symbols-rounded">upload_file</span>
+                    </button>
+                    <button id="export-btn" class="m3-btn m3-btn-secondary" title="Export map.bin">
+                        <span class="material-symbols-rounded">save</span>
+                    </button>
+                    <button id="clear-btn" class="m3-btn m3-btn-error" title="Clear Scene">
+                        <span class="material-symbols-rounded">delete</span>
+                    </button>
+                </div>
+                <input type="file" id="file-input" accept=".bin" style="display: none;" />
+            </div>
+            <div id="prefab-list"></div>
+        </div>
     </div>
+    
     <div class="grid-floating-panel">
         <button id="rotate-btn" class="m3-btn m3-btn-secondary" style="width:40px;padding:8px 0;" title="Toggle Horizontal Rotate (Long press to switch)">
             <span class="material-symbols-rounded" style="font-size:20px;">rotate_right</span>
@@ -505,6 +519,7 @@
             <span class="material-symbols-rounded" style="font-size:20px;">close</span>
         </button>
     </div>
+    
     <div id="context-menu">
         <div class="cm-title" id="cm-title">
             Model Name
@@ -521,12 +536,14 @@
             </button>
         </div>
     </div>
+    
     <div id="m3-dialog-overlay">
         <div id="m3-dialog">
             <h3 class="m3-dialog-title">
-                <span class="material-symbols-rounded" style="color:var(--md-sys-color-error);">warning</span> Clear Scene
+                <span class="material-symbols-rounded" style="color:var(--md-sys-color-error);">warning</span> 
+                <span id="dialog-title-text">Clear Scene</span>
             </h3>
-            <div class="m3-dialog-text">
+            <div class="m3-dialog-text" id="dialog-desc-text">
                 Are you sure you want to delete all objects in the scene? This action cannot be undone.
             </div>
             <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px;">
@@ -535,10 +552,12 @@
             </div>
         </div>
     </div>
+    
     <div id="toast-msg"></div>
     <div id="canvas-container"></div>
+    
     <script type="module">
-        import * as THREE from 'three';
+import * as THREE from 'three';
 import { FlyControls } from 'three/addons/controls/FlyControls.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -547,14 +566,10 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 const REPO_MAPS = "MapMakersAndProgrammers/tanki-bin-maps";
-const MAP_PATH = "remaster/sandalmmRemaster";
 const REPO_PROPS = "MapMakersAndProgrammers/tanki-prop-libraries";
 
-const MAP_BASE_URL = "https://res.3dtank.com/570/174542/371/104/31526471323603";
-window.currentMapBaseUrl = MAP_BASE_URL;
+window.currentMapBaseUrl = "";
 
-const loadingScreen = document.getElementById('loading-screen');
-const loadingTextEl = document.getElementById('loading-text');
 const toastEl = document.getElementById('toast-msg');
 const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
@@ -599,27 +614,14 @@ defaultTile.needsUpdate = true;
 
 function getCleanBaseName(rawName) {
     let cleaned = rawName;
-    if (/[-_]sub[-_]?\d+$/i.test(cleaned)) {
-        cleaned = cleaned.replace(/[-_]sub[-_]?\d+$/i, '');
+    if (/_sub\d+$/i.test(cleaned)) {
+        cleaned = cleaned.replace(/_sub\d+$/i, '');
     }
     return cleaned;
 }
 
 function log(msg) {
-    if (loadingTextEl) loadingTextEl.innerText = msg;
     console.log(`[System] ${msg}`);
-}
-
-async function showLoading(msg) {
-    log(msg);
-    loadingScreen.style.display = 'flex';
-    loadingScreen.style.opacity = '1';
-    await new Promise(r => setTimeout(r, 50)); 
-}
-
-function hideLoading() {
-    loadingScreen.style.opacity = '0';
-    setTimeout(() => { loadingScreen.style.display = 'none'; }, 500);
 }
 
 function showToast(msg, isError = true) {
@@ -629,6 +631,37 @@ function showToast(msg, isError = true) {
     toastEl.style.color = isError ? 'var(--md-sys-color-on-error)' : 'white';
     toastEl.style.opacity = '1';
     setTimeout(() => { toastEl.style.opacity = '0'; }, 2500);
+}
+
+async function fetchWithProgress(url, onProgress) {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP ${response.status}: ${url}`);
+    
+    const contentLength = response.headers.get('content-length');
+    const total = contentLength ? parseInt(contentLength, 10) : 0;
+    let loaded = 0;
+
+    const reader = response.body.getReader();
+    const chunks =[];
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        loaded += value.length;
+        if (total) {
+            onProgress(loaded / total);
+        } else {
+            onProgress(Math.min(loaded / 2000000, 1)); 
+        }
+    }
+
+    const allChunks = new Uint8Array(loaded);
+    let position = 0;
+    for (let chunk of chunks) {
+        allChunks.set(chunk, position);
+        position += chunk.length;
+    }
+    return allChunks.buffer;
 }
 
 async function fetchFile(url, type = 'arraybuffer') {
@@ -790,26 +823,12 @@ function parseA3D(buffer) {
     const matSig = stream.readUint32(true);
     const matLen = stream.readUint32(true); 
     const matCount = stream.readUint32(true);
-    
-    const a3dMaterials =[];
 
     for(let i=0; i<matCount; i++) {
-        let matName = "";
-        let texName = "";
-        if(version===3) { 
-            matName = stream.readLengthPrefixedStringA3D(); 
-            stream.offset+=12; 
-            texName = stream.readLengthPrefixedStringA3D(); 
-        } else { 
-            matName = stream.readNullTerminatedString(); 
-            stream.offset+=12; 
-            texName = stream.readNullTerminatedString(); 
-        }
-        a3dMaterials.push({ matName, texName });
+        if(version===3) { stream.readLengthPrefixedStringA3D(); stream.offset+=12; stream.readLengthPrefixedStringA3D(); }
+        else { stream.readNullTerminatedString(); stream.offset+=12; stream.readNullTerminatedString(); }
     }
     if(version===3) stream.offset += (((matLen + 3) >> 2) << 2) - matLen; 
-    
-    data.a3dMaterials = a3dMaterials;
 
     const meshSig = stream.readUint32(true);
     const meshLen = stream.readUint32(true); 
@@ -831,17 +850,13 @@ function parseA3D(buffer) {
         
         const submeshCount = stream.readUint32(true);
         const submeshes =[];
-        const v2MatIds =[];
-        
         for(let s=0; s<submeshCount; s++) {
             if(version===2) {
                 const fCount = stream.readUint32(true);
                 const iCount = fCount * 3;
                 const sliceBuf = stream.buffer.slice(stream.offset, stream.offset + iCount * 2);
                 stream.offset += iCount * 2 + fCount * 4; 
-                const matId = stream.readUint16(true);
-                v2MatIds.push(matId);
-                submeshes.push({ indices: new Uint16Array(sliceBuf.buffer, sliceBuf.byteOffset, iCount), matId: matId });
+                submeshes.push({ indices: new Uint16Array(sliceBuf.buffer, sliceBuf.byteOffset, iCount), matId: stream.readUint16(true) });
             } else {
                 const iCount = stream.readUint32(true);
                 const sliceBuf = stream.buffer.slice(stream.offset, stream.offset + iCount * 2);
@@ -861,7 +876,6 @@ function parseA3D(buffer) {
             geo.addGroup(start, sm.indices.length, idx);
         });
         geo.setIndex(mainIndices);
-        geo.userData.v2MatIds = v2MatIds;
 
         buffers.forEach(buf => {
             if(buf.type === 1) geo.setAttribute('position', new THREE.BufferAttribute(buf.data, 3));
@@ -871,7 +885,6 @@ function parseA3D(buffer) {
             else if(buf.type === 6 && !geo.attributes.normal) geo.setAttribute('normal', new THREE.BufferAttribute(buf.data, 3));
         });
         
-        if (!geo.attributes.uv && geo.attributes.uv2) geo.setAttribute('uv', geo.attributes.uv2);
         if (!geo.attributes.normal) geo.computeVertexNormals();
         data.meshes.push(geo);
     }
@@ -914,51 +927,21 @@ function parseA3D(buffer) {
                     const objects =[];
                     
                     for (let i = 0; i < objectCount; i++) {
-                        let name = "";
-                        let mID = 0;
-                        let tID = 0;
-                        let matIds =[];
                         if (version === 2) {
-                            name = stream.readNullTerminatedString(); 
-                            mID = stream.readUint32(true);
-                            tID = stream.readUint32(true);
+                            stream.readNullTerminatedString(); 
+                            objects.push({ meshID: stream.readUint32(true), transformID: stream.readUint32(true) });
                         } else {
-                            name = stream.readLengthPrefixedStringA3D();
-                            mID = stream.readUint32(true);
-                            tID = stream.readUint32(true);
-                            const mCount = stream.readUint32(true);
-                            for (let j = 0; j < mCount; j++) {
-                                matIds.push(stream.readInt32(true));
-                            }
+                            const mID = stream.readUint32(true), tID = stream.readUint32(true), mCount = stream.readUint32(true);
+                            for (let j = 0; j < mCount; j++) stream.readInt32(true); 
+                            objects.push({ meshID: mID, transformID: tID });
                         }
-                        objects.push({ name, meshID: mID, transformID: tID, matIds });
                     }
 
-                    data.namedMeshes = {};
-                    const transformedMeshes =[];
-                    for (let i = 0; i < data.meshes.length; i++) {
-                        transformedMeshes[i] = data.meshes[i].clone();
-                    }
-
-                    for (let i = 0; i < objects.length; i++) {
-                        const obj = objects[i];
-                        if (obj.meshID < transformedMeshes.length && obj.transformID < transforms.length) {
+                    for (const obj of objects) {
+                        if (obj.meshID < data.meshes.length && obj.transformID < transforms.length) {
                             const tf = transforms[obj.transformID];
                             const mat = new THREE.Matrix4().compose(tf.pos, tf.quat, tf.scale);
-                            const geo = transformedMeshes[obj.meshID].clone();
-                            geo.applyMatrix4(mat);
-                            
-                            geo.userData.matIds = obj.matIds;
-                            if (version === 2) {
-                                geo.userData.matIds = geo.userData.v2MatIds ||[];
-                            }
-                            
-                            data.namedMeshes[obj.name] = geo;
-                            data.namedMeshes[`mesh_${i}`] = geo;
-                            
-                            if (i === 0) {
-                                data.meshes[0] = geo;
-                            }
+                            data.meshes[obj.meshID].applyMatrix4(mat);
                         }
                     }
                 }
@@ -993,7 +976,7 @@ async function parseMapBin(buffer) {
     }
     headerEndOffset = packet.offset;
 
-    const optMask =[...fullOriginalBits].reverse();
+    const optMask = [...fullOriginalBits].reverse();
     let popCount = 0;
     const popBit = () => { popCount++; return optMask.pop(); };
 
@@ -1073,7 +1056,7 @@ async function parseMapBin(buffer) {
         const matID = packet.readUint32(false);
         const name = packet.readString();
         const pos = readV3();
-        const rot = popBit() ? readV3() :[0,0,0];
+        const rot = popBit() ? readV3() : [0,0,0];
         const scale = popBit() ? readV3() : [1,1,1];
         
         result.props.push({ id, grpName, libName, matID, name, pos, rot, scale });
@@ -1229,9 +1212,6 @@ function initThree() {
     renderer.domElement.addEventListener('webglcontextlost', (event) => {
         event.preventDefault();
         console.warn("WebGL Context Lost! Pausing rendering...");
-        if (loadingTextEl) loadingTextEl.innerText = "Restoring WebGL Context...";
-        loadingScreen.style.display = 'flex';
-        loadingScreen.style.opacity = '1';
     }, false);
 
     renderer.domElement.addEventListener('webglcontextrestored', () => {
@@ -1242,7 +1222,6 @@ function initThree() {
         const environment = new RoomEnvironment();
         scene.environment = pmremGenerator.fromScene(environment).texture;
         environment.dispose();
-
 
         textureCache.forEach(tex => {
             if(tex) tex.needsUpdate = true;
@@ -1258,7 +1237,6 @@ function initThree() {
         
         setTimeout(() => {
             window.dispatchEvent(new Event('resize'));
-            hideLoading();
         }, 100);
     }, false);
 
@@ -1423,7 +1401,8 @@ function animate() {
     if (controls) controls.update(delta);
     
     const uiContainer = document.getElementById('ui-container');
-    if (uiContainer.style.transform !== 'translateX(100%)') {
+    const propsView = document.getElementById('view-props');
+    if (uiContainer.style.transform !== 'translateX(100%)' && propsView.style.display !== 'none') {
         const listContainer = document.getElementById('prefab-list');
         const listRect = listContainer.getBoundingClientRect();
         
@@ -1457,7 +1436,28 @@ function setupEditorGroup() {
 
 async function loadTexture(repo, branch, path, silent = false, isLinear = false, isRepeating = false) {
     const url = `https://raw.githubusercontent.com/${repo}/${branch}/${path}`;
-    return loadTextureDirect(url, silent, isLinear, isRepeating);
+    const loader = new THREE.TextureLoader();
+    
+    return new Promise((resolve) => {
+        loader.load(url, (tex) => {
+            tex.colorSpace = isLinear ? THREE.LinearSRGBColorSpace : THREE.SRGBColorSpace;
+            tex.flipY = false;
+            
+            if (isRepeating) {
+                tex.wrapS = THREE.RepeatWrapping;
+                tex.wrapT = THREE.RepeatWrapping;
+            } else {
+                tex.wrapS = THREE.ClampToEdgeWrapping;
+                tex.wrapT = THREE.ClampToEdgeWrapping;
+            }
+
+            if (renderer) tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+            resolve(tex);
+        }, undefined, () => {
+            if(!silent) console.warn(`Failed to load texture: ${url}`);
+            resolve(null);
+        });
+    });
 }
 
 function loadTextureDirect(url, silent = false, isLinear = false, isRepeating = false) {
@@ -1497,7 +1497,6 @@ async function getPropDict(mapData) {
     for (const lib of uniqueLibs) {
         if (window.loadedLibraries.has(lib)) continue;
         
-        log(`Fetching Prop Library index: ${lib}...`);
         try {
             const libJson = await fetchRawFile(REPO_PROPS, 'main', `html5/${lib}/library.json`, 'json');
             for(const grp of libJson.groups) {
@@ -1568,6 +1567,10 @@ function addPrefabToUI(baseName, group) {
         item.classList.add('active');
         window.isGhostLockedToOriginal = false;
         window.selectPrefab(baseName);
+        if (isTouchDevice) {
+            isUIOpen = false;
+            document.getElementById('ui-container').style.transform = 'translateX(100%)';
+        }
     };
 }
 
@@ -1587,48 +1590,36 @@ function addErrorToUI(fileName, errorMsg) {
     listContainer.insertBefore(item, listContainer.firstChild);
 }
 
-async function processMap(mapData, buildWorld = false) {
+async function processMap(mapData, buildWorld = false, onProgress = null) {
     const propDict = await getPropDict(mapData); 
 
     const uniqueModelToLib = new Map(); 
     const uniqueTexToLib = new Map();
     const repeatingTextures = new Set(); 
-    let needsModelsA3D = false;
 
     for (const prop of mapData.props) {
-        if (!prop.libName) {
-            needsModelsA3D = true;
-        } else {
-            const pInfo = propDict[`${prop.grpName}_${prop.name}`] || propDict[prop.name];
-            if (pInfo) {
-                if (pInfo.mesh && pInfo.mesh.file) {
-                    uniqueModelToLib.set(pInfo.mesh.file, prop.libName);
-                }
-                if (pInfo.textures) {
-                    for (let t of pInfo.textures) {
-                        if (t.diffuseMap) uniqueTexToLib.set(t.diffuseMap, prop.libName);
-                    }
+        const pInfo = propDict[`${prop.grpName}_${prop.name}`] || propDict[prop.name];
+        if (pInfo) {
+            if (pInfo.mesh && pInfo.mesh.file) {
+                uniqueModelToLib.set(pInfo.mesh.file, prop.libName);
+            }
+            if (pInfo.textures) {
+                for (let t of pInfo.textures) {
+                    if (t.diffuseMap) uniqueTexToLib.set(t.diffuseMap, prop.libName);
                 }
             }
-        }
-    }
-
-    if (mapData.atlases) {
-        for (const atlasName of Object.keys(mapData.atlases)) {
-            uniqueTexToLib.set(atlasName, null);
         }
     }
 
     for (const mat of Object.values(mapData.materials)) {
         for (const param of mat.texParams) {
             uniqueTexToLib.set(param.texName, param.libName);
-            if (param.name.toLowerCase().includes('splat')) {
+        
+            if (param.name.startsWith('_Splat')) {
                 repeatingTextures.add(param.texName);
             }
         }
     }
-
-    log(`Loading models and textures...`);
     
     const modelPromises = Array.from(uniqueModelToLib.entries()).map(async ([file, libName]) => {
         if (!modelCache.has(file)) {
@@ -1636,27 +1627,18 @@ async function processMap(mapData, buildWorld = false) {
                 if (file.toLowerCase().endsWith('.a3d')) {
                     let a3dBuf;
                     try {
-                        if (libName) {
-                            a3dBuf = await fetchRawFile(REPO_PROPS, 'main', `html5/${libName}/${file}`);
-                        } else {
-                            a3dBuf = await fetchFile(`${window.currentMapBaseUrl}/${file}`);
-                        }
+                        a3dBuf = await fetchRawFile(REPO_PROPS, 'main', `html5/${libName}/${file}`);
                     } catch (fetchErr) {
                         const lowerFile = file.toLowerCase();
                         if (file !== lowerFile) {
-                            console.warn(`[Case Fallback] Cannot find ${file}, trying lowercase: ${lowerFile}`);
-                            if (libName) {
-                                a3dBuf = await fetchRawFile(REPO_PROPS, 'main', `html5/${libName}/${lowerFile}`);
-                            } else {
-                                a3dBuf = await fetchFile(`${window.currentMapBaseUrl}/${lowerFile}`);
-                            }
+                            a3dBuf = await fetchRawFile(REPO_PROPS, 'main', `html5/${libName}/${lowerFile}`);
                         } else {
                             throw fetchErr; 
                         }
                     }
                     
                     const a3dData = parseA3D(a3dBuf);
-                    modelCache.set(file, a3dData);
+                    if (a3dData.meshes.length > 0) modelCache.set(file, a3dData.meshes[0]);
                 }
             } catch (e) {
                 console.error(`[Missing Model] ${file} -> ${e.message}`);
@@ -1665,50 +1647,37 @@ async function processMap(mapData, buildWorld = false) {
         }
     });
 
-    if (needsModelsA3D && !modelCache.has('models.a3d')) {
-        modelPromises.push((async () => {
-            try {
-                const mapBaseUrl = window.currentMapBaseUrl || MAP_BASE_URL;
-                const a3dBuf = await fetchFile(`${mapBaseUrl}/models.a3d`);
-                const a3dData = parseA3D(a3dBuf);
-                modelCache.set('models.a3d', a3dData);
-            } catch (e) {
-                console.error(`Failed to load models.a3d:`, e.message);
-                addErrorToUI('models.a3d', e.message);
-            }
-        })());
-    }
-
     const texPromises = Array.from(uniqueTexToLib.entries()).map(async ([texName, libName]) => {
         if (!textureCache.has(texName)) {
-            const isControl = texName.includes('-control') || texName.includes('_Control'); 
+            const isControl = texName.includes('-control'); 
             const isRepeat = repeatingTextures.has(texName);
             let tex = null;
 
-            let cleanTexName = texName;
-            if (cleanTexName.toLowerCase().endsWith('.webp') || cleanTexName.toLowerCase().endsWith('.png') || cleanTexName.toLowerCase().endsWith('.jpg') || cleanTexName.toLowerCase().endsWith('.ktx')) {
-                cleanTexName = cleanTexName.substring(0, cleanTexName.lastIndexOf('.'));
-            }
-
             if (libName) {
-                tex = await loadTexture(REPO_PROPS, 'main', `html5/${libName}/${cleanTexName}.webp`, true, isControl, isRepeat);
+                tex = await loadTexture(REPO_PROPS, 'main', `html5/${libName}/${texName}.webp`, true, isControl, isRepeat);
             }
 
             if (!tex) {
-                const mapBaseUrl = window.currentMapBaseUrl || MAP_BASE_URL;
-                tex = await loadTextureDirect(`${mapBaseUrl}/${cleanTexName}.webp`, true, isControl, isRepeat);
+                const mapBaseUrl = window.currentMapBaseUrl || "";
+                tex = await loadTextureDirect(`${mapBaseUrl}/${texName}.webp`, true, isControl, isRepeat);
             }
 
-            if (!tex) {
-                tex = await loadTexture(REPO_MAPS, 'master', `${MAP_PATH}/${cleanTexName}.webp`, true, isControl, isRepeat);
-            }
-
-            if (tex) textureCache.set(texName, tex); 
+            if (tex) textureCache.set(texName, tex);
         }
     });
 
-    await Promise.all([...modelPromises, ...texPromises]);
-    log(`Assets ready, processing map...`);
+    const allPromises = [...modelPromises, ...texPromises];
+    let completed = 0;
+    if (allPromises.length === 0 && onProgress) {
+        onProgress(1);
+    } else if (allPromises.length > 0) {
+        const wrappedPromises = allPromises.map(p => p.then(res => {
+            completed++;
+            if (onProgress) onProgress(completed / allPromises.length);
+            return res;
+        }));
+        await Promise.all(wrappedPromises);
+    }
 
     if (buildWorld) {
         if (ghost) {
@@ -1739,125 +1708,42 @@ async function processMap(mapData, buildWorld = false) {
         const prop = mapData.props[i];
         
         let baseName = getCleanBaseName(prop.name);
-        let parentRawPos = prop.pos;
-        let parentRawRot = prop.rot;
 
-        let geometry = null;
-        let pInfo = null;
-        let file = null;
-        let a3dData = null;
-
-        if (!prop.libName) {
-            a3dData = modelCache.get('models.a3d');
-            if (a3dData && a3dData.namedMeshes) {
-                geometry = a3dData.namedMeshes[prop.name];
-                if (!geometry) {
-                    const matchedKey = Object.keys(a3dData.namedMeshes).find(k => k.toLowerCase() === prop.name.toLowerCase());
-                    if (matchedKey) geometry = a3dData.namedMeshes[matchedKey];
-                }
-            }
-        } else {
-            pInfo = propDict[`${prop.grpName}_${prop.name}`] || propDict[prop.name];
-            file = pInfo && pInfo.mesh ? pInfo.mesh.file : null;
-            if (file && modelCache.has(file)) {
-                a3dData = modelCache.get(file);
-                if (a3dData) {
-                    if (a3dData.namedMeshes && Object.keys(a3dData.namedMeshes).length > 0) {
-                        geometry = Object.values(a3dData.namedMeshes)[0];
-                    } else if (a3dData.meshes && a3dData.meshes.length > 0) {
-                        geometry = a3dData.meshes[0];
-                    }
-                }
-            }
-        }
-
+        const pInfo = propDict[`${prop.grpName}_${prop.name}`] || propDict[prop.name];
+        const file = pInfo && pInfo.mesh ? pInfo.mesh.file : null;
+        
+        let geometry = file ? modelCache.get(file) : null;
         if (!geometry) continue;
         
         const matInfo = mapData.materials[prop.matID];
+        const isSprite = matInfo && matInfo.shader.includes("Sprite");
 
         let controlTexName = null;
         let baseTexName = null;
         if (matInfo && matInfo.texParams) {
-            const pControl = matInfo.texParams.find(p => p.name === '_Control' || p.name === '_ControlTex');
+            const pControl = matInfo.texParams.find(p => p.name === '_Control');
             if (pControl) controlTexName = pControl.texName;
 
-            const pBase = matInfo.texParams.find(p => {
-                const n = p.name.toLowerCase();
-                return n.includes('base') || n.includes('main') || n.includes('albedo') || n.includes('diffuse') || n === 'tex' || n === '_map';
-            });
-            if (pBase) {
-                baseTexName = pBase.texName;
-            } else if (matInfo.texParams.length > 0) {
-                const fallback = matInfo.texParams.find(p => {
-                    const n = p.name.toLowerCase();
-                    return !n.includes('splat') && !n.includes('control') && !n.includes('normal') && !n.includes('bump');
-                });
-                if (fallback) baseTexName = fallback.texName;
-                else baseTexName = matInfo.texParams[0].texName;
-            }
+            const pBase = matInfo.texParams.find(p => p.name === '_BaseMap' || p.name === '_MainTex');
+            if (pBase) baseTexName = pBase.texName;
         }
 
-        if (!baseTexName && prop.libName && pInfo && pInfo.textures && pInfo.textures.length > 0) {
+        if (!baseTexName && pInfo && pInfo.textures && pInfo.textures.length > 0) {
             const fallbackTex = pInfo.textures.find(t => t.diffuseMap && !t.diffuseMap.includes('-control'));
             if (fallbackTex) baseTexName = fallbackTex.diffuseMap;
         }
-        if (!controlTexName && prop.libName && pInfo && pInfo.textures && pInfo.textures.length > 0) {
+        if (!controlTexName && pInfo && pInfo.textures && pInfo.textures.length > 0) {
             const fallbackCtrl = pInfo.textures.find(t => t.diffuseMap && t.diffuseMap.includes('-control'));
             if (fallbackCtrl) controlTexName = fallbackCtrl.diffuseMap;
         }
 
-        const isTerrainMesh = (file && file.toLowerCase().includes('terrain')) || prop.name.toLowerCase().includes('terrain');
+        const instGeo = geometry.clone();
+        let mat;
+        const isTerrainMesh = file.toLowerCase().includes('terrain');
         const hasControlMap = !!controlTexName;
 
-        let targetTexName = baseTexName;
-        let atlasRect = null;
-        let atlasInfo = null;
+        const matCacheKey = `${isTerrainMesh}_${controlTexName}_${baseTexName}_${prop.matID}_${prop.libName}_${prop.name}`;
 
-        let matName1 = null;
-        let matName2 = null;
-        if (a3dData && geometry && geometry.userData) {
-            let matIds = geometry.userData.matIds;
-            if (!matIds || matIds.length === 0) matIds = geometry.userData.v2MatIds;
-            if (matIds && matIds.length > 0) {
-                const mObj = a3dData.a3dMaterials ? a3dData.a3dMaterials[matIds[0]] : null;
-                if (mObj) {
-                    matName1 = mObj.matName;
-                    matName2 = mObj.texName;
-                }
-            }
-        }
-
-        const cleanStr = (s) => {
-            if (!s) return null;
-            let c = s.replace(/\\/g, '/').split('/').pop();
-            if (c.indexOf('.') !== -1) c = c.substring(0, c.lastIndexOf('.'));
-            return c;
-        };
-        matName1 = cleanStr(matName1);
-        matName2 = cleanStr(matName2);
-
-        const possibleKeys =[
-            matName1, matName2, prop.name, baseName, baseTexName
-        ].filter(Boolean).map(s => s.toLowerCase());
-
-        if (mapData.atlases) {
-            for (const [aName, aInfo] of Object.entries(mapData.atlases)) {
-                for (const [rectKey, rect] of Object.entries(aInfo.rects)) {
-                    const lowerKey = rectKey.toLowerCase();
-                    if (possibleKeys.some(pk => lowerKey === pk || lowerKey === `_${pk}` || lowerKey.endsWith(pk))) {
-                        atlasRect = rect;
-                        atlasInfo = aInfo;
-                        targetTexName = aName; 
-                        break;
-                    }
-                }
-                if (atlasRect) break;
-            }
-        }
-
-        const matCacheKey = `${isTerrainMesh}_${controlTexName}_${targetTexName}_${prop.matID}_${prop.libName}_${prop.name}`;
-
-        let mat;
         if (materialCache.has(matCacheKey)) {
             mat = materialCache.get(matCacheKey);
         } else {
@@ -2001,30 +1887,26 @@ async function processMap(mapData, buildWorld = false) {
                     depthWrite: true
                 });
 
-                if (targetTexName) {
-                    const diffTex = textureCache.get(targetTexName);
-                    if (diffTex) {
-                        mat.map = diffTex;
-                    } else {
-                        mat.color.setHex(0xaaaaaa);
-                        mat.map = defaultTile; 
-                    }
-                } else {
-                    mat.color.setHex(0xaaaaaa);
-                    mat.map = defaultTile;
+                if (baseTexName) {
+                    const diffTex = textureCache.get(baseTexName);
+                    if (diffTex) mat.map = diffTex;
                 }
             }
             materialCache.set(matCacheKey, mat);
         }
 
-        const instGeo = geometry.clone();
+        let atlasRect = null, atlasInfo = null;
+        if (baseTexName && mapData.atlases[baseTexName]) {
+            atlasInfo = mapData.atlases[baseTexName];
+            atlasRect = atlasInfo.rects[`${prop.libName}_${prop.name}`];
+        }
 
         if (instGeo.attributes.uv && atlasRect && atlasInfo) {
             const uv = instGeo.attributes.uv.clone();
             let sx = atlasRect.w / atlasInfo.width;
             let sy = atlasRect.h / atlasInfo.height;
             let ox = atlasRect.x / atlasInfo.width;
-            let oy = atlasRect.y / atlasInfo.height; 
+            let oy = atlasRect.y / atlasInfo.height;
             
             for(let u=0; u<uv.array.length; u+=2) {
                 uv.array[u] = uv.array[u] * sx + ox;
@@ -2038,73 +1920,93 @@ async function processMap(mapData, buildWorld = false) {
         prefabMesh.receiveShadow = true;
         prefabMesh.scale.set(prop.scale[0], prop.scale[1], prop.scale[2]);
 
-        let targetInstanceGroup = null;
-
-        if (prop.grpName && prop.grpName.trim() !== "") {
-            const key = `${baseName}_grp_${prop.grpName}`;
-            if (!originalInstancesMap.has(key)) {
+        if (buildWorld && originalMapGroup) {
+            let instanceKey;
+            if (prop.grpName && prop.grpName.trim() !== "") {
+                instanceKey = `${baseName}_grp_${prop.grpName}`;
+            } else {
+                let snap = 1;
+                const px = Math.round(prop.pos[0] / snap) * snap;
+                const py = Math.round(prop.pos[1] / snap) * snap;
+                const pz = Math.round(prop.pos[2] / snap) * snap;
+                instanceKey = `${baseName}_${px}_${py}_${pz}`;
+            }
+            
+            if (!originalInstancesMap.has(instanceKey)) {
                 const grp = new THREE.Group();
                 grp.position.set(prop.pos[0], prop.pos[1], prop.pos[2]);
                 grp.rotation.set(prop.rot[0], prop.rot[1], prop.rot[2], 'ZYX');
                 grp.userData.baseName = baseName;
                 grp.userData.originalProps =[];
-                grp.userData.isGroupedByName = true;
-                originalInstancesMap.set(key, grp);
+                originalInstancesMap.set(instanceKey, grp);
             }
-            targetInstanceGroup = originalInstancesMap.get(key);
-        } else {
-            const px = Math.round(parentRawPos[0]);
-            const py = Math.round(parentRawPos[1]);
-            const pz = Math.round(parentRawPos[2]);
-            const key = `${baseName}_${px}_${py}_${pz}`;
-
-            if (!originalInstancesMap.has(key)) {
-                const grp = new THREE.Group();
-                grp.position.set(parentRawPos[0], parentRawPos[1], parentRawPos[2]);
-                grp.rotation.set(parentRawRot[0], parentRawRot[1], parentRawRot[2], 'ZYX');
-                grp.userData.baseName = baseName;
-                grp.userData.originalProps =[];
-                grp.userData.isGroupedByName = false;
-                originalInstancesMap.set(key, grp);
-            }
-            targetInstanceGroup = originalInstancesMap.get(key);
+            
+            const instanceGroup = originalInstancesMap.get(instanceKey);
+            instanceGroup.userData.originalProps.push(prop);
+            
+            const sceneMesh = prefabMesh.clone();
+            
+            const rootMatrix = new THREE.Matrix4().compose(
+                instanceGroup.position,
+                instanceGroup.quaternion,
+                new THREE.Vector3(1, 1, 1)
+            );
+            const propMatrix = new THREE.Matrix4().compose(
+                new THREE.Vector3(prop.pos[0], prop.pos[1], prop.pos[2]),
+                new THREE.Quaternion().setFromEuler(new THREE.Euler(prop.rot[0], prop.rot[1], prop.rot[2], 'ZYX')),
+                new THREE.Vector3(1, 1, 1)
+            );
+            const localMatrix = propMatrix.premultiply(rootMatrix.invert());
+            
+            localMatrix.decompose(sceneMesh.position, sceneMesh.quaternion, new THREE.Vector3());
+            instanceGroup.add(sceneMesh);
         }
 
-        targetInstanceGroup.userData.originalProps.push(prop);
-        
-        const sceneMesh = prefabMesh.clone();
-        const rootMatrix = new THREE.Matrix4().compose(
-            targetInstanceGroup.position,
-            targetInstanceGroup.quaternion,
-            new THREE.Vector3(1, 1, 1)
-        );
-        const propMatrix = new THREE.Matrix4().compose(
-            new THREE.Vector3(prop.pos[0], prop.pos[1], prop.pos[2]),
-            new THREE.Quaternion().setFromEuler(new THREE.Euler(prop.rot[0], prop.rot[1], prop.rot[2], 'ZYX')),
-            new THREE.Vector3(1, 1, 1)
-        );
-        const localMatrix = propMatrix.premultiply(rootMatrix.invert());
-        localMatrix.decompose(sceneMesh.position, sceneMesh.quaternion, new THREE.Vector3());
-        targetInstanceGroup.add(sceneMesh);
+        if (!globalLoadedProps.has(prop.name)) {
+            if (!prefabs.has(baseName)) {
+                const group = new THREE.Group();
+                group.userData.originalProps =[];
+                group.userData.rootPos = new THREE.Vector3(prop.pos[0], prop.pos[1], prop.pos[2]);
+                group.userData.rootRot = new THREE.Euler(prop.rot[0], prop.rot[1], prop.rot[2], 'ZYX');
+                prefabs.set(baseName, group);
+            }
+            
+            const group = prefabs.get(baseName);
+            const currentPos = new THREE.Vector3(prop.pos[0], prop.pos[1], prop.pos[2]);
+            const dist = group.userData.rootPos.distanceTo(currentPos);
+            
+            if (dist < 3000) {
+                globalLoadedProps.add(prop.name);
+                group.userData.originalProps.push(prop);
+
+                const rootMatrix = new THREE.Matrix4().compose(
+                    group.userData.rootPos,
+                    new THREE.Quaternion().setFromEuler(group.userData.rootRot),
+                    new THREE.Vector3(1, 1, 1)
+                );
+                
+                const propMatrix = new THREE.Matrix4().compose(
+                    currentPos,
+                    new THREE.Quaternion().setFromEuler(new THREE.Euler(prop.rot[0], prop.rot[1], prop.rot[2], 'ZYX')),
+                    new THREE.Vector3(1, 1, 1)
+                );
+
+                const localMatrix = propMatrix.premultiply(rootMatrix.invert());
+                
+                const localPos = new THREE.Vector3();
+                const localQuat = new THREE.Quaternion();
+                localMatrix.decompose(localPos, localQuat, new THREE.Vector3());
+
+                prefabMesh.position.copy(localPos);
+                prefabMesh.quaternion.copy(localQuat);
+                
+                group.add(prefabMesh);
+            }
+        }
     }
-    
-    for (const grp of originalInstancesMap.values()) {
-        if (buildWorld && originalMapGroup) {
+    if (buildWorld && originalMapGroup) {
+        for (const grp of originalInstancesMap.values()) {
             originalMapGroup.add(grp);
-        }
-        
-        const bName = grp.userData.baseName;
-        if (!prefabs.has(bName)) {
-            const prefabTemplate = new THREE.Group();
-            prefabTemplate.userData.originalProps = JSON.parse(JSON.stringify(grp.userData.originalProps));
-            prefabTemplate.userData.rootPos = new THREE.Vector3(0,0,0);
-            prefabTemplate.userData.rootRot = new THREE.Euler(0,0,0);
-            
-            grp.children.forEach(mesh => {
-                prefabTemplate.add(mesh.clone());
-            });
-            
-            prefabs.set(bName, prefabTemplate);
         }
     }
     
@@ -2116,37 +2018,141 @@ async function processMap(mapData, buildWorld = false) {
     });
 }
 
+async function renderMapList() {
+    const list = document.getElementById('map-list');
+    
+    list.innerHTML = `
+        <div style="padding: 24px; text-align: center; color: var(--md-sys-color-on-surface-variant); display: flex; flex-direction: column; align-items: center; gap: 8px;">
+            <span class="material-symbols-rounded" style="animation: spin 2s linear infinite;">sync</span>
+            <span style="font-size: 14px;">Fetching maps from GitHub...</span>
+            <style>@keyframes spin { 100% { transform: rotate(360deg); } }</style>
+        </div>
+    `;
+
+    try {
+        const response = await fetch(`https://api.github.com/repos/${REPO_MAPS}/contents/remaster`);
+        
+        if (!response.ok) {
+            throw new Error(`GitHub API Error: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        
+        const mapNames = data.filter(item => item.type === 'dir').map(item => item.name);
+
+        list.innerHTML = '';
+        mapNames.forEach(mapName => {
+            const item = document.createElement('div');
+            item.className = 'map-item';
+            item.innerHTML = `
+                <span class="map-item-title">${mapName}</span>
+                <div class="progress-container" style="display:none; position: absolute; right: 16px; top: 50%; transform: translateY(-50%);">
+                    <div class="circular-progress">
+                        <span class="circular-progress-text">0%</span>
+                    </div>
+                </div>
+            `;
+            item.onclick = () => loadMapLibrary(mapName, item);
+            list.appendChild(item);
+        });
+
+    } catch (error) {
+        console.error("Failed to load map list:", error);
+        list.innerHTML = `
+            <div style="padding: 16px; text-align: center; background: rgba(255,102,102,0.1); border: 1px solid var(--md-sys-color-error); border-radius: 12px; margin: 0 12px;">
+                <span class="material-symbols-rounded" style="color: var(--md-sys-color-error); margin-bottom: 8px; font-size: 32px;">wifi_off</span>
+                <div style="color: var(--md-sys-color-error); font-size: 13px; font-weight: 500;">Failed to fetch map list</div>
+                <div style="color: var(--md-sys-color-on-surface-variant); font-size: 11px; margin-top: 4px;">Possible API Rate Limit hit. Please wait a moment and refresh.</div>
+            </div>
+        `;
+    }
+}
+
+function resetEditorState() {
+    document.getElementById('prefab-list').innerHTML = '';
+    prefabs.clear();
+    thumbnailItems.length = 0;
+    
+    textureCache.clear();
+    modelCache.clear();
+    propDictCache = null;
+    window.loadedLibraries.clear();
+    globalLoadedProps.clear();
+    
+    if (ghost) {
+        editorGroup.remove(ghost);
+        ghost = null;
+        currentPrefabGroup = null;
+        document.querySelector('.grid-floating-panel').style.display = 'none';
+    }
+    
+    while (editorGroup.children.length > 0) {
+        let child = editorGroup.children[0];
+        editorGroup.remove(child);
+    }
+}
+
+async function loadMapLibrary(mapName, itemElement) {
+    if (itemElement.classList.contains('loading')) return;
+    
+    resetEditorState();
+
+    itemElement.classList.add('loading');
+    const progContainer = itemElement.querySelector('.progress-container');
+    const progCirc = itemElement.querySelector('.circular-progress');
+    const progText = itemElement.querySelector('.circular-progress-text');
+    progContainer.style.display = 'block';
+
+    const updateUI = (percent) => {
+        const p = Math.floor(percent * 100);
+        progCirc.style.background = `conic-gradient(var(--md-sys-color-primary) ${p}%, transparent ${p}%)`;
+        progText.innerText = `${p}%`;
+    };
+
+    updateUI(0);
+
+    try {
+        const baseUrl = `https://raw.githubusercontent.com/${REPO_MAPS}/master/remaster/${mapName}`;
+        window.currentMapBaseUrl = baseUrl;
+
+        const mapBuf = await fetchWithProgress(`${baseUrl}/map.bin`, (p) => {
+            updateUI(p * 0.15); 
+        });
+
+        const mapData = await parseMapBin(mapBuf);
+        window.defaultMapProps = mapData.props;
+
+        await processMap(mapData, false, (p) => {
+            updateUI(0.15 + p * 0.85); 
+        });
+
+        updateUI(1);
+
+        setTimeout(() => {
+            document.getElementById('view-maps').style.display = 'none';
+            document.getElementById('view-props').style.display = 'flex';
+            itemElement.classList.remove('loading');
+            progContainer.style.display = 'none';
+            progCirc.style.background = `conic-gradient(var(--md-sys-color-primary) 0%, transparent 0%)`;
+            progText.innerText = `0%`;
+        }, 400);
+
+    } catch (e) {
+        console.error(e);
+        showToast(`Failed to load ${mapName}`);
+        itemElement.classList.remove('loading');
+        progContainer.style.display = 'none';
+    }
+}
+
 async function loadMain() {
     try {
         initThree();
         setupEditorGroup();
-        
-        await showLoading("Fetching default map catalog...");
-        
-        let mapBuf;
-        try {
-            mapBuf = await fetchFile(`${MAP_BASE_URL}/map.bin`);
-            window.currentMapBaseUrl = MAP_BASE_URL;
-        } catch (e) {
-            console.warn("Failed to fetch from 3dtank, falling back to GitHub...");
-            mapBuf = await fetchRawFile(REPO_MAPS, 'master', `${MAP_PATH}/map.bin`);
-            window.currentMapBaseUrl = `https://raw.githubusercontent.com/${REPO_MAPS}/master/${MAP_PATH}`;
-        }
-        
-        const mapData = await parseMapBin(mapBuf);
-        window.defaultMapProps = mapData.props;
-        
-        await processMap(mapData, false);
+        await renderMapList();
         setupUIEvents();
-        
-        log("Ready!");
-        hideLoading();
     } catch (e) {
-        log(`Fatal error: ${e.message}`);
-        console.error(e);
-        const spinner = document.querySelector('.m3-spinner');
-        if (spinner) spinner.style.display = 'none';
-        loadingTextEl.style.color = 'var(--md-sys-color-error)';
+        console.error("Fatal initialization error:", e);
     }
 }
 
@@ -2170,6 +2176,138 @@ document.addEventListener('visibilitychange', () => {
         }, 200);
     }
 });
+
+async function generateMapBin() {
+    if (!window.repackingData) throw new Error("Repacking data not initialized");
+    
+    const newPropBits = [];
+    const bw = new BinaryWriter();
+    const propsToWrite =[];
+  
+    let globalIdCounter = 0; 
+  
+    let originalMapGrp = editorGroup.children.find(c => c.userData.isOriginalMapGroup);
+    if (originalMapGrp) {
+        for (const child of originalMapGrp.children) {
+            if (child.userData.originalProps && child.userData.originalProps.length > 0) {
+                let meshIdx = 0;
+                for (const origProp of child.userData.originalProps) {
+                    const mesh = child.children[meshIdx++];
+                    const partMatrix = new THREE.Matrix4().multiplyMatrices(child.matrixWorld, mesh.matrix);
+                    const rawMatrix = partMatrix.premultiply(editorGroup.matrixWorld.clone().invert());
+                    
+                    const pos = new THREE.Vector3();
+                    const quat = new THREE.Quaternion();
+                    rawMatrix.decompose(pos, quat, new THREE.Vector3());
+                    const euler = new THREE.Euler().setFromQuaternion(quat, 'ZYX');
+
+                    propsToWrite.push({
+                        ...origProp,
+                        id: globalIdCounter++,
+                        pos:[pos.x, pos.y, pos.z],
+                        rot: [euler.x, euler.y, euler.z]
+                    });
+                }
+            }
+        }
+    }
+
+    let instanceIndex = 1;
+    for (const child of editorGroup.children) {
+        if (child === ghost || child.userData.isOriginalMapGroup) continue;  
+        
+        if (child.userData.originalProps) {
+            let meshIdx = 0;
+            for (const origProp of child.userData.originalProps) {
+                const mesh = child.children[meshIdx++];
+                const partMatrix = new THREE.Matrix4().multiplyMatrices(child.matrixWorld, mesh.matrix);
+                const rawMatrix = partMatrix.premultiply(editorGroup.matrixWorld.clone().invert());
+                
+                const pos = new THREE.Vector3();
+                const quat = new THREE.Quaternion();
+                rawMatrix.decompose(pos, quat, new THREE.Vector3());
+                const euler = new THREE.Euler().setFromQuaternion(quat, 'ZYX');
+
+                let outGrpName = origProp.grpName;
+                if (outGrpName && outGrpName !== "") {
+                    outGrpName = outGrpName + "_inst" + instanceIndex;
+                }
+                propsToWrite.push({
+                    ...origProp,
+                    grpName: outGrpName,
+                    id: globalIdCounter++,
+                    pos:[pos.x, pos.y, pos.z],
+                    rot:[euler.x, euler.y, euler.z],
+                    scale: origProp.scale 
+                });
+            }
+            instanceIndex++;
+        }
+    }
+    
+    bw.writeStringLength(propsToWrite.length);
+    for (const p of propsToWrite) {
+        if (p.grpName && p.grpName !== "") {
+            newPropBits.push(true);
+            bw.writeString(p.grpName);
+        } else {
+            newPropBits.push(false);
+        }
+        
+        bw.writeUint32(p.id, false);
+        bw.writeString(p.libName);
+        bw.writeUint32(p.matID, false);
+        bw.writeString(p.name);
+        
+        bw.writeFloat32(p.pos[0], false);
+        bw.writeFloat32(p.pos[1], false);
+        bw.writeFloat32(p.pos[2], false);
+  
+        const isRotZero = (Math.abs(p.rot[0]) < 1e-5 && Math.abs(p.rot[1]) < 1e-5 && Math.abs(p.rot[2]) < 1e-5);
+        if (!isRotZero) {
+            newPropBits.push(true);
+            bw.writeFloat32(p.rot[0], false);
+            bw.writeFloat32(p.rot[1], false);
+            bw.writeFloat32(p.rot[2], false);
+        } else {
+            newPropBits.push(false);
+        }
+  
+        const isScaleOne = (Math.abs(p.scale[0]-1) < 1e-5 && Math.abs(p.scale[1]-1) < 1e-5 && Math.abs(p.scale[2]-1) < 1e-5);
+        if (!isScaleOne) {
+            newPropBits.push(true);
+            bw.writeFloat32(p.scale[0], false);
+            bw.writeFloat32(p.scale[1], false);
+            bw.writeFloat32(p.scale[2], false);
+        } else {
+            newPropBits.push(false);
+        }
+    }
+    
+    const finalBits =[
+        ...window.repackingData.consumedBitsBeforeProps, 
+        ...newPropBits,
+        ...window.repackingData.suffixBits
+    ];
+    const header = packHeader(finalBits);
+    
+    const uncompressedLen = header.headerPrefix.length + 
+                            header.extBytes.length + 
+                            window.repackingData.prefixBytes.length + 
+                            bw.length + 
+                            window.repackingData.suffixBytes.length; 
+    
+    const uncompressed = new Uint8Array(uncompressedLen);
+    let offset = 0;
+    
+    uncompressed.set(header.headerPrefix, offset); offset += header.headerPrefix.length;
+    uncompressed.set(header.extBytes, offset); offset += header.extBytes.length;
+    uncompressed.set(window.repackingData.prefixBytes, offset); offset += window.repackingData.prefixBytes.length;
+    uncompressed.set(bw.toUint8Array(), offset); offset += bw.length; 
+    uncompressed.set(window.repackingData.suffixBytes, offset); 
+    
+    return await wrapPacketCompressed(uncompressed);
+}
 
 window.selectPrefab = function(baseName) {
     try {
@@ -2257,6 +2395,79 @@ function setupUIEvents() {
     const clearBtn = document.getElementById('clear-btn');
     const gridHeightDisplay = document.getElementById('grid-height-display');
     const gridZBtn = document.getElementById('grid-z-btn');
+    
+    const dialogOverlay = document.getElementById('m3-dialog-overlay');
+    const dialogContainer = document.getElementById('m3-dialog');
+    const dialogCancelBtn = document.getElementById('dialog-cancel-btn');
+    const dialogConfirmBtn = document.getElementById('dialog-confirm-btn');
+    const dialogTitleText = document.getElementById('dialog-title-text');
+    const dialogDescText = document.getElementById('dialog-desc-text');
+
+    let currentDialogAction = null;
+
+    function showDialog(title, desc, confirmText, actionCallback) {
+        if (dialogTitleText) dialogTitleText.innerText = title;
+        if (dialogDescText) dialogDescText.innerText = desc;
+        if (dialogConfirmBtn) dialogConfirmBtn.innerText = confirmText;
+        currentDialogAction = actionCallback;
+        
+        dialogOverlay.style.display = 'flex';
+        void dialogOverlay.offsetWidth;
+        dialogOverlay.style.opacity = '1';
+        dialogContainer.style.transform = 'scale(1) translateY(0)';
+    }
+
+    function closeDialog() {
+        dialogOverlay.style.opacity = '0';
+        dialogContainer.style.transform = 'scale(0.9) translateY(20px)';
+        setTimeout(() => { dialogOverlay.style.display = 'none'; }, 300);
+    }
+
+    dialogCancelBtn.addEventListener('click', closeDialog);
+
+    dialogConfirmBtn.addEventListener('click', () => {
+        if (currentDialogAction) currentDialogAction();
+        closeDialog();
+    });
+
+    const backToMapsBtn = document.getElementById('back-to-maps-btn');
+    if (backToMapsBtn) {
+        backToMapsBtn.addEventListener('click', () => {
+            showDialog(
+                "Leave Map",
+                "Are you sure you want to go back? All unsaved placed props will be lost.",
+                "Leave",
+                () => {
+                    resetEditorState();
+                    document.getElementById('view-props').style.display = 'none';
+                    document.getElementById('view-maps').style.display = 'flex';
+                }
+            );
+        });
+    }
+
+    clearBtn.addEventListener('click', () => {
+        showDialog(
+            "Clear Scene", 
+            "Are you sure you want to delete all objects in the scene? This action cannot be undone.", 
+            "Delete",
+            () => {
+                while(editorGroup.children.length > 0) {
+                    editorGroup.remove(editorGroup.children[0]);
+                }
+                
+                if (ghost) {
+                    ghost = null;
+                    window.isGhostLockedToOriginal = false;
+                }
+                
+                window.originalObjectBeingMoved = null;
+                window.originalObjectParent = null;
+                
+                document.querySelector('.grid-floating-panel').style.display = 'none';
+            }
+        );
+    });
 
     function updateDragModeUI() {
         rotateBtn.className = window.dragMode === 'rotate' ? 'm3-btn m3-btn-primary' : 'm3-btn m3-btn-secondary';
@@ -2369,7 +2580,6 @@ function setupUIEvents() {
         const files = Array.from(e.target.files);
         if (files.length === 0) return;
         
-        await showLoading("Loading custom map...");
         try {
             const mapFile = files.find(f => f.name === 'map.bin' || f.name.endsWith('.bin'));
             const a3dFile = files.find(f => f.name === 'models.a3d' || f.name.endsWith('.a3d'));
@@ -2416,51 +2626,10 @@ function setupUIEvents() {
                 showToast("No map.bin selected!");
             }
         } catch (err) {
-            log(`Import error: ${err.message}`);
             console.error(err);
             showToast("Failed to load map.");
         }
-        hideLoading();
         e.target.value = ''; 
-    });
-
-    const dialogOverlay = document.getElementById('m3-dialog-overlay');
-    const dialogContainer = document.getElementById('m3-dialog');
-    const dialogCancelBtn = document.getElementById('dialog-cancel-btn');
-    const dialogConfirmBtn = document.getElementById('dialog-confirm-btn');
-
-    function closeDialog() {
-        dialogOverlay.style.opacity = '0';
-        dialogContainer.style.transform = 'scale(0.9) translateY(20px)';
-        setTimeout(() => { dialogOverlay.style.display = 'none'; }, 300);
-    }
-
-    clearBtn.addEventListener('click', () => {
-        dialogOverlay.style.display = 'flex';
-        void dialogOverlay.offsetWidth;
-        dialogOverlay.style.opacity = '1';
-        dialogContainer.style.transform = 'scale(1) translateY(0)';
-    });
-
-    dialogCancelBtn.addEventListener('click', closeDialog);
-
-    dialogConfirmBtn.addEventListener('click', () => {
-        closeDialog();
-        const toRemove =[];
-        editorGroup.children.forEach(child => {
-            toRemove.push(child);
-        });
-        toRemove.forEach(c => editorGroup.remove(c));
-        
-        if (ghost) {
-            ghost = null;
-            window.isGhostLockedToOriginal = false;
-        }
-        
-        window.originalObjectBeingMoved = null;
-        window.originalObjectParent = null;
-        
-        document.querySelector('.grid-floating-panel').style.display = 'none';
     });
 
     const continuousCopyBtn = document.getElementById('continuous-copy-btn');
@@ -3041,7 +3210,8 @@ function updateGhost(clientX, clientY, isLockedDrag = false) {
         }
     }
 }
+
 loadMain();
-</script>
+    </script>
 </body>
 </html>

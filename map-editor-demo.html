@@ -247,7 +247,6 @@
             text-overflow: ellipsis;
         }
 
-
         #toast-msg {
             position: fixed;
             bottom: 24px;
@@ -594,6 +593,31 @@ defaultControl.needsUpdate = true;
 const defaultTile = new THREE.DataTexture(new Uint8Array([128, 128, 128, 255]), 1, 1);
 defaultTile.colorSpace = THREE.SRGBColorSpace;
 defaultTile.needsUpdate = true;
+
+function getCleanBaseName(rawName) {
+    const tmpLower = rawName.toLowerCase();
+    
+    const grabUnIdx = tmpLower.indexOf('grab_un_tower');
+    if (grabUnIdx !== -1) return rawName.substring(0, grabUnIdx + 'grab_un_tower'.length);
+
+    const grabFlIdx = tmpLower.indexOf('grab_fl_tower');
+    if (grabFlIdx !== -1) return rawName.substring(0, grabFlIdx + 'grab_fl_tower'.length);
+
+    const riseAIdx = tmpLower.indexOf('rise_a');
+    if (riseAIdx !== -1) return rawName.substring(0, riseAIdx + 'rise_a'.length);
+
+    let cleaned = rawName;
+    if (/_sub\d+$/i.test(cleaned)) {
+        cleaned = cleaned.replace(/_sub\d+$/i, '');
+    } else if (/(.*)(_?part\d+[a-z]*)(.*)/i.test(cleaned)) {
+        cleaned = cleaned.replace(/_?part\d+[a-z]*/i, '');
+        cleaned = cleaned.replace(/__+/g, '_');
+        if (cleaned.endsWith('_')) {
+            cleaned = cleaned.slice(0, -1);
+        }
+    }
+    return cleaned;
+}
 
 function log(msg) {
     if (loadingTextEl) loadingTextEl.innerText = msg;
@@ -1522,6 +1546,7 @@ function addErrorToUI(fileName, errorMsg) {
     `;
     listContainer.insertBefore(item, listContainer.firstChild);
 }
+
 async function processMap(mapData, buildWorld = false) {
     const propDict = await getPropDict(mapData); 
 
@@ -1560,13 +1585,11 @@ async function processMap(mapData, buildWorld = false) {
                 if (file.toLowerCase().endsWith('.a3d')) {
                     let a3dBuf;
                     try {
-                    
                         a3dBuf = await fetchRawFile(REPO_PROPS, 'main', `html5/${libName}/${file}`);
                     } catch (fetchErr) {
                         const lowerFile = file.toLowerCase();
                         if (file !== lowerFile) {
                             console.warn(`[Case Fallback] Cannot find ${file}, trying lowercase: ${lowerFile}`);
-               
                             a3dBuf = await fetchRawFile(REPO_PROPS, 'main', `html5/${libName}/${lowerFile}`);
                         } else {
                             throw fetchErr; 
@@ -1590,12 +1613,10 @@ async function processMap(mapData, buildWorld = false) {
             let tex = null;
 
             if (libName) {
-                
                 tex = await loadTexture(REPO_PROPS, 'main', `html5/${libName}/${texName}.webp`, true, isControl, isRepeat);
             }
 
             if (!tex) {
-                
                 tex = await loadTexture(REPO_MAPS, 'master', `${MAP_PATH}/${texName}.webp`, true, isControl, isRepeat);
             }
 
@@ -1634,19 +1655,7 @@ async function processMap(mapData, buildWorld = false) {
     for (let i = 0; i < mapData.props.length; i++) {
         const prop = mapData.props[i];
         
-        let baseName = prop.name;
-        
-        if (/_sub\d+$/i.test(baseName)) {
-            baseName = baseName.replace(/_sub\d+$/i, '');
-        } else if (/(.*)(_?part\d+[a-z]*)(.*)/i.test(baseName)) {
-            baseName = baseName.replace(/_?part\d+[a-z]*/i, '');
-            
-            baseName = baseName.replace(/__+/g, '_');
-            if (baseName.endsWith('_')) {
-                baseName = baseName.slice(0, -1);
-            }
-        }
-
+        let baseName = getCleanBaseName(prop.name);
         const lowerName = baseName.toLowerCase();
         
         const isDisplay = lowerName.startsWith('display');
@@ -1656,15 +1665,11 @@ async function processMap(mapData, buildWorld = false) {
             let originalMainName = null;
             let expectedBodyLower = trackMatch ? 'body' + trackMatch[2] : '';
 
-                        for (let j = 0; j < mapData.props.length; j++) {
-                let n = mapData.props[j].name;
-                if (/_sub\d+$/i.test(n)) n = n.replace(/_sub\d+$/i, '');
-                else if (/_?part\d+[a-z]*$/i.test(n)) n = n.replace(/_?part\d+[a-z]*$/i, '');
-                
+            for (let j = 0; j < mapData.props.length; j++) {
+                let n = getCleanBaseName(mapData.props[j].name);
                 const nLower = n.toLowerCase();
                 
                 if (isDisplay && nLower.startsWith('billboard')) {
-                 
                     originalMainName = n;
                     break;
                 } else if (trackMatch && nLower === expectedBodyLower) {
@@ -1676,7 +1681,6 @@ async function processMap(mapData, buildWorld = false) {
             if (originalMainName) {
                 baseName = originalMainName;
             } else {
-          
                 baseName = isDisplay ? 'Billboard' : (expectedBodyLower.charAt(0).toUpperCase() + expectedBodyLower.slice(1));
             }
         }
@@ -1840,7 +1844,7 @@ async function processMap(mapData, buildWorld = false) {
                         } else {
                             discard;
                         }
-                     
+                        
                         diffuseColor = vec4(splatColor.rgb, diffuseColor.a);
                         `
                     );
@@ -1897,7 +1901,12 @@ async function processMap(mapData, buildWorld = false) {
             if (prop.grpName && prop.grpName.trim() !== "") {
                 instanceKey = `${baseName}_grp_${prop.grpName}`;
             } else {
-                const snap = baseName.toLowerCase().startsWith('rise_a') ? 2000 : 1;
+                let snap = 1;
+                const lowerBase = baseName.toLowerCase();
+                if (lowerBase === 'rise_a' || lowerBase === 'grab_un_tower' || lowerBase === 'grab_fl_tower') {
+                    snap = 2000;
+                }
+                
                 const px = Math.round(prop.pos[0] / snap) * snap;
                 const py = Math.round(prop.pos[1] / snap) * snap;
                 const pz = Math.round(prop.pos[2] / snap) * snap;
@@ -2338,7 +2347,7 @@ function setupUIEvents() {
             let name = hitObj.userData.baseName;
             if (!name && hitObj.userData.originalProps && hitObj.userData.originalProps.length > 0) {
                 let pName = hitObj.userData.originalProps[0].name;
-                name = pName.replace(/_sub\d+$/i, '').replace(/_?part\d+[a-z]*$/i, '');
+                name = getCleanBaseName(pName);
             }
             title.innerText = name || "Unknown Object";
             
@@ -2368,7 +2377,7 @@ function setupUIEvents() {
             let name = selectedObjectForAction.userData.baseName;
             if (!name && selectedObjectForAction.userData.originalProps && selectedObjectForAction.userData.originalProps.length > 0) {
                 let pName = selectedObjectForAction.userData.originalProps[0].name;
-                name = pName.replace(/_sub\d+$/i, '').replace(/_?part\d+[a-z]*$/i, '');
+                name = getCleanBaseName(pName);
             }
             const rot = selectedObjectForAction.rotation.clone();
             const pos = selectedObjectForAction.position.clone();
@@ -2442,7 +2451,7 @@ function setupUIEvents() {
             let name = selectedObjectForAction.userData.baseName;
             if (!name && selectedObjectForAction.userData.originalProps && selectedObjectForAction.userData.originalProps.length > 0) {
                 let pName = selectedObjectForAction.userData.originalProps[0].name;
-                name = pName.replace(/_sub\d+$/i, '').replace(/_?part\d+[a-z]*$/i, '');
+                name = getCleanBaseName(pName);
             }
             const rot = selectedObjectForAction.rotation.clone();
             const pos = selectedObjectForAction.position.clone();

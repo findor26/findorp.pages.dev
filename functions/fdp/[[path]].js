@@ -1,4 +1,4 @@
-// /functions/api/[[path]].js
+// /functions/fdp/[[path]].js
 
 export async function onRequest(context) {
   const { request, params } = context;

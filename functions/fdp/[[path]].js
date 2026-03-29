@@ -16,6 +16,7 @@ export async function onRequest(context) {
   newHeaders.set("X-Forwarded-Host", url.host);
 
   // 3. 发起背靠背请求
+  
   try {
     const response = await fetch(targetUrl, {
       method: request.method,

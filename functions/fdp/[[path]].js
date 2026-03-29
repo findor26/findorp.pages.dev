@@ -1,6 +1,5 @@
 // /functions/fdp/[[path]].js
 
-
 export async function onRequest(context) {
   const { request, params } = context;
   const url = new URL(request.url);

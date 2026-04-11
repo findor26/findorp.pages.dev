@@ -114,7 +114,7 @@ export async function onRequest(context) {
 
       // 检查留言总数限制（500条）- 只有主留言才检查
       if (!parent_id) {
-        const totalResult = await env.DB_TEST.prepare(
+        const totalResult = await env.DB.prepare(
           "SELECT COUNT(*) as count FROM messages WHERE parent_id IS NULL"
         ).first();
         if (totalResult && totalResult.count >= 500) {
@@ -124,7 +124,7 @@ export async function onRequest(context) {
 
       // 如果parent_id存在，验证父留言是否存在且不是回复的回复
       if (parent_id) {
-        const parentResult = await env.DB_TEST.prepare(
+        const parentResult = await env.DB.prepare(
           "SELECT parent_id FROM messages WHERE id = ?"
         ).bind(parent_id).first();
         
@@ -141,13 +141,13 @@ export async function onRequest(context) {
 
       try {
         // 尝试插入留言（包含parent_id字段）
-        await env.DB_TEST.prepare(
+        await env.DB.prepare(
           "INSERT INTO messages (nickname, content, created_at, ip_address, parent_id) VALUES (?, ?, ?, ?, ?)"
         ).bind(nickname, content, createdAt, ip, parent_id || null).run();
       } catch (dbErr) {
         // 如果parent_id字段不存在，尝试不带parent_id的插入
         if (dbErr.message && dbErr.message.includes("no such column: parent_id")) {
-          await env.DB_TEST.prepare(
+          await env.DB.prepare(
             "INSERT INTO messages (nickname, content, created_at, ip_address) VALUES (?, ?, ?, ?)"
           ).bind(nickname, content, createdAt, ip).run();
         } else {
@@ -158,7 +158,7 @@ export async function onRequest(context) {
       // 如果是回复，尝试更新父留言的回复计数
       if (parent_id) {
         try {
-          await env.DB_TEST.prepare(
+          await env.DB.prepare(
             "UPDATE messages SET reply_count = reply_count + 1 WHERE id = ?"
           ).bind(parent_id).run();
         } catch (updateErr) {

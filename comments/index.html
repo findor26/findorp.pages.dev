@@ -216,6 +216,33 @@
             margin: 32px 0;
         }
 
+        /* 留言卡片内回复容器的平滑过渡 */
+        .replies-container {
+            display: none; /* 默认隐藏，点击后再展开 */
+            margin-top: 12px;
+            margin-left: 12px;
+            padding-left: 12px;
+            border-left: 3px solid var(--md-sys-color-primary-container);
+            animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .reply-item {
+            background: var(--md-sys-color-surface); /* 略深于主卡片的底色 */
+            border: none;
+            border-bottom: 1px solid var(--md-sys-color-outline-variant);
+            border-radius: 0;
+            padding: 8px 0;
+        }
+
+        .reply-item:last-child {
+            border-bottom: none;
+        }
+
         .btn-text {
             background: none;
             border: none;
@@ -659,19 +686,22 @@
             location.reload();
         }
 
-        // --- 回复相关函数 ---
+        // 核心逻辑：点击图标负责“展开/收起”回复列表，并激活回复模式
         function handleReplyClick(parentId, nickname) {
             const container = document.getElementById(`replies-${parentId}`);
-            const replyButton = event.target.closest('.vote-chip');
-            
-            if (container.innerHTML === '') {
-                // 第一次点击，加载回复
-                loadReplies(parentId);
-                replyButton.setAttribute('data-loaded', 'true');
+
+            // 切换折叠状态
+            if (container.style.display === 'none' || container.innerHTML === '') {
+                container.style.display = 'block';
+                if (container.innerHTML === '') {
+                    loadReplies(parentId);
+                }
             } else {
-                // 已经加载过，显示回复表单
-                showReplyForm(parentId, nickname);
+                container.style.display = 'none';
             }
+
+            // 激活回复输入模式
+            showReplyForm(parentId, nickname);
         }
 
         function showReplyForm(parentId, nickname) {
@@ -689,33 +719,33 @@
         }
 
         async function loadReplies(parentId) {
+            const container = document.getElementById(`replies-${parentId}`);
             try {
                 const res = await fetch(`/api/messages?parent_id=${parentId}`);
                 const replies = await res.json();
-                const container = document.getElementById(`replies-${parentId}`);
-                
+
                 if (!replies || replies.length === 0) {
-                    container.innerHTML = '<div style="font-size: 12px; color: var(--md-sys-color-outline-variant);">暂无回复</div>';
+                    container.innerHTML = '<div style="font-size: 12px; padding: 8px; color: var(--md-sys-color-outline-variant);">尚无回复</div>';
                     return;
                 }
-                
-                let html = '';
-                replies.forEach(reply => {
-                    html += `
-                        <div class="reply-item">
-                            <div class="reply-header">
-                                <span class="reply-nickname">${safeText(reply.nickname)}</span>
-                                <span class="reply-time">${prettyDate(reply.created_at)}</span>
-                            </div>
-                            <div class="reply-content">${safeText(reply.content)}</div>
-                        </div>
-                    `;
-                });
-                container.innerHTML = html;
+
+                container.innerHTML = replies.map(reply => `
+            <div class="reply-item">
+                <div class="reply-header">
+                    <span class="reply-nickname">${safeText(reply.nickname)}</span>
+                    <span class="reply-time">${prettyDate(reply.created_at)}</span>
+                </div>
+                <div class="reply-content">${safeText(reply.content)}</div>
+                ${isAdmin ? `
+                    <div style="text-align:right; margin-top:4px;">
+                        <span class="material-symbols-outlined tool-icon danger" style="font-size:16px;"
+                              onclick="handleDelete(${reply.id})">delete</span>
+                    </div>
+                ` : ''}
+            </div>
+        `).join('');
             } catch (err) {
-                console.error('加载回复失败:', err);
-                const container = document.getElementById(`replies-${parentId}`);
-                container.innerHTML = '<div style="font-size: 12px; color: var(--md-sys-color-error);">加载回复失败</div>';
+                container.innerHTML = '<div style="font-size: 12px; color: var(--md-sys-color-error);">回复加载失败</div>';
             }
         }
 

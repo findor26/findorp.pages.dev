@@ -383,6 +383,20 @@
 .vote-count {
     font-weight: 500;
 }
+
+        .replies-container {
+            /* 移除之前的 margin-left: 24px，改用更现代的间距 */
+            margin-top: 16px;
+            padding: 12px;
+            background-color: var(--md-sys-color-surface-container);
+            border-radius: 16px;
+            border-left: 4px solid var(--md-sys-color-primary);
+        }
+
+        /* 回复按钮点击时的反馈 */
+        .vote-chip[onclick*="handleToggleReplies"]:active {
+            background-color: var(--md-sys-color-primary-container);
+        }
     </style>
 </head>
 <body>
@@ -514,23 +528,21 @@
                     <div class="content">${safeText(m.content)}</div>
                     
                     <div class="interaction-bar">
-                        <div class="vote-chip ${myVote === 'up' ? 'active-up' : ''}" 
-                             onclick="submitVote(${m.id}, 'up')">
-                            <span class="material-symbols-outlined">${myVote === 'up' ? 'thumb_up_filled' : 'thumb_up'}</span>
-                            <span class="vote-count">${m.upvotes || 0}</span>
-                        </div>
-                        <div class="vote-chip ${myVote === 'down' ? 'active-down' : ''}" 
-                             onclick="submitVote(${m.id}, 'down')">
-                            <span class="material-symbols-outlined">${myVote === 'down' ? 'thumb_down_filled' : 'thumb_down'}</span>
-                            <span class="vote-count">${m.downvotes || 0}</span>
-                        </div>
-                        <div class="vote-chip" onclick="handleReplyClick(${m.id}, '${safeText(m.nickname)}')">
-                            <span class="material-symbols-outlined">reply</span>
-                            <span class="vote-count">${m.reply_count || 0}</span>
-                        </div>
-                    </div>
-                    
-                    <div id="replies-${m.id}" class="replies-container"></div>
+    <div class="vote-chip ${myVote === 'up' ? 'active-up' : ''}" onclick="submitVote(${m.id}, 'up')">
+        <span class="material-symbols-outlined">${myVote === 'up' ? 'thumb_up_filled' : 'thumb_up'}</span>
+        <span class="vote-count">${m.upvotes || 0}</span>
+    </div>
+    <div class="vote-chip ${myVote === 'down' ? 'active-down' : ''}" onclick="submitVote(${m.id}, 'down')">
+        <span class="material-symbols-outlined">${myVote === 'down' ? 'thumb_down_filled' : 'thumb_down'}</span>
+        <span class="vote-count">${m.downvotes || 0}</span>
+    </div>
+    <div class="vote-chip" id="reply-btn-${m.id}" onclick="handleToggleReplies(${m.id}, '${safeText(m.nickname)}')">
+        <span class="material-symbols-outlined">forum</span>
+        <span class="vote-count">${m.reply_count || 0}</span>
+        <span class="expand-icon material-symbols-outlined" style="font-size:16px; margin-left:4px;">expand_more</span>
+    </div>
+</div>
+<div id="replies-${m.id}" class="replies-container" style="display: none;"></div>
 
                     ${isAdmin ? `
                         <div class="admin-tools">
@@ -545,6 +557,35 @@
                     ` : ''}
                 </div>
             `;
+        }
+
+        async function handleToggleReplies(parentId, nickname) {
+            const container = document.getElementById(`replies-${parentId}`);
+            const btn = document.getElementById(`reply-btn-${parentId}`);
+            const icon = btn.querySelector('.expand-icon');
+
+            // 1. 如果当前是隐藏的，则展开并加载
+            if (container.style.display === 'none') {
+                container.style.display = 'block';
+                icon.textContent = 'expand_less'; // 切换图标
+
+                // 只有在容器为空时才去抓取数据，避免重复请求
+                if (container.innerHTML === '') {
+                    await loadReplies(parentId);
+                }
+
+                // 同时激活回复模式（将输入框焦点移过去）
+                showReplyForm(parentId, nickname);
+            }
+            // 2. 如果当前是显示的，则收起
+            else {
+                container.style.display = 'none';
+                icon.textContent = 'expand_more';
+                // 如果收起的是当前正在回复的 ID，则取消回复状态
+                if (document.getElementById('parent_id').value == parentId) {
+                    cancelReply();
+                }
+            }
         }
 
         // --- 管理动作逻辑 ---
@@ -634,28 +675,79 @@
         }
 
         // --- 发布逻辑 ---
+        /**
+         * 核心发布逻辑：支持主留言与回复留言
+         */
         async function handleSendMessage() {
+            const parentId = document.getElementById('parent_id').value;
             const nickname = nickInp.value.trim();
             const content = contInp.value.trim();
             const btn = document.getElementById('post-btn');
 
+            // 1. 基础校验
             if (!nickname || !content) return alert("称呼和内容都要填哦");
             if (nickname.length > 20 || content.length > 500) return alert("字数超限啦");
 
+            // 2. 防止重复提交
             btn.disabled = true;
+            const originalBtnText = btn.innerHTML;
+            btn.innerHTML = '<span class="material-symbols-outlined">sync</span> 发布中...';
+
             try {
                 const res = await fetch('/api/messages', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ nickname, content })
+                    body: JSON.stringify({
+                        nickname,
+                        content,
+                        parent_id: parentId ? parseInt(parentId) : null
+                    })
                 });
+
                 if (res.ok) {
+                    // 3. 清理输入状态
                     contInp.value = '';
                     document.getElementById('cont-num').textContent = '0';
-                    fetchMessages(true);
+
+                    if (parentId) {
+                        // --- 情况 A: 处理回复成功 ---
+                        const container = document.getElementById(`replies-${parentId}`);
+                        const btnChip = document.getElementById(`reply-btn-${parentId}`);
+                        const icon = btnChip ? btnChip.querySelector('.expand-icon') : null;
+                        const countSpan = btnChip ? btnChip.querySelector('.vote-count') : null;
+
+                        // 强制展开回复容器并切换图标状态
+                        container.style.display = 'block';
+                        if (icon) icon.textContent = 'expand_less';
+
+                        // 局部刷新该留言下的回复列表
+                        await loadReplies(parentId);
+
+                        // 更新主留言卡片上的回复数显示
+                        if (countSpan) {
+                            countSpan.textContent = parseInt(countSpan.textContent) + 1;
+                        }
+
+                        // 退出回复模式
+                        cancelReply();
+                    } else {
+                        // --- 情况 B: 处理主留言成功 ---
+                        fetchMessages(true); // 刷新全局列表
+                    }
+
+                    // 成功提示（可选）
+                    console.log("发布成功");
+                } else {
+                    const errorText = await res.text();
+                    alert(`发布失败: ${errorText}`);
                 }
+            } catch (err) {
+                console.error('网络请求异常:', err);
+                alert('网络错误，请稍后再试');
             } finally {
+                // 4. 恢复按钮状态
                 btn.disabled = false;
+                btn.innerHTML = originalBtnText;
             }
         }
 

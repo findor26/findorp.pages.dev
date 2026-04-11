@@ -155,7 +155,6 @@ export async function onRequest(context) {
         }
       }
 
-
       // 如果是回复，尝试更新父留言的回复计数
       if (parent_id) {
         try {

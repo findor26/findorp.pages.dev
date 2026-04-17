@@ -9,6 +9,7 @@ export async function onRequest(context) {
         "183.95.42.127",
         "5.6.7.8"
     ];
+
     if (blacklistedIps.includes(clientIp)) {
         // 立即返回 403 拒绝访问，不再执行后续逻辑
         return new Response("您的 IP 已被禁止访问", {

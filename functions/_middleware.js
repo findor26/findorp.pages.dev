@@ -6,7 +6,7 @@ export async function onRequest(context) {
 
     // 待拉黑的 IP 列表
     const blacklistedIps = [
-        "183.95.42.127",
+
     ];
 
     if (blacklistedIps.includes(clientIp)) {

@@ -1,7 +1,6 @@
 // functions/translate.js
 // 你的访问路径: https://findorp.pages.dev/functions/translate
 
-
 // 允许的模型白名单
 const ALLOWED_MODELS = [
     'gemini-3-flash-preview',

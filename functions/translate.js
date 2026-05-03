@@ -84,7 +84,6 @@ export async function onRequest(context) {
         }
 
         // ========== 调用 Gemini 流式 API ==========
-        // 注意：端点改为 streamGenerateContent，加上 alt=sse 参数
         const geminiUrl = `${GEMINI_BASE}/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
 
         const geminiResponse = await fetch(geminiUrl, {
@@ -94,7 +93,6 @@ export async function onRequest(context) {
         });
 
         if (!geminiResponse.ok) {
-            // 流式错误，读取完整响应体
             const errorData = await geminiResponse.json().catch(() => ({}));
             return jsonResponse({
                 error: errorData.error?.message || 'Gemini API 错误',
@@ -103,15 +101,39 @@ export async function onRequest(context) {
             }, geminiResponse.status);
         }
 
-        // ========== 流式转发 ==========
-        return new Response(geminiResponse.body, {
+        // ========== 手动读取流并逐块写入 ==========
+        const { readable, writable } = new TransformStream();
+        const writer = writable.getWriter();
+        const reader = geminiResponse.body.getReader();
+        const encoder = new TextEncoder();
+
+        // 异步处理流，不阻塞响应返回
+        context.waitUntil(
+            (async () => {
+                try {
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) {
+                            await writer.close();
+                            break;
+                        }
+                        await writer.write(value);
+                    }
+                } catch (e) {
+                    console.error('Stream error:', e);
+                    await writer.abort(e);
+                }
+            })()
+        );
+
+        return new Response(readable, {
             status: 200,
             headers: {
                 'Content-Type': 'text/event-stream',
                 'Cache-Control': 'no-cache',
                 'Connection': 'keep-alive',
                 'Access-Control-Allow-Origin': '*',
-                'X-Accel-Buffering': 'no'  // 禁用 nginx 缓冲（如果经过反向代理）
+                'X-Accel-Buffering': 'no'
             }
         });
 

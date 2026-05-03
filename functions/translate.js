@@ -83,8 +83,9 @@ export async function onRequest(context) {
             }];
         }
 
-        // ========== 调用 Gemini API ==========
-        const geminiUrl = `${GEMINI_BASE}/${model}:generateContent?key=${apiKey}`;
+        // ========== 调用 Gemini 流式 API ==========
+        // 注意：端点改为 streamGenerateContent，加上 alt=sse 参数
+        const geminiUrl = `${GEMINI_BASE}/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
 
         const geminiResponse = await fetch(geminiUrl, {
             method: 'POST',
@@ -92,18 +93,27 @@ export async function onRequest(context) {
             body: JSON.stringify(geminiBody)
         });
 
-        const data = await geminiResponse.json();
-
         if (!geminiResponse.ok) {
+            // 流式错误，读取完整响应体
+            const errorData = await geminiResponse.json().catch(() => ({}));
             return jsonResponse({
-                error: data.error?.message || 'Gemini API 错误',
+                error: errorData.error?.message || 'Gemini API 错误',
                 code: 'API_ERROR',
-                details: data.error
+                details: errorData.error
             }, geminiResponse.status);
         }
 
-        // ========== 返回翻译结果 ==========
-        return jsonResponse(data, 200);
+        // ========== 流式转发 ==========
+        return new Response(geminiResponse.body, {
+            status: 200,
+            headers: {
+                'Content-Type': 'text/event-stream',
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive',
+                'Access-Control-Allow-Origin': '*',
+                'X-Accel-Buffering': 'no'  // 禁用 nginx 缓冲（如果经过反向代理）
+            }
+        });
 
     } catch (err) {
         return jsonResponse({

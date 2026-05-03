@@ -511,6 +511,9 @@
         <span class="loading-text">正在翻译...</span>
     </div>
 
+    <!-- MD3 Error Toast -->
+    <div class="error-toast" id="errorToast"></div>
+
     <!-- MD3 Input Bar -->
     <div class="input-area">
         <div class="input-wrapper">
@@ -561,7 +564,7 @@
         }
     }
 
-    // ========== 核心发送函数 ==========
+    // ========== 核心发送函数（SSE 流式） ==========
     async function sendMessage() {
         const text = userInput.value.trim();
         if (!text) return;
@@ -573,6 +576,13 @@
         // 设置加载状态
         sendBtn.disabled = true;
         loadingContainer.classList.add("active");
+        hideError();
+
+        // 创建 AI 消息气泡（用于流式输出）
+        const aiMsgDiv = document.createElement("div");
+        aiMsgDiv.className = "message ai-msg";
+        aiMsgDiv.textContent = "";
+        chatBox.appendChild(aiMsgDiv);
 
         const model = modelSelect.value;
 
@@ -613,11 +623,66 @@ ${dictPrompt}`
             });
 
             if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                showError(errorData.error || `请求失败 (${response.status})`);
+                aiMsgDiv.remove();
+                return;
             }
 
+            // ========== 读取 SSE 流 ==========
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "";
+            let hasContent = false;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+
+                // 按行分割，保留末尾不完整的行
+                const lines = buffer.split("\n");
+                buffer = lines.pop() || "";
+
+                for (const line of lines) {
+                    if (line.startsWith("data: ")) {
+                        const data = line.slice(6).trim();
+                        if (!data || data === "[DONE]") continue;
+
+                        try {
+                            const parsed = JSON.parse(data);
+                            // Gemini SSE 可能返回对象或数组
+                            const candidates = Array.isArray(parsed)
+                                ? parsed[0]?.candidates
+                                : parsed.candidates;
+                            const textPiece = candidates?.[0]?.content?.parts?.[0]?.text;
+                            if (textPiece) {
+                                hasContent = true;
+                                // Gemini 流式响应中每个事件包含累积文本，直接替换
+                                aiMsgDiv.textContent = textPiece;
+                                // 自动滚动到底部
+                                chatBox.scrollTo({
+                                    top: chatBox.scrollHeight,
+                                    behavior: "smooth"
+                                });
+                            }
+                        } catch (e) {
+                            // 忽略单个事件解析错误
+                        }
+                    }
+                }
+            }
+
+            // 如果没有任何输出，移除空气泡
+            if (!hasContent) {
+                aiMsgDiv.remove();
+            }
 
         } catch (error) {
             console.error("翻译错误:", error);
+            showError("网络错误，请检查连接后重试");
+            aiMsgDiv.remove();
         } finally {
             // 恢复状态
             sendBtn.disabled = false;
@@ -637,6 +702,18 @@ ${dictPrompt}`
             top: chatBox.scrollHeight,
             behavior: "smooth"
         });
+    }
+
+    function showError(msg) {
+        const toast = document.getElementById("errorToast");
+        toast.textContent = msg;
+        toast.classList.add("show");
+        setTimeout(hideError, 5000);
+    }
+
+    function hideError() {
+        const toast = document.getElementById("errorToast");
+        toast.classList.remove("show");
     }
 
     // ========== 页面加载完成，聚焦输入框 ==========

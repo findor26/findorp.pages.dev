@@ -101,39 +101,13 @@ export async function onRequest(context) {
             }, geminiResponse.status);
         }
 
-        // ========== 手动读取流并逐块写入 ==========
-        const { readable, writable } = new TransformStream();
-        const writer = writable.getWriter();
-        const reader = geminiResponse.body.getReader();
-        const encoder = new TextEncoder();
-
-        // 异步处理流，不阻塞响应返回
-        context.waitUntil(
-            (async () => {
-                try {
-                    while (true) {
-                        const { done, value } = await reader.read();
-                        if (done) {
-                            await writer.close();
-                            break;
-                        }
-                        await writer.write(value);
-                    }
-                } catch (e) {
-                    console.error('Stream error:', e);
-                    await writer.abort(e);
-                }
-            })()
-        );
-
-        return new Response(readable, {
+        // ========== 直接透传 Gemini 的 SSE 流 ==========
+        return new Response(geminiResponse.body, {
             status: 200,
             headers: {
-                'Content-Type': 'text/event-stream',
-                'Cache-Control': 'no-cache',
-                'Connection': 'keep-alive',
-                'Access-Control-Allow-Origin': '*',
-                'X-Accel-Buffering': 'no'
+                'Content-Type': 'text/event-stream; charset=utf-8',
+                'Cache-Control': 'no-cache, no-transform',
+                'Access-Control-Allow-Origin': '*'
             }
         });
 

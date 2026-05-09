@@ -46,12 +46,7 @@
 
             --md-sys-elevation-0: none;
             --md-sys-elevation-1: 0px 1px 2px rgba(0,0,0,0.3), 0px 1px 3px 1px rgba(0,0,0,0.15);
-            --md-sys-elevation-2: 0px 1px 2px rgba(0,0,0,0.3), 0px 2px 6px 2px rgba(0,0,0,0.15);
             --md-sys-elevation-3: 0px 1px 3px rgba(0,0,0,0.3), 0px 4px 8px 3px rgba(0,0,0,0.15);
-
-            --md-sys-state-hover-opacity: 0.08;
-            --md-sys-state-focus-opacity: 0.12;
-            --md-sys-state-pressed-opacity: 0.12;
         }
 
         /* ========== 全局重置 ========== */
@@ -70,11 +65,9 @@
             justify-content: center;
             align-items: center;
             padding: 16px;
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
         }
 
-        /* ========== 主容器 - MD3 Surface Card ========== */
+        /* ========== 主容器 ========== */
         .chat-container {
             width: 100%;
             max-width: 640px;
@@ -85,10 +78,9 @@
             flex-direction: column;
             overflow: hidden;
             box-shadow: var(--md-sys-elevation-3);
-            position: relative;
         }
 
-        /* ========== 顶部栏 - MD3 Top App Bar ========== */
+        /* ========== 顶部栏 ========== */
         .header {
             background: var(--md-sys-color-primary);
             color: var(--md-sys-color-on-primary);
@@ -98,75 +90,28 @@
             align-items: center;
             gap: 12px;
             flex-shrink: 0;
-            z-index: 1;
         }
 
         .header-title {
             font-size: 1.125rem;
             font-weight: 500;
-            letter-spacing: 0;
-            line-height: 1.5;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .header-icon {
-            width: 24px;
-            height: 24px;
-            flex-shrink: 0;
-        }
-
-        /* MD3 Filled Select */
-        .model-select-wrapper {
-            position: relative;
-            flex-shrink: 0;
         }
 
         .model-select {
-            appearance: none;
-            -webkit-appearance: none;
             background: rgba(255, 255, 255, 0.15);
             color: var(--md-sys-color-on-primary);
             border: 1px solid rgba(255, 255, 255, 0.3);
             border-radius: var(--md-sys-shape-corner-small);
-            padding: 8px 32px 8px 12px;
-            font-family: 'Roboto', sans-serif;
-            font-size: 0.8125rem;
-            font-weight: 500;
-            cursor: pointer;
+            padding: 8px;
             outline: none;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            letter-spacing: 0.01em;
-        }
-
-        .model-select:hover {
-            background: rgba(255, 255, 255, 0.25);
-        }
-
-        .model-select:focus-visible {
-            background: rgba(255, 255, 255, 0.2);
-            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5);
         }
 
         .model-select option {
             background: var(--md-sys-color-surface-container-highest);
             color: var(--md-sys-color-on-surface);
-            padding: 8px;
         }
 
-        .select-arrow {
-            position: absolute;
-            right: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            pointer-events: none;
-            width: 16px;
-            height: 16px;
-            fill: var(--md-sys-color-on-primary);
-        }
-
-        /* ========== 聊天区域 - MD3 Surface ========== */
+        /* ========== 聊天区域 ========== */
         .chat-box {
             flex: 1;
             overflow-y: auto;
@@ -178,359 +123,94 @@
             scroll-behavior: smooth;
         }
 
-        .chat-box::-webkit-scrollbar {
-            width: 4px;
-        }
-
-        .chat-box::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
-        .chat-box::-webkit-scrollbar-thumb {
-            background: var(--md-sys-color-outline-variant);
-            border-radius: 2px;
-        }
-
-        /* ========== 消息气泡 - MD3 Cards ========== */
+        /* ========== 消息气泡 ========== */
         .message {
             max-width: 85%;
             padding: 12px 16px;
             font-size: 0.9375rem;
             line-height: 1.5;
-            letter-spacing: 0.01em;
             word-wrap: break-word;
-            position: relative;
+            /* 👇 新增：强制保留换行符，防止多段翻译挤成一行 */
+            white-space: pre-wrap; 
             animation: messageIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         @keyframes messageIn {
-            from {
-                opacity: 0;
-                transform: translateY(8px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
-        /* AI 消息 - MD3 Secondary Container */
         .ai-msg {
             background: var(--md-sys-color-secondary-container);
             color: var(--md-sys-color-on-secondary-container);
             align-self: flex-start;
-            border-radius: var(--md-sys-shape-corner-medium)
-            var(--md-sys-shape-corner-medium)
-            var(--md-sys-shape-corner-medium)
-            var(--md-sys-shape-corner-extra-small);
-            box-shadow: var(--md-sys-elevation-0);
-            margin-right: 32px;
+            border-radius: 12px 12px 12px 4px;
         }
 
-        /* 用户消息 - MD3 Primary Container */
         .user-msg {
             background: var(--md-sys-color-primary-container);
             color: var(--md-sys-color-on-primary-container);
             align-self: flex-end;
-            border-radius: var(--md-sys-shape-corner-medium)
-            var(--md-sys-shape-corner-medium)
-            var(--md-sys-shape-corner-extra-small)
-            var(--md-sys-shape-corner-medium);
-            box-shadow: var(--md-sys-elevation-0);
-            margin-left: 32px;
+            border-radius: 12px 12px 4px 12px;
         }
 
-        /* ========== 加载指示器 - MD3 Linear Progress ========== */
-        .loading-container {
-            display: none;
-            align-items: center;
-            gap: 12px;
-            padding: 8px 16px;
-            background: var(--md-sys-color-surface-container-low);
-            border-top: 1px solid var(--md-sys-color-outline-variant);
-            flex-shrink: 0;
-        }
-
-        .loading-container.active {
-            display: flex;
-        }
-
-        .loading-indicator {
-            flex: 1;
-            height: 4px;
-            background: var(--md-sys-color-surface-container-highest);
-            border-radius: 2px;
-            overflow: hidden;
-            position: relative;
-        }
-
-        .loading-indicator::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: var(--md-sys-color-primary);
-            border-radius: 2px;
-            animation: loadingBar 1.5s ease-in-out infinite;
-        }
-
-        @keyframes loadingBar {
-            0% { left: -100%; width: 40%; }
-            50% { left: 40%; width: 40%; }
-            100% { left: 100%; width: 40%; }
-        }
-
-        .loading-text {
-            font-size: 0.8125rem;
-            color: var(--md-sys-color-on-surface-variant);
-            white-space: nowrap;
-            letter-spacing: 0.02em;
-        }
-
-        /* ========== 输入区域 - MD3 Input Bar ========== */
+        /* ========== 输入区域 ========== */
         .input-area {
             display: flex;
-            align-items: center;
             gap: 8px;
             padding: 12px 16px;
             background: var(--md-sys-color-surface-container-lowest);
             border-top: 1px solid var(--md-sys-color-outline-variant);
-            flex-shrink: 0;
-        }
-
-        /* MD3 Outlined Text Field */
-        .input-wrapper {
-            flex: 1;
-            position: relative;
         }
 
         .input-area input {
-            width: 100%;
+            flex: 1;
             padding: 12px 16px;
             border: 1px solid var(--md-sys-color-outline);
-            border-radius: var(--md-sys-shape-corner-extra-large);
-            background: var(--md-sys-color-surface-container-lowest);
-            color: var(--md-sys-color-on-surface);
-            font-family: 'Roboto', sans-serif;
-            font-size: 0.9375rem;
-            line-height: 1.5;
+            border-radius: 28px;
             outline: none;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            letter-spacing: 0.01em;
+            font-size: 0.9375rem;
         }
 
-        .input-area input::placeholder {
-            color: var(--md-sys-color-on-surface-variant);
-            opacity: 0.7;
-        }
-
-        .input-area input:hover {
-            background: var(--md-sys-color-surface-container-highest);
-            border-color: var(--md-sys-color-on-surface-variant);
-        }
-
-        .input-area input:focus {
-            border-color: var(--md-sys-color-primary);
-            border-width: 2px;
-            padding: 11px 15px;
-            box-shadow: 0 0 0 1px var(--md-sys-color-primary);
-            background: var(--md-sys-color-surface-container-lowest);
-        }
-
-        /* MD3 Filled Tonal Button */
         .input-area button {
             background: var(--md-sys-color-primary);
             color: var(--md-sys-color-on-primary);
             border: none;
-            padding: 12px 24px;
-            border-radius: var(--md-sys-shape-corner-extra-large);
-            font-family: 'Roboto', sans-serif;
-            font-size: 0.875rem;
-            font-weight: 500;
-            letter-spacing: 0.01em;
+            padding: 0 24px;
+            border-radius: 28px;
             cursor: pointer;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            overflow: hidden;
-            white-space: nowrap;
-            flex-shrink: 0;
-            height: 48px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .input-area button::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: currentColor;
-            opacity: 0;
-            transition: opacity 0.2s;
-        }
-
-        .input-area button:hover::before {
-            opacity: var(--md-sys-state-hover-opacity);
-        }
-
-        .input-area button:active::before {
-            opacity: var(--md-sys-state-pressed-opacity);
+            font-weight: 500;
         }
 
         .input-area button:disabled {
-            background: var(--md-sys-color-surface-container-highest);
-            color: var(--md-sys-color-on-surface-variant);
+            background: #ccc;
             cursor: not-allowed;
-            opacity: 0.6;
         }
 
-        .input-area button:disabled::before {
-            display: none;
-        }
-
-        .btn-icon {
-            width: 18px;
-            height: 18px;
-            margin-right: 4px;
-            fill: currentColor;
-        }
-
-        /* ========== 错误 Toast ========== */
-        .error-toast {
-            position: absolute;
-            bottom: 80px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: var(--md-sys-color-error-container);
-            color: var(--md-sys-color-on-error-container);
-            padding: 10px 16px;
-            border-radius: var(--md-sys-shape-corner-small);
-            font-size: 0.8125rem;
-            z-index: 10;
-            box-shadow: var(--md-sys-elevation-2);
-            animation: toastIn 0.3s ease;
-            display: none;
-        }
-
-        .error-toast.show {
-            display: block;
-        }
-
-        @keyframes toastIn {
-            from {
-                opacity: 0;
-                transform: translateX(-50%) translateY(10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(-50%) translateY(0);
-            }
-        }
-
-        /* ========== 响应式 ========== */
-        @media (max-width: 480px) {
-            body {
-                padding: 0;
-            }
-
-            .chat-container {
-                width: 100%;
-                height: 100vh;
-                border-radius: 0;
-                max-width: 100%;
-            }
-
-            .header {
-                padding: 12px;
-            }
-
-            .header-title {
-                font-size: 1rem;
-            }
-
-            .chat-box {
-                padding: 12px;
-            }
-
-            .message {
-                max-width: 90%;
-                font-size: 0.875rem;
-            }
-
-            .input-area {
-                padding: 8px 12px;
-                gap: 8px;
-            }
-
-            .input-area button {
-                padding: 10px 16px;
-                height: 44px;
-                font-size: 0.8125rem;
-            }
-
-            .input-area input {
-                padding: 10px 14px;
-                font-size: 0.875rem;
-            }
-        }
+        .loading-text { font-size: 12px; color: #888; display: none; padding-left: 16px; }
+        .loading-text.active { display: block; }
     </style>
 </head>
 <body>
 
 <div class="chat-container">
-    <!-- MD3 Top App Bar -->
     <div class="header">
-        <svg class="header-icon" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M20,2H4A2,2 0 0,0 2,4V22L6,18H20A2,2 0 0,0 22,16V4A2,2 0 0,0 20,2M8,14H6V12H8V14M8,11H6V9H8V11M8,8H6V6H8V8M15.1,15.5L18,12.5V6H6.6L10.1,9.5L10.6,10L10.1,10.5L6.6,14H13.8L15.1,15.5Z"/>
-        </svg>
         <span class="header-title">3D坦克(Tanki) 翻译引擎</span>
-        <div class="model-select-wrapper">
-            <select id="modelSelect" class="model-select">
-                <option value="gemini-3-flash-preview">Gemini 3 Flash</option>
-                <option value="gemini-3.1-flash-lite-preview" selected>Gemini 3.1 Flash Lite</option>
-            </select>
-            <svg class="select-arrow" viewBox="0 0 24 24">
-                <path d="M7,10L12,15L17,10H7Z" fill="currentColor"/>
-            </svg>
-        </div>
+        <select id="modelSelect" class="model-select">
+            <option value="gemini-3-flash-preview">Gemini 3 Flash</option>
+            <option value="gemini-3.1-flash-lite-preview" selected>Gemini 3.1 Flash Lite</option>
+        </select>
     </div>
 
-    <!-- MD3 Chat Area -->
     <div class="chat-box" id="chatBox">
-        <div class="message ai-msg">
-            【系统】正在获取最新专有词库，请稍候...
-        </div>
+        <div class="message ai-msg">【系统】正在获取最新专有词库，请稍候...</div>
     </div>
+    
+    <div class="loading-text" id="loadingTip">AI 正在翻译中...</div>
 
-    <!-- MD3 Loading Indicator -->
-    <div class="loading-container" id="loadingContainer">
-        <div class="loading-indicator"></div>
-        <span class="loading-text">正在翻译...</span>
-    </div>
-
-    <!-- MD3 Error Toast -->
-    <div class="error-toast" id="errorToast"></div>
-
-    <!-- MD3 Input Bar -->
     <div class="input-area">
-        <div class="input-wrapper">
-            <input
-                    type="text"
-                    id="userInput"
-                    placeholder="正在加载词库，请稍候..."
-                    onkeypress="handleEnter(event)"
-                    autocomplete="off"
-                    disabled
-            >
-        </div>
-        <button id="sendBtn" onclick="sendMessage()" disabled>
-            <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M2,21L23,12L2,3V10L17,12L2,14V21Z"/>
-            </svg>
-            翻译
-        </button>
+        <input type="text" id="userInput" placeholder="正在加载词库，请稍候..." onkeypress="handleEnter(event)" disabled>
+        <button id="sendBtn" onclick="sendMessage()" disabled>翻译</button>
     </div>
 </div>
 
@@ -540,48 +220,40 @@
 
     let dictPrompt = "【专有名词对照表】\n";
 
-    // ========== DOM 元素 ==========
     const chatBox = document.getElementById("chatBox");
     const userInput = document.getElementById("userInput");
     const sendBtn = document.getElementById("sendBtn");
-    const loadingContainer = document.getElementById("loadingContainer");
+    const loadingTip = document.getElementById("loadingTip");
     const modelSelect = document.getElementById("modelSelect");
 
     // ========== 异步加载外部 GitHub 词库 ==========
     window.addEventListener('DOMContentLoaded', async () => {
         const aiMsgDiv = document.querySelector(".ai-msg");
-
         try {
             const response = await fetch('https://raw.githubusercontent.com/Testanki1/testanki1.github.io/refs/heads/main/translations.js');
             const text = await response.text();
             
-            // 安全提取文件内的字典对象区域并转换
             const start = text.indexOf('{');
             const end = text.lastIndexOf('}');
             if (start !== -1 && end !== -1) {
                 const objText = text.substring(start, end + 1);
-                // 在前端浏览器环境中可安全使用 new Function 将文本还原为对象
                 const dict = new Function('return ' + objText)();
                 for (const key in dict) {
                     dictPrompt += `英文 "${key}" 必须严格翻译为中文 "${dict[key]}"\n`;
                 }
             }
-
             aiMsgDiv.innerHTML = "你好！我已加载【3D坦克】专有词库。<br>请输入英文更新日志或文本，将为你输出精准的中文翻译。";
             userInput.placeholder = "输入英文文本，按 Enter 发送...";
         } catch (error) {
-            console.error("词库加载失败:", error);
             aiMsgDiv.innerHTML = "⚠️ 词库加载失败，请检查网络或刷新重试。";
             userInput.placeholder = "词库加载失败";
         } finally {
-            // 解除禁用状态
             sendBtn.disabled = false;
             userInput.disabled = false;
             userInput.focus();
         }
     });
 
-    // ========== 回车发送 ==========
     function handleEnter(event) {
         if (event.key === "Enter" && !event.shiftKey) {
             event.preventDefault();
@@ -594,33 +266,24 @@
         const text = userInput.value.trim();
         if (!text) return;
 
-        // 显示用户消息
         appendMessage(text, "user-msg");
         userInput.value = "";
 
-        // 设置加载状态
         sendBtn.disabled = true;
         userInput.disabled = true;
-        loadingContainer.classList.add("active");
-        hideError();
+        loadingTip.classList.add("active");
 
-        // 创建 AI 消息气泡（用于流式输出）
         const aiMsgDiv = document.createElement("div");
         aiMsgDiv.className = "message ai-msg";
-        aiMsgDiv.textContent = "";
+        aiMsgDiv.textContent = ""; 
         chatBox.appendChild(aiMsgDiv);
 
-        const model = modelSelect.value;
-
         try {
-            // 通过 Pages Functions 代理请求
             const response = await fetch(PROXY_URL, {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    model: model,
+                    model: modelSelect.value,
                     text: text,
                     systemInstruction: {
                         parts:[{
@@ -635,72 +298,56 @@ ${dictPrompt}`
                 })
             });
 
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                showError(errorData.error || `请求失败 (${response.status})`);
-                aiMsgDiv.remove();
-                return;
-            }
+            if (!response.ok) throw new Error("网络错误");
 
-            // ========== 读取 SSE 流 ==========
+            // ========== 更稳健的 SSE 读取器 ==========
             const reader = response.body.getReader();
-            const decoder = new TextDecoder();
+            const decoder = new TextDecoder("utf-8");
             let buffer = "";
-            let hasContent = false;
 
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
 
+                // 解码网络字节并拼接到缓冲区
                 buffer += decoder.decode(value, { stream: true });
 
-                // 按行分割，保留末尾不完整的行
-                const lines = buffer.split("\n");
-                buffer = lines.pop() || "";
+                // SSE 事件是以双换行符 \n\n 结尾的，根据它把数据切分出来
+                let boundaryIndex;
+                while ((boundaryIndex = buffer.indexOf('\n\n')) !== -1) {
+                    const eventStr = buffer.slice(0, boundaryIndex);
+                    buffer = buffer.slice(boundaryIndex + 2);
 
-                for (const line of lines) {
-                    if (line.startsWith("data: ")) {
-                        const data = line.slice(6).trim();
-                        if (!data || data === "[DONE]") continue;
+                    // 提取所有带 "data: " 的行，提取内容
+                    const dataLines = eventStr.split('\n')
+                        .filter(line => line.startsWith('data: '))
+                        .map(line => line.replace(/^data:\s*/, ''));
+                    
+                    const dataStr = dataLines.join('');
+                    if (!dataStr || dataStr === '[DONE]') continue;
 
-                        try {
-                            const parsed = JSON.parse(data);
-                            // Gemini SSE 可能返回对象或数组
-                            const candidates = Array.isArray(parsed)
-                                ? parsed[0]?.candidates
-                                : parsed.candidates;
-                            const textPiece = candidates?.[0]?.content?.parts?.[0]?.text;
-                            if (textPiece) {
-                                hasContent = true;
-                                // Gemini 流式响应中每个事件包含累积文本，直接替换
-                                aiMsgDiv.textContent = textPiece;
-                                // 自动滚动到底部
-                                chatBox.scrollTo({
-                                    top: chatBox.scrollHeight,
-                                    behavior: "smooth"
-                                });
-                            }
-                        } catch (e) {
-                            // 忽略单个事件解析错误
+                    try {
+                        const parsed = JSON.parse(dataStr);
+                        const candidates = Array.isArray(parsed) ? parsed[0]?.candidates : parsed.candidates;
+                        const textPiece = candidates?.[0]?.content?.parts?.[0]?.text;
+                        
+                        if (textPiece) {
+                            // 👇 【关键修复点】：将原先的 = 改为 += ，拼接流式文本块，就不会出现覆盖漏字了！
+                            aiMsgDiv.textContent += textPiece;
+                            
+                            chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: "smooth" });
                         }
+                    } catch (e) {
+                        console.error("解析流式片段失败", e);
                     }
                 }
             }
-
-            // 如果没有任何输出，移除空气泡
-            if (!hasContent) {
-                aiMsgDiv.remove();
-            }
-
         } catch (error) {
-            console.error("翻译错误:", error);
-            showError("网络错误，请检查连接后重试");
-            aiMsgDiv.remove();
+            aiMsgDiv.textContent = "❌ 翻译请求失败，请稍后重试。";
         } finally {
-            // 恢复状态
             sendBtn.disabled = false;
             userInput.disabled = false;
-            loadingContainer.classList.remove("active");
+            loadingTip.classList.remove("active");
             userInput.focus();
         }
     }
@@ -710,24 +357,7 @@ ${dictPrompt}`
         msgDiv.className = `message ${className}`;
         msgDiv.textContent = text;
         chatBox.appendChild(msgDiv);
-
-        // 自动滚动到底部
-        chatBox.scrollTo({
-            top: chatBox.scrollHeight,
-            behavior: "smooth"
-        });
-    }
-
-    function showError(msg) {
-        const toast = document.getElementById("errorToast");
-        toast.textContent = msg;
-        toast.classList.add("show");
-        setTimeout(hideError, 5000);
-    }
-
-    function hideError() {
-        const toast = document.getElementById("errorToast");
-        toast.classList.remove("show");
+        chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: "smooth" });
     }
 </script>
 

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D坦克 专业翻译助手</title>
+    <title>3D坦克翻译助手</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -71,7 +71,7 @@
 
 <div class="chat-container">
     <div class="header">
-        <span class="header-title">3D坦克(Tanki)</span>
+        <span class="header-title">3D坦克翻译助手</span>
         <div class="model-select-wrapper">
             <select id="modelSelect" class="model-select">
                 <option value="gemini-flash-latest">Gemini Flash</option>
@@ -121,11 +121,11 @@
                 const objText = text.substring(start, end + 1);
                 const dict = new Function('return ' + objText)();
                 for (const key in dict) {
-                    dictPrompt += `英文 "${key}" 必须严格翻译为中文 "${dict[key]}"\n`;
+                    dictPrompt += `外文 "${key}" 必须严格翻译为中文 "${dict[key]}"\n`;
                 }
             }
-            aiMsgDiv.innerHTML = "你好！我已加载【3D坦克】专有词库。<br>请输入英文更新日志或文本，将为你输出精准的中文翻译。";
-            userInput.placeholder = "输入英文文本，按 Enter 发送...";
+            aiMsgDiv.innerHTML = "你好！我已加载【3D坦克】专有词库。<br>请输入外文更新日志或文本，将为你输出精准的中文翻译。";
+            userInput.placeholder = "输入外文文本，按 Enter 发送...";
         } catch (error) {
             aiMsgDiv.innerHTML = "⚠️ 词库加载失败，请检查网络或刷新重试。";
             userInput.placeholder = "词库加载失败";

@@ -104,7 +104,6 @@
     const modelSelect = document.getElementById("modelSelect");
     const versionDisplay = document.getElementById("versionDisplay");
 
-    // 切换下拉框时重置提示
     modelSelect.addEventListener('change', () => {
         versionDisplay.textContent = "等待翻译后显示版本...";
     });
@@ -157,6 +156,8 @@
         const aiMsgDiv = document.createElement("div");
         aiMsgDiv.className = "message ai-msg";
         aiMsgDiv.textContent = ""; 
+        // 增加 rawText 缓存以支持正则表达式完整过滤流内容
+        aiMsgDiv.dataset.rawText = "";
         chatBox.appendChild(aiMsgDiv);
 
         try {
@@ -172,6 +173,9 @@
 你的任务只有：将外文的句子翻译为中文
 首先判断句子的主体语言，如果句子除了主体语言外，还用了其他语言的词汇（如“什么是 Garage”），则仅将该主体语言翻译为中文，并保留句子中任何其他非主体语言的词汇。
 然后直接写出翻译后的结果。
+【排版规则】：
+1. 汉字与汉字之间不能有任何空格。
+2. 汉字与外文（如英文字母、俄文字母）或数字之间必须包含一个半角空格。
 以下为游戏内专有名称中英文对照词库：
 ${dictPrompt}`
                         }]
@@ -204,7 +208,6 @@ ${dictPrompt}`
                         try {
                             const parsed = JSON.parse(dataStr);
 
-                            // 只显示纯粹的版本号（去掉前缀）
                             if (parsed.modelVersion) {
                                 const pureVersion = parsed.modelVersion.replace('models/', '');
                                 if (versionDisplay.textContent !== pureVersion) {
@@ -216,7 +219,19 @@ ${dictPrompt}`
                             const textPiece = candidates?.[0]?.content?.parts?.[0]?.text;
                             
                             if (textPiece) {
-                                aiMsgDiv.textContent += textPiece;
+                                aiMsgDiv.dataset.rawText += textPiece;
+                                let currentText = aiMsgDiv.dataset.rawText;
+                                
+                                // 正则实时强制约束排版
+                                currentText = currentText
+                                    // 1. 去掉汉字之间的空格 (不包含换行符)
+                                    .replace(/([\u4e00-\u9fa5])[ \t\u3000]+(?=[\u4e00-\u9fa5])/g, '$1')
+                                    // 2. 汉字后接外文/数字时加空格 (范围包含英文字母、数字和俄文字母)
+                                    .replace(/([\u4e00-\u9fa5])([a-zA-Z0-9\u0400-\u04FF])/g, '$1 $2')
+                                    // 3. 外文/数字后接汉字时加空格
+                                    .replace(/([a-zA-Z0-9\u0400-\u04FF])([\u4e00-\u9fa5])/g, '$1 $2');
+
+                                aiMsgDiv.textContent = currentText;
                                 chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: "smooth" });
                             }
                         } catch (e) {

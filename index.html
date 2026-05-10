@@ -1,403 +1,408 @@
 <!doctype html>
 <html lang="zh-CN">
-  <head>
-    <title>Findor | 3D坦克玩家空间</title>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="stylesheet" href="style.css" />
-    <meta
-  http-equiv="Content-Security-Policy"
-  content="default-src 'self'; 
-           script-src 'self' 'unsafe-inline' https://unpkg.com; 
-           style-src 'self' 'unsafe-inline' https://unpkg.com https://fonts.googleapis.com; 
-           font-src 'self' https://fonts.gstatic.com; 
-           img-src 'self' data: https://tankionline.com; 
-           connect-src 'self' https://tanki-proxy.findor.workers.dev;"
-/>
-    <link
-      href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" />
-    <link rel="stylesheet" href="https://unpkg.com/mdui@2/mdui.css" />
-    <script src="https://unpkg.com/mdui@2/mdui.global.js"></script>
-    <style>
-      :root {
-        /* MD3 标准色彩 */
-        --md-sys-color-primary: #006495;
-        --md-sys-color-on-primary: #ffffff;
-        --md-sys-color-primary-container: #cbe6ff;
-        --md-sys-color-on-primary-container: #001b3e;
-        --md-sys-color-surface: #fcfcff;
-        --md-sys-color-on-surface: #191c1e;
-        --md-sys-color-surface-variant: #dee3eb;
-        --md-sys-color-on-surface-variant: #42474e;
-        --md-sys-color-outline: #72777f;
-        --primary-color: var(--mdui-color-primary);
-        --surface-color: var(--mdui-color-surface);
-        --on-surface-color: var(--mdui-color-on-surface);
-        --outline-color: var(--mdui-color-outline);
-        --hover-bg: rgba(0, 100, 149, 0.08);
-        --online-bg: rgba(255, 255, 255, 0.3);
-      }
+<head>
+  <title>Findor | 3D坦克玩家空间</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-      /* 深色模式变量 */
-      [data-theme="dark"] :root {
-        --md-sys-color-primary: #90caf9;
-        --md-sys-color-on-primary: #001b3e;
-        --md-sys-color-primary-container: #004a77;
-        --md-sys-color-on-primary-container: #cbe6ff;
-        --md-sys-color-surface: #0f1419;
-        --md-sys-color-on-surface: #e0e2ec;
-        --md-sys-color-surface-variant: #42474e;
-        --md-sys-color-on-surface-variant: #c2c7cf;
-        --md-sys-color-outline: #8b9198;
-        --hover-bg: rgba(144, 202, 249, 0.08);
-        --online-bg: rgba(0, 0, 0, 0.3);
-      }
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
 
-      body {
-        background-color: var(--mdui-color-surface-container-low);
-        color: var(--mdui-color-on-surface);
-        transition: background-color 0.3s, color 0.3s;
-        font-family: "Roboto", sans-serif;
-        margin: 0;
-        padding: 0;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        min-height: 100vh;
+  <!-- 自定义 Tailwind 配置 -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#006495',
+            'primary-light': '#cbe6ff',
+            'primary-dark': '#004a77',
+            surface: '#fcfcff',
+            'surface-dark': '#0f1419',
+            'surface-variant': '#dee3eb',
+            'surface-variant-dark': '#42474e',
+          },
+          fontFamily: {
+            'roboto': ['Roboto', 'sans-serif'],
+          },
+          animation: {
+            'float': 'float 3s ease-in-out infinite',
+            'glow': 'glow 2s ease-in-out infinite',
+          },
+          keyframes: {
+            float: {
+              '0%, 100%': { transform: 'translateY(0px)' },
+              '50%': { transform: 'translateY(-5px)' },
+            },
+            glow: {
+              '0%, 100%': { opacity: '0.6' },
+              '50%': { opacity: '1' },
+            },
+          },
+        }
       }
+    }
+  </script>
 
-      /* 顶部栏 */
-      header {
-        width: 100%;
-        padding: 48px 24px;
-        background-color: var(--mdui-color-primary-container);
-        color: var(--mdui-color-on-primary-container);
-        text-align: center;
-        border-bottom-left-radius: 32px;
-        border-bottom-right-radius: 32px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-      }
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" />
+  <link rel="stylesheet" href="https://unpkg.com/mdui@2/mdui.css" />
+  <script src="https://unpkg.com/mdui@2/mdui.global.js"></script>
 
-      h1 {
-        margin: 0;
-        font-size: 2.5rem;
-        color: var(--md-sys-color-primary);
-        font-weight: 700;
-      }
+  <style>
+    /* 深色模式切换及自定义滚动条 */
+    [data-theme="dark"] {
+      color-scheme: dark;
+    }
 
-      .subtitle {
-        margin-top: 12px;
-        font-size: 1.1rem;
-        color: var(--md-sys-color-on-surface-variant);
-      }
+    body {
+      transition: background-color 0.3s, color 0.3s;
+    }
 
-      /* 内容容器 */
-      main {
-        width: 90%;
-        max-width: 800px;
-        margin: 24px 0;
-        flex: 1;
-      }
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
 
-      /* MD3 卡片样式 */
-      .card {
-        background-color: var(--mdui-color-surface-container);
-        border: 1px solid var(--mdui-color-outline-variant);
-        color: var(--mdui-color-on-surface);
-        border-radius: 24px;
-        padding: 24px;
-        margin-bottom: 24px;
-        transition:
-          transform 0.2s,
-          box-shadow 0.2s;
-      }
+    ::-webkit-scrollbar-track {
+      background: #f1f1f1;
+    }
 
-      .card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
-        background-color: var(--mdui-color-surface-container-high);
-      }
+    ::-webkit-scrollbar-thumb {
+      background: #006495;
+      border-radius: 4px;
+    }
 
-      .card-title {
-        font-size: 1.25rem;
-        font-weight: 500;
-        margin-bottom: 12px;
-        color: var(--md-sys-color-primary);
-      }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #004a77;
+    }
 
-      /* 列表容器 */
-      .nav-list {
-        list-style: none;
-        padding: 0;
-        margin: 16px 0 0 0;
-        border-top: 1px solid var(--md-sys-color-surface-variant);
-      }
+    [data-theme="dark"] ::-webkit-scrollbar-track {
+      background: #1f2937;
+    }
 
-      .nav-list li {
-        border-bottom: 1px solid var(--md-sys-color-surface-variant);
-      }
+    .card-hover {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
 
-      .list-item {
-        display: flex;
-        align-items: center;
-        padding: 16px 8px;
-        text-decoration: none;
-        transition: background-color 0.2s;
-        color: var(--md-sys-color-on-surface);
-      }
+    .card-hover:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    }
 
-      .material-symbols-rounded {
-        display: inline-block;
-        vertical-align: middle;
-        line-height: 1;
-      }
+    .theme-toggle {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 50;
+      background: white;
+      border-radius: 9999px;
+      padding: 12px;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+      cursor: pointer;
+      transition: all 0.3s;
+      border: 1px solid #e5e7eb;
+    }
 
-      .list-item:hover {
-        background-color: var(--hover-bg);
-        text-decoration: none;
-      }
+    .theme-toggle:hover {
+      transform: scale(1.1);
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+    }
 
-      .item-icon {
-        width: 40px;
-        font-size: 1.2rem;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-      }
+    [data-theme="dark"] .theme-toggle {
+      background: #1f2937;
+      border-color: #374151;
+    }
 
-      .item-text {
-        flex: 1;
-        font-size: 1rem;
-        font-weight: 500;
-        margin-left: 12px;
-      }
+    .evidence-img {
+      transition: filter 0.3s, transform 0.3s;
+    }
 
-      .item-arrow {
-        color: var(--md-sys-color-outline);
-        font-family: monospace;
-        font-weight: bold;
-        opacity: 0.5;
-        transition: transform 0.2s, opacity 0.2s;
-      }
+    .evidence-img:hover {
+      filter: grayscale(0%) !important;
+      transform: scale(1.05);
+    }
+  </style>
+</head>
+<body class="font-roboto antialiased transition-colors duration-300 min-h-screen flex flex-col"
+      :class="darkMode ? 'bg-gray-900' : 'bg-gray-50'"
+      x-data="{ darkMode: localStorage.getItem('theme') === 'dark' }"
+      x-init="
+        if (darkMode) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+          $el.classList.add('dark');
+        }
+        $watch('darkMode', value => {
+          if (value) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            $el.classList.add('dark');
+            localStorage.setItem('theme', 'dark');
+          } else {
+            document.documentElement.removeAttribute('data-theme');
+            $el.classList.remove('dark');
+            localStorage.setItem('theme', 'light');
+          }
+        })
+      ">
 
-      .list-item:hover .item-arrow {
-        transform: translateX(4px);
-        opacity: 1;
-        color: var(--md-sys-color-primary);
-      }
+<!-- 主题切换按钮 -->
+<button @click="darkMode = !darkMode"
+        class="theme-toggle"
+        :class="darkMode ? 'text-yellow-400' : 'text-gray-700'"
+        title="切换模式">
+  <svg x-show="!darkMode" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="5"></circle>
+    <line x1="12" y1="1" x2="12" y2="3"></line>
+    <line x1="12" y1="21" x2="12" y2="23"></line>
+    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+    <line x1="1" y1="12" x2="3" y2="12"></line>
+    <line x1="21" y1="12" x2="23" y2="12"></line>
+    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+  </svg>
+  <svg x-show="darkMode" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+  </svg>
+</button>
 
-      footer {
-        margin-top: auto;
-        padding: 24px;
-        font-size: 0.8rem;
-        color: var(--md-sys-color-outline);
-      }
+<!-- 头部区域 -->
+<header class="w-full px-6 py-16 text-center"
+        :class="darkMode ? 'bg-blue-900/30 text-blue-100' : 'bg-blue-50 text-blue-900'"
+        style="border-bottom-left-radius: 32px; border-bottom-right-radius: 32px;">
+  <h1 class="text-4xl md:text-5xl font-bold mb-3"
+      :class="darkMode ? 'text-blue-300' : 'text-primary'">
+    Findor 的空间
+  </h1>
+  <p class="text-base md:text-lg opacity-80">3D坦克 (Tanki Online) 技术玩家</p>
+</header>
 
-      a {
-        color: var(--md-sys-color-primary);
-        text-decoration: none;
-      }
-      a:hover {
-        text-decoration: underline;
-      }
+<!-- 主内容区 -->
+<main class="flex-1 w-11/12 max-w-4xl mx-auto py-8 space-y-6">
 
-      /* 证据预览图特有样式 */
-      .evidence-thumb {
-        flex: 0 0 100px;
-        height: 100px;
-        overflow: hidden;
-        border-radius: 12px;
-        border: 2px solid var(--mdui-color-outline-variant);
-        cursor: pointer;
-      }
-      .evidence-thumb img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        filter: grayscale(100%);
-        transition: filter 0.3s, transform 0.3s;
-      }
-      .evidence-thumb:hover img {
-        filter: grayscale(0%);
-        transform: scale(1.05);
-      }
-    </style>
-  </head>
-  <body>
-    <button id="theme-toggle" title="切换模式" aria-label="切换暗黑模式">
-      <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="5"></circle>
-        <line x1="12" y1="1" x2="12" y2="3"></line>
-        <line x1="12" y1="21" x2="12" y2="23"></line>
-        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-        <line x1="1" y1="12" x2="3" y2="12"></line>
-        <line x1="21" y1="12" x2="23" y2="12"></line>
-        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-      </svg>
-      <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none">
-        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-      </svg>
-    </button>
-    <header>
-      <h1>Findor 的空间</h1>
-      <p class="subtitle">3D坦克 (Tanki Online) 技术玩家</p>
-    </header>
+  <!-- 关于我卡片 -->
+  <div class="rounded-2xl p-6 transition-all duration-300 card-hover"
+       :class="darkMode ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'">
+    <h2 class="text-xl font-semibold mb-3"
+        :class="darkMode ? 'text-blue-400' : 'text-primary'">
+      关于我
+    </h2>
+    <p class="mb-3 leading-relaxed" :class="darkMode ? 'text-gray-300' : 'text-gray-700'">
+      欢迎来到我的个人主页。我是一名热爱 <strong class="font-semibold" :class="darkMode ? 'text-blue-400' : 'text-primary'">3D坦克</strong> 的玩家，专注于游戏机制研究和测试服动态监测。
+    </p>
+    <p :class="darkMode ? 'text-gray-300' : 'text-gray-700'">
+      你可以在
+      <a href="https://space.bilibili.com/1863175083" target="_blank"
+         class="font-medium underline-offset-2 hover:underline"
+         :class="darkMode ? 'text-blue-400 hover:text-blue-300' : 'text-primary hover:text-primary-dark'">
+        Bilibili
+      </a>
+      找到我的日常分享。
+    </p>
+  </div>
 
-    <main>
-      <section class="card">
-        <div class="card-title">关于我</div>
-        <p>
-          欢迎来到我的个人主页。我是一名热爱
-          <strong>3D坦克</strong> 的玩家，专注于游戏机制研究和测试服动态监测。
-        </p>
-        <p>
-          你可以在
-          <a href="https://space.bilibili.com/1863175083" target="_blank">Bilibili</a>
-          找到我的日常分享。
-        </p>
-      </section>
-
-      <section class="card" style="background-color: var(--md-sys-color-primary-container); border: none;">
-        <div class="card-title" style="color: var(--md-sys-color-primary); font-size: 0.9rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;">
-          全服实时在线
+  <!-- 实时在线卡片 -->
+  <div class="rounded-2xl p-6 transition-all duration-300"
+       :class="darkMode ? 'bg-blue-900/20 border border-blue-800' : 'bg-blue-50 border border-blue-100'">
+    <div class="text-xs font-bold tracking-wider mb-2"
+         :class="darkMode ? 'text-blue-400' : 'text-primary'">
+      全服实时在线
+    </div>
+    <div id="v_online" class="text-5xl md:text-6xl font-bold mb-4 font-mono"
+         :class="darkMode ? 'text-blue-300' : 'text-primary'">
+      ---
+    </div>
+    <div class="flex gap-4 flex-wrap">
+      <div class="px-4 py-2 rounded-xl"
+           :class="darkMode ? 'bg-gray-800/50' : 'bg-white/50'">
+        <div class="text-xs font-medium mb-1" :class="darkMode ? 'text-gray-400' : 'text-gray-600'">
+          战斗中
         </div>
-        <div id="v_online" style="font-size: 4rem; font-weight: 700; margin: 8px 0; color: var(--md-sys-color-on-primary-container); font-family: 'Roboto', sans-serif; letter-spacing: -0.02em;">
+        <div id="v_battle" class="text-lg font-bold"
+             :class="darkMode ? 'text-blue-400' : 'text-primary'">
           ---
         </div>
-        <div style="display: flex; gap: 16px; justify-content: flex-start; margin-top: 8px;">
-          <div style="background: var(--online-bg); padding: 8px 16px; border-radius: 12px;">
-            <span style="color: var(--md-sys-color-on-surface-variant); font-size: 0.8rem; font-weight: 500;">战斗中</span>
-            <div id="v_battle" style="color: var(--md-sys-color-primary); font-size: 1.1rem; font-weight: 700;">---</div>
-          </div>
-          <div style="background: var(--online-bg); padding: 8px 16px; border-radius: 12px;">
-            <span style="color: var(--md-sys-color-on-surface-variant); font-size: 0.8rem; font-weight: 500;">4399 渠道</span>
-            <div id="v_4399" style="color: var(--md-sys-color-primary); font-size: 1.1rem; font-weight: 700;">---</div>
-          </div>
+      </div>
+      <div class="px-4 py-2 rounded-xl"
+           :class="darkMode ? 'bg-gray-800/50' : 'bg-white/50'">
+        <div class="text-xs font-medium mb-1" :class="darkMode ? 'text-gray-400' : 'text-gray-600'">
+          4399 渠道
         </div>
-      </section>
-
-      <section class="card" style="background-color: var(--md-sys-color-primary-container); border: none; padding: 24px;">
-  <div class="card-title" style="color: var(--md-sys-color-primary); font-size: 0.9rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
-    <span class="material-symbols-rounded" style="font-size: 20px;">gavel</span>
-    某人又急了我不说是谁
-  </div>
-  
-  <div style="width: 100%;">
-    
-    <div style="text-align: center; margin-bottom: 20px;">
-      <div style="display: inline-flex; gap: 12px; flex-wrap: wrap; justify-content: center;">
-        <a href="files/Screenshot_20260312_192258_tv.danmaku.bili.png" target="_blank" style="width: 110px; height: 110px; overflow: hidden; border-radius: 12px; border: 2px solid var(--mdui-color-outline-variant); display: block;">
-          <img src="files/Screenshot_20260312_192258_tv.danmaku.bili.png" alt="被举报记录截图1" style="width: 100%; height: 100%; object-fit: cover; filter: grayscale(100%); transition: 0.3s;" onmouseover="this.style.filter='grayscale(0%)'" onmouseout="this.style.filter='grayscale(100%)'">
-        </a>
-        <a href="files/Screenshot_20260312_202257_tv.danmaku.bili.png" target="_blank" style="width: 110px; height: 110px; overflow: hidden; border-radius: 12px; border: 2px solid var(--mdui-color-outline-variant); display: block;">
-          <img src="files/Screenshot_20260312_202257_tv.danmaku.bili.png" alt="证据截图2" style="width: 100%; height: 100%; object-fit: cover; filter: grayscale(100%); transition: 0.3s;" onmouseover="this.style.filter='grayscale(0%)'" onmouseout="this.style.filter='grayscale(100%)'">
-        </a>
+        <div id="v_4399" class="text-lg font-bold"
+             :class="darkMode ? 'text-blue-400' : 'text-primary'">
+          ---
+        </div>
       </div>
     </div>
-    
-    <div style="color: var(--md-sys-color-on-primary-container); font-size: 0.95rem; line-height: 1.6;">
-      <p style="margin: 0 0 12px 0; font-weight: 700; color: var(--md-sys-color-primary); font-size: 1rem;">
+  </div>
+
+  <!-- 事件记录卡片 -->
+  <div class="rounded-2xl p-6 transition-all duration-300"
+       :class="darkMode ? 'bg-blue-900/20 border border-blue-800' : 'bg-blue-50 border border-blue-100'">
+    <div class="flex items-center gap-2 text-xs font-bold tracking-wider mb-4"
+         :class="darkMode ? 'text-blue-400' : 'text-primary'">
+      <span class="material-symbols-rounded text-base">gavel</span>
+      某人又急了我不说是谁
+    </div>
+
+    <!-- 证据图片 -->
+    <div class="flex justify-center gap-3 mb-5 flex-wrap">
+      <a href="files/Screenshot_20260312_192258_tv.danmaku.bili.png" target="_blank"
+         class="block w-28 h-28 rounded-xl overflow-hidden border-2 transition-all hover:shadow-lg"
+         :class="darkMode ? 'border-gray-700' : 'border-gray-300'">
+        <img src="files/Screenshot_20260312_192258_tv.danmaku.bili.png" alt="被举报记录截图1"
+             class="w-full h-full object-cover grayscale transition-all duration-300 evidence-img">
+      </a>
+      <a href="files/Screenshot_20260312_202257_tv.danmaku.bili.png" target="_blank"
+         class="block w-28 h-28 rounded-xl overflow-hidden border-2 transition-all hover:shadow-lg"
+         :class="darkMode ? 'border-gray-700' : 'border-gray-300'">
+        <img src="files/Screenshot_20260312_202257_tv.danmaku.bili.png" alt="证据截图2"
+             class="w-full h-full object-cover grayscale transition-all duration-300 evidence-img">
+      </a>
+    </div>
+
+    <div :class="darkMode ? 'text-gray-300' : 'text-gray-700'">
+      <p class="font-bold mb-3" :class="darkMode ? 'text-blue-400' : 'text-primary'">
         你看又举报，急急急，急死了，真够废物的
       </p>
-      
-      <div style="background: rgba(255, 255, 255, 0.2); padding: 12px; border-radius: 8px; margin-bottom: 12px;">
-        <p style="margin: 0 0 4px 0;"><strong>事件摘要：</strong></p>
-        <p style="margin: 0;">发布正常未成年人现状描述，连续遭遇恶意举报并被系统误删。</p>
+
+      <div class="p-3 rounded-lg mb-3"
+           :class="darkMode ? 'bg-gray-800/50' : 'bg-white/50'">
+        <p class="font-semibold mb-1">事件摘要：</p>
+        <p class="text-sm">发布正常未成年人现状描述，连续遭遇恶意举报并被系统误删。</p>
       </div>
 
-      <p style="margin: 0;"><strong>点评：</strong> 典型的逻辑断层后的“降维打击”。对方看见我重发便再次举报，以此寻找某种心理补偿。此类行为已永久归档，作为互联网生物多样性的观察样本。</p>
+      <p class="text-sm"><strong>点评：</strong> 典型的逻辑断层后的"降维打击"。对方看见我重发便再次举报，以此寻找某种心理补偿。此类行为已永久归档，作为互联网生物多样性的观察样本。</p>
+    </div>
+
+    <div class="mt-4 pt-3 text-right text-xs italic"
+         :class="darkMode ? 'text-gray-500 border-gray-800' : 'text-gray-500 border-gray-200'"
+         style="border-top-width: 1px;">
+      最后取证: 2026-03-12 20:22
     </div>
   </div>
-  
-  <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid rgba(0,0,0,0.05); font-size: 0.75rem; color: var(--md-sys-color-on-surface-variant); text-align: right; font-style: italic;">
-    最后取证: 2026-03-12 20:22
+
+  <!-- 快捷导航卡片 -->
+  <div class="rounded-2xl p-6 transition-all duration-300 card-hover"
+       :class="darkMode ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'">
+    <h2 class="text-xl font-semibold mb-4"
+        :class="darkMode ? 'text-blue-400' : 'text-primary'">
+      3D坦克 快捷导航
+    </h2>
+    <ul class="space-y-1">
+      <li>
+        <a href="https://tankionline.com" target="_blank"
+           class="flex items-center gap-3 px-3 py-3 rounded-xl transition-all group">
+          <span class="material-symbols-rounded text-2xl">language</span>
+          <span class="flex-1 font-medium">官方网站</span>
+          <span class="opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-1">→</span>
+        </a>
+      </li>
+      <li>
+        <a href="https://3dtank.com" target="_blank"
+           class="flex items-center gap-3 px-3 py-3 rounded-xl transition-all group">
+          <span class="material-symbols-rounded text-2xl">public</span>
+          <span class="flex-1 font-medium">国服官网</span>
+          <span class="opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-1">→</span>
+        </a>
+      </li>
+      <li>
+        <a href="files"
+           class="flex items-center gap-3 px-3 py-3 rounded-xl transition-all group">
+          <span class="material-symbols-rounded text-2xl">folder_open</span>
+          <span class="flex-1 font-medium">文件中心</span>
+          <span class="opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-1">→</span>
+        </a>
+      </li>
+      <li>
+        <a href="test.html" target="_blank"
+           class="flex items-center gap-3 px-3 py-3 rounded-xl transition-all group">
+          <span class="material-symbols-rounded text-2xl">build</span>
+          <span class="flex-1 font-medium">测试服动态</span>
+          <span class="opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-1">→</span>
+        </a>
+      </li>
+      <li>
+        <a href="map-editor-demo.html" target="_blank"
+           class="flex items-center gap-3 px-3 py-3 rounded-xl transition-all group">
+          <span class="material-symbols-rounded text-2xl">edit</span>
+          <span class="flex-1 font-medium">地图编辑器</span>
+          <span class="opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-1">→</span>
+        </a>
+      </li>
+      <li>
+        <a href="chat" target="_blank"
+           class="flex items-center gap-3 px-3 py-3 rounded-xl transition-all group">
+          <span class="material-symbols-rounded text-2xl">forum</span>
+          <span class="flex-1 font-medium">聊天房</span>
+          <span class="opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-1">→</span>
+        </a>
+      </li>
+      <li>
+        <a href="comments" target="_blank"
+           class="flex items-center gap-3 px-3 py-3 rounded-xl transition-all group">
+          <span class="material-symbols-rounded text-2xl">chat</span>
+          <span class="flex-1 font-medium">留言区</span>
+          <span class="opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-1">→</span>
+        </a>
+      </li>
+      <li>
+        <a href="https://en.tankiwiki.com" target="_blank"
+           class="flex items-center gap-3 px-3 py-3 rounded-xl transition-all group">
+          <span class="material-symbols-rounded text-2xl">menu_book</span>
+          <span class="flex-1 font-medium">游戏维基</span>
+          <span class="opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-1">→</span>
+        </a>
+      </li>
+    </ul>
   </div>
-</section>
 
-      <section class="card">
-        <div class="card-title">3D坦克 快捷导航</div>
-        <ul class="nav-list">
-          <li>
-            <a href="https://tankionline.com" target="_blank" class="list-item">
-              <span class="material-symbols-rounded item-icon">language</span>
-              <span class="item-text">官方网站</span>
-              <mdui-icon-arrow-forward></mdui-icon-arrow-forward>
-            </a>
-          </li>
-          <li>
-            <a href="https://3dtank.com" target="_blank" class="list-item">
-              <span class="material-symbols-rounded item-icon">public</span>
-              <span class="item-text">国服官网</span>
-              <mdui-icon-arrow-forward></mdui-icon-arrow-forward>
-            </a>
-          </li>
-          <li>
-            <a href="files" class="list-item">
-              <span class="material-symbols-rounded item-icon">folder_open</span>
-              <span class="item-text">文件中心</span>
-              <mdui-icon-arrow-forward></mdui-icon-arrow-forward>
-            </a>
-          </li>
-          <li>
-            <a href="test.html" target="_blank" class="list-item">
-              <span class="material-symbols-rounded item-icon">build</span>
-              <span class="item-text">测试服动态</span>
-              <mdui-icon-arrow-forward></mdui-icon-arrow-forward>
-            </a>
-          </li>
-          <li>
-            <a href="map-editor-demo.html" target="_blank" class="list-item">
-              <span class="material-symbols-rounded item-icon">edit</span>
-              <span class="item-text">地图编辑器</span>
-              <mdui-icon-arrow-forward></mdui-icon-arrow-forward>
-            </a>
-          </li>
-          <li>
-            <a href="chat" target="_blank" class="list-item">
-              <span class="material-symbols-rounded item-icon">forum</span>
-              <span class="item-text">聊天房</span>
-              <mdui-icon-arrow-forward></mdui-icon-arrow-forward>
-            </a>
-          </li>
-          <li>
-            <a href="comments" target="_blank" class="list-item">
-              <span class="material-symbols-rounded item-icon">chat</span>
-              <span class="item-text">留言区</span>
-              <mdui-icon-arrow-forward></mdui-icon-arrow-forward>
-            </a>
-          </li>
-          <li>
-            <a href="https://en.tankiwiki.com" target="_blank" class="list-item">
-              <span class="material-symbols-rounded item-icon">menu_book</span>
-              <span class="item-text">游戏维基</span>
-              <mdui-icon-arrow-forward></mdui-icon-arrow-forward>
-            </a>
-          </li>
-        </ul>
-      </section>
+  <!-- 当前项目卡片 -->
+  <div class="rounded-2xl p-6 transition-all duration-300 card-hover"
+       :class="darkMode ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'">
+    <h2 class="text-xl font-semibold mb-3"
+        :class="darkMode ? 'text-blue-400' : 'text-primary'">
+      当前项目
+    </h2>
+    <p :class="darkMode ? 'text-gray-300' : 'text-gray-700'">
+      • <strong>Findor's Monitor</strong>: 实时监测测试服版本更新（开发中）。
+    </p>
+  </div>
+</main>
 
-      <section class="card">
-        <div class="card-title">当前项目</div>
-        <p>• <strong>Findor's Monitor</strong>: 实时监测测试服版本更新（开发中）。</p>
-      </section>
-    </main>
+<!-- 页脚 -->
+<footer class="mt-auto py-8 px-6 text-center"
+        :class="darkMode ? 'text-gray-500' : 'text-gray-600'">
+  <div class="flex justify-center mb-3">
+    <a href="https://github.com/findor26/findorp.pages.dev" target="_blank"
+       class="inline-flex transition-colors hover:text-gray-700"
+       :class="darkMode ? 'text-gray-500 hover:text-gray-300' : 'text-gray-600 hover:text-gray-900'">
+      <svg height="24" viewBox="0 0 16 16" width="24" fill="currentColor">
+        <path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 3.58-8Z"></path>
+      </svg>
+    </a>
+  </div>
+  <div class="text-sm">
+    &copy; 2026 Findor. 基于 Cloudflare Pages 托管.
+  </div>
+</footer>
 
-    <footer style="display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 32px 24px; color: var(--md-sys-color-outline);">
-      <a href="https://github.com/findor26/findorp.pages.dev" target="_blank" title="查看 GitHub 仓库" style="color: var(--md-sys-color-outline); transition: color 0.2s; display: flex;">
-        <svg height="24" viewBox="0 0 16 16" width="24" fill="currentColor">
-          <path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 3.58-8Z"></path>
-        </svg>
-      </a>
-      <div style="font-size: 0.8rem; text-align: center">
-        &copy; 2026 Findor. 基于 Cloudflare Pages 托管.
-      </div>
-    </footer>
+<!-- 引入 Alpine.js 用于响应式 -->
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<script src="main.js"></script>
 
-    <script src="main.js"></script>
-  </body>
+<style>
+  /* 为 Tailwind 添加自定义样式覆盖 */
+  .card-hover a {
+    transition: all 0.2s ease;
+  }
+
+  .card-hover a:hover {
+    background-color: rgba(0, 100, 149, 0.04);
+  }
+
+  [data-theme="dark"] .card-hover a:hover {
+    background-color: rgba(144, 202, 249, 0.08);
+  }
+</style>
+</body>
 </html>

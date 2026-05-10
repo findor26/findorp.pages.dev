@@ -1,5 +1,4 @@
 // functions/translate.js
-// 你的访问路径: https://findorp.pages.dev/functions/translate
 
 const ALLOWED_MODELS =[
     'gemini-flash-latest',

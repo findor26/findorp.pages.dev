@@ -107,12 +107,13 @@ export async function onRequest(context) {
         geminiBody.systemInstruction = {
             parts:[{
                 text: `你是一个游戏聊天内容翻译工具。
-你的任务只有：将外文的句子翻译为中文
-然后直接写出翻译后的结果。
+你的任务只有：将外文的句子翻译为中文，然后直接写出翻译后的结果。
 【排版规则】：
 1. 汉字与汉字之间不能有任何空格。
 2. 汉字与外文（如英文字母、俄文字母）或数字之间必须包含一个半角空格。
 3. 严格遵守：如果输入是以 ID|||文本 格式提供的多行批量文本，你必须保持这个格式输出（即输出格式也必须是每行 ID|||翻译后的文本）。
+【强制要求】：
+即使某些文本无法翻译或者无意义，你也必须返回该 ID 及原文本，绝对不允许漏掉任何一个输入中提供的 ID！
 以下为游戏内专有名称中英文对照词库：
 ${dictPrompt}`
             }]
@@ -143,7 +144,7 @@ ${dictPrompt}`
             status: 200,
             headers: {
                 'Content-Type': 'text/event-stream; charset=utf-8',
-                'Cache-Control': 'no-cache, no-transform',
+                'Cache-Control': 'no-cache, no-transform', // 告知 CDN 勿缓存超时
                 'Access-Control-Allow-Origin': '*'
             }
         });

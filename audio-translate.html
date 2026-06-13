@@ -143,9 +143,16 @@
             <h1>Gemini 3.5 同声传译</h1>
         </div>
 
+        <!-- 新增 API Key 选项：如果填写，将使用极速稳定的客户端直连模式 -->
+        <md-outlined-text-field
+            id="apiKeyInput"
+            label="Gemini API Key (推荐！填写则100%稳定直连Google)"
+            placeholder="AIzaSy...">
+        </md-outlined-text-field>
+
         <md-outlined-text-field
             id="proxyUrl"
-            label="接口地址"
+            label="代理接口地址 (不填 Key 时使用)"
             value="https://findorp.pages.dev/audio">
         </md-outlined-text-field>
 
@@ -169,7 +176,7 @@
         </div>
 
         <div id="resultSection" class="audio-result-box hidden">
-            <span style="font-size: 14px; font-weight: bold;">🎧 同传翻译完成！请试听中文语音：</span>
+            <span style="font-size: 14px; font-weight: bold;">🎧 翻译完成！请试听中文语音：</span>
             <audio id="audioPlayer" controls></audio>
             <md-outlined-button id="saveBtn">
                 <md-icon slot="icon">download</md-icon>
@@ -179,6 +186,7 @@
     </div>
 
     <script>
+        const apiKeyInput = document.getElementById('apiKeyInput');
         const proxyUrlInput = document.getElementById('proxyUrl');
         const audioFileInput = document.getElementById('audioFile');
         const uploadTriggerBtn = document.getElementById('uploadTriggerBtn');
@@ -198,7 +206,6 @@
             fileNameDisplay.textContent = f ? f.name : "尚未选择文件";
         };
 
-        // 用于将同传返回的 24kHz 裸 PCM 片段组装成标准可播放的 WAV 音频
         function createWavFile(pcmChunks, sampleRate) {
             let totalSamples = pcmChunks.reduce((acc, chunk) => acc + chunk.length, 0);
             const buffer = new ArrayBuffer(44 + totalSamples * 2);
@@ -234,12 +241,21 @@
 
         translateBtn.addEventListener('click', async () => {
             const file = audioFileInput.files[0];
-            let url = proxyUrlInput.value.trim();
+            const apiKey = apiKeyInput.value.trim();
+            let proxyUrl = proxyUrlInput.value.trim();
 
-            if (!url) return alert('请输入接口地址');
             if (!file) return alert('请先选择一个音频文件');
 
-            if (url.startsWith('http')) url = url.replace(/^http/, 'ws');
+            let url = "";
+            if (apiKey) {
+                // ⭐️ 直连模式：直接连接 Google 官方的 v1beta Bidi 传译通道，完全免除 Cloudflare 干扰
+                url = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${apiKey}`;
+            } else {
+                // 代理模式
+                if (!proxyUrl) return alert('请在上方填入 API Key，或在此处填入代理接口地址');
+                if (proxyUrl.startsWith('http')) proxyUrl = proxyUrl.replace(/^http/, 'ws');
+                url = proxyUrl;
+            }
 
             translateBtn.disabled = true;
             uploadTriggerBtn.disabled = true;
@@ -250,7 +266,6 @@
             let receivedPcmChunks = []; 
 
             try {
-                // 将本地音频重采样为 16000Hz PCM 单声道
                 const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
                 const arrayBuffer = await file.arrayBuffer();
                 const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
@@ -262,18 +277,17 @@
                     int16Buffer[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
                 }
 
-                loadingText.textContent = "正在建立 WebSocket 同传通道...";
+                loadingText.textContent = apiKey ? "正在直接建立与 Google 的 WebSocket 传译通道..." : "正在通过代理建立 WebSocket 传译通道...";
                 ws = new WebSocket(url);
 
                 ws.onopen = () => {
-                    // ⭐️ 建立连接后发送 Setup 指令配置同传模型
                     ws.send(JSON.stringify({
                         setup: {
                             model: "models/gemini-3.5-live-translate-preview",
                             generationConfig: {
                                 responseModalities: ["AUDIO"],
                                 translationConfig: {
-                                    targetLanguageCode: "zh-Hans", // 简体中文代码
+                                    targetLanguageCode: "zh-Hans", 
                                     echoTargetLanguage: false
                                 }
                             }
@@ -292,8 +306,6 @@
                         for(let i = 0; i < int16Buffer.length; i += CHUNK_SIZE) {
                             if (ws.readyState !== WebSocket.OPEN) break;
                             const chunk = int16Buffer.subarray(i, i + CHUNK_SIZE);
-                            
-                            // ⭐️ 只读取当前分片的字节，避免溢出和崩溃
                             const uint8 = new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength);
                             
                             let binary = '';
@@ -319,7 +331,6 @@
                         }
                     }
 
-                    // 接收 Google 传回的 24000Hz 同传音频
                     if (msg.serverContent?.modelTurn?.parts) {
                         msg.serverContent.modelTurn.parts.forEach(part => {
                             if (part.inlineData && part.inlineData.data) {
@@ -369,7 +380,7 @@
                 };
 
                 ws.onerror = (e) => {
-                    alert("⚠️ 无法连接至代理接口，请检查网络。\n提示：可在浏览器中直接输入接口地址进行自检。");
+                    alert("⚠️ 无法连接至接口，请检查网络。\n提示：如果是代理报错，强烈建议在上方填入 API Key 启用直连模式。");
                     translateBtn.disabled = false;
                     uploadTriggerBtn.disabled = false;
                     loadingSection.classList.add('hidden');

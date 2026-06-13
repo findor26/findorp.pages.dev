@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gemini 音频同声传译 (HTTP 稳定版)</title>
+    <title>Gemini 3.5 同声传译</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -54,6 +54,7 @@
             display: flex;
             flex-direction: column;
             gap: 24px;
+            transition: all 0.3s ease;
         }
 
         .header {
@@ -138,21 +139,14 @@
 
     <div class="main-card">
         <div class="header">
-            <md-icon>interpreter_mode</md-icon>
-            <h1>同声传译 (音频 -> 翻译音频)</h1>
+            <md-icon>auto_awesome</md-icon>
+            <h1>Gemini 3.5 同声传译</h1>
         </div>
 
         <md-outlined-text-field
             id="proxyUrl"
-            label="接口地址"
-            value="/audioTranslate">
-        </md-outlined-text-field>
-
-        <!-- 模型选择：建议选择你后台中拥有的音频生成模型 -->
-        <md-outlined-text-field
-            id="modelName"
-            label="调用模型"
-            value="gemini-2.5-flash">
+            label="WebSocket 代理地址"
+            value="https://findorp.pages.dev/audio">
         </md-outlined-text-field>
 
         <div class="file-upload-section">
@@ -171,23 +165,21 @@
 
         <div id="loadingSection" class="loading-container hidden">
             <md-linear-progress indeterminate style="width: 100%;"></md-linear-progress>
-            <span id="loadingText">正在上传音频并等待 Google 翻译生成语音...</span>
+            <span id="loadingText">正在准备，请稍候...</span>
         </div>
 
-        <!-- 翻译完成的播放与下载区 -->
         <div id="resultSection" class="audio-result-box hidden">
-            <span style="font-size: 14px; font-weight: bold;">🎧 翻译完成！试听中文语音：</span>
+            <span style="font-size: 14px; font-weight: bold;">🎧 同传翻译完成！请试听中文语音：</span>
             <audio id="audioPlayer" controls></audio>
             <md-outlined-button id="saveBtn">
                 <md-icon slot="icon">download</md-icon>
-                下载翻译音频
+                下载翻译音频 (.wav)
             </md-outlined-button>
         </div>
     </div>
 
     <script>
         const proxyUrlInput = document.getElementById('proxyUrl');
-        const modelNameInput = document.getElementById('modelName');
         const audioFileInput = document.getElementById('audioFile');
         const uploadTriggerBtn = document.getElementById('uploadTriggerBtn');
         const fileNameDisplay = document.getElementById('fileName');
@@ -196,6 +188,9 @@
         const audioPlayer = document.getElementById('audioPlayer');
         const saveBtn = document.getElementById('saveBtn');
         const loadingSection = document.getElementById('loadingSection');
+        const loadingText = document.getElementById('loadingText');
+
+        let ws = null;
 
         uploadTriggerBtn.onclick = () => audioFileInput.click();
         audioFileInput.onchange = (e) => {
@@ -203,102 +198,187 @@
             fileNameDisplay.textContent = f ? f.name : "尚未选择文件";
         };
 
-        // 将音频文件直接读为 Base64 编码
-        function fileToBase64(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onload = () => resolve(reader.result.split(',')[1]);
-                reader.onerror = error => reject(error);
-            });
-        }
-
-        // Base64 转为可以供浏览器下载的二进制 Blob
-        function base64ToBlob(base64, mimeType) {
-            const binary = atob(base64);
-            const bytes = new Uint8Array(binary.length);
-            for (let i = 0; i < binary.length; i++) {
-                bytes[i] = binary.charCodeAt(i);
+        // 核心：手写标准的 WAV 文件头（WAV 播放器识别必需）
+        function createWavFile(pcmChunks, sampleRate) {
+            let totalSamples = pcmChunks.reduce((acc, chunk) => acc + chunk.length, 0);
+            const buffer = new ArrayBuffer(44 + totalSamples * 2);
+            const view = new DataView(buffer);
+            
+            const writeString = (v, offset, str) => { 
+                for (let i = 0; i < str.length; i++) {
+                    v.setUint8(offset + i, str.charCodeAt(i)); 
+                }
+            };
+            
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, 36 + totalSamples * 2, true);
+            writeString(view, 8, 'WAVE');
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true); // PCM format
+            view.setUint16(22, 1, true); // Mono channel
+            view.setUint32(24, sampleRate, true); 
+            view.setUint32(28, sampleRate * 2, true); 
+            view.setUint16(32, 2, true); 
+            view.setUint16(34, 16, true); // 16 bits
+            writeString(view, 36, 'data');
+            view.setUint32(40, totalSamples * 2, true);
+            
+            let offset = 44;
+            for (let chunk of pcmChunks) {
+                for (let i = 0; i < chunk.length; i++) {
+                    view.setInt16(offset, chunk[i], true);
+                    offset += 2;
+                }
             }
-            return new Blob([bytes], { type: mimeType });
+            return new Blob([view], { type: 'audio/wav' });
         }
 
         translateBtn.addEventListener('click', async () => {
-            const url = proxyUrlInput.value.trim();
-            const model = modelNameInput.value.trim();
             const file = audioFileInput.files[0];
+            let url = proxyUrlInput.value.trim();
 
             if (!url) return alert('请输入接口地址');
-            if (!model) return alert('请输入模型名称');
             if (!file) return alert('请先选择一个音频文件');
+
+            if (url.startsWith('http')) url = url.replace(/^http/, 'ws');
 
             translateBtn.disabled = true;
             uploadTriggerBtn.disabled = true;
             resultSection.classList.add('hidden');
             loadingSection.classList.remove('hidden');
+            loadingText.textContent = "本地正在提取并重采样音频...";
+
+            let receivedPcmChunks = []; 
 
             try {
-                // 1. 获取本地音频的 Base64 编码
-                const base64Audio = await fileToBase64(file);
-                const mimeType = file.type || 'audio/mp3';
+                // 将本地音频重采样为 16000Hz PCM
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+                const arrayBuffer = await file.arrayBuffer();
+                const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                const pcmFloatData = audioBuffer.getChannelData(0); 
+                
+                const int16Buffer = new Int16Array(pcmFloatData.length);
+                for(let i = 0; i < pcmFloatData.length; i++) {
+                    let s = Math.max(-1, Math.min(1, pcmFloatData[i]));
+                    int16Buffer[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                }
 
-                // 2. 构造符合 Google 官方 REST 规范的请求体
-                const payload = {
-                    model: model,
-                    contents: [{
-                        parts: [
-                            { text: "请听这段音频，并将其中的谈话内容翻译为中文。请只返回翻译后的中文语音，不要有任何多余的文本解释或废话。" },
-                            { inlineData: { mimeType: mimeType, data: base64Audio } }
-                        ]
-                    }],
-                    // ⭐️ 核心设置：请求输出格式为 AUDIO (语音)
-                    generationConfig: {
-                        responseModalities: ["AUDIO"]
+                loadingText.textContent = "正在建立 WebSocket 同传通道...";
+                ws = new WebSocket(url);
+
+                ws.onopen = () => {
+                    // ⭐️ 建立连接后发送 Setup 指令配置同传模型
+                    ws.send(JSON.stringify({
+                        setup: {
+                            model: "models/gemini-3.5-live-translate-preview",
+                            generationConfig: {
+                                responseModalities: ["AUDIO"],
+                                translationConfig: {
+                                    targetLanguageCode: "zh-Hans", // ⭐️ 修正：简体中文在 Live API 必须是 zh-Hans
+                                    echoTargetLanguage: false
+                                }
+                            }
+                        }
+                    }));
+                };
+
+                ws.onmessage = async (e) => {
+                    const msg = JSON.parse(e.data);
+
+                    if (msg.setupComplete) {
+                        const CHUNK_SIZE = 4096; 
+                        const totalChunks = Math.ceil(int16Buffer.length / CHUNK_SIZE);
+                        let currentChunk = 0;
+
+                        for(let i = 0; i < int16Buffer.length; i += CHUNK_SIZE) {
+                            if (ws.readyState !== WebSocket.OPEN) break;
+                            const chunk = int16Buffer.subarray(i, i + CHUNK_SIZE);
+                            
+                            // ⭐️ 只读取当前分片的字节，避免溢出和崩溃
+                            const uint8 = new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength);
+                            
+                            let binary = '';
+                            const len = uint8.length;
+                            for (let j = 0; j < len; j++) {
+                                binary += String.fromCharCode(uint8[j]);
+                            }
+                            
+                            ws.send(JSON.stringify({
+                                realtimeInput: { mediaChunks: [{ mimeType: "audio/pcm;rate=16000", data: btoa(binary) }] }
+                            }));
+                            
+                            currentChunk++;
+                            const percent = Math.round((currentChunk / totalChunks) * 100);
+                            loadingText.textContent = `正在传输音频数据: ${percent}% ...`;
+                            
+                            await new Promise(r => setTimeout(r, 15)); 
+                        }
+                        
+                        if (ws.readyState === WebSocket.OPEN) {
+                            loadingText.textContent = "音频发送完毕，正在等待同传翻译语音生成...";
+                            ws.send(JSON.stringify({ clientContent: { turnComplete: true, turns: [] } }));
+                        }
+                    }
+
+                    // 接收 Google 传回的 24000Hz 同传音频
+                    if (msg.serverContent?.modelTurn?.parts) {
+                        msg.serverContent.modelTurn.parts.forEach(part => {
+                            if (part.inlineData && part.inlineData.data) {
+                                const binary = atob(part.inlineData.data);
+                                const bytes = new Uint8Array(binary.length);
+                                for(let i = 0; i < binary.length; i++) {
+                                    bytes[i] = binary.charCodeAt(i);
+                                }
+                                
+                                receivedPcmChunks.push(new Int16Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 2));
+                            }
+                        });
+                    }
+
+                    if (msg.serverContent?.turnComplete) {
+                        ws.close();
                     }
                 };
 
-                // 3. 发送标准的 POST 请求到我们刚写的 Pages 后端
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
+                ws.onclose = (e) => {
+                    loadingSection.classList.add('hidden');
+                    translateBtn.disabled = false;
+                    uploadTriggerBtn.disabled = false;
 
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
-                }
+                    if (e.code !== 1000 && e.code !== 1005) {
+                        alert(`❌ WebSocket 异常断开\n错误码: ${e.code}\n原因: ${e.reason || '未提供具体原因'}`);
+                        return; 
+                    }
 
-                const data = await response.json();
+                    if (receivedPcmChunks.length > 0) {
+                        const blob = createWavFile(receivedPcmChunks, 24000);
+                        const finalAudioUrl = URL.createObjectURL(blob);
+                        
+                        audioPlayer.src = finalAudioUrl;
+                        resultSection.classList.remove('hidden');
 
-                // 4. 解析传回的 JSON，提取 Google 生成的 MP3 语音
-                const part = data.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
-                if (part && part.inlineData && part.inlineData.data) {
-                    const outputMimeType = part.inlineData.mimeType || 'audio/mp3';
-                    const outputBase64 = part.inlineData.data;
+                        saveBtn.onclick = () => {
+                            const a = document.createElement('a');
+                            a.href = finalAudioUrl;
+                            const dStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+                            a.download = `同声传译_中文_${dStr}.wav`;
+                            a.click();
+                        };
+                    } else {
+                        alert("⚠️ 转换完成，但未收到翻译后的音频流数据。");
+                    }
+                };
 
-                    // 5. 将 Base64 直接赋给播放器
-                    const audioUrl = `data:${outputMimeType};base64,${outputBase64}`;
-                    audioPlayer.src = audioUrl;
-                    resultSection.classList.remove('hidden');
-
-                    // 6. 绑定下载按钮
-                    saveBtn.onclick = () => {
-                        const blob = base64ToBlob(outputBase64, outputMimeType);
-                        const fileUrl = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = fileUrl;
-                        a.download = `同声传译_${new Date().getTime()}.${outputMimeType.split('/')[1] || 'mp3'}`;
-                        a.click();
-                        URL.revokeObjectURL(fileUrl);
-                    };
-
-                } else {
-                    alert("未能获取到生成的语音数据，请确保调用了支持音频输出的模型。");
-                }
+                ws.onerror = (e) => {
+                    alert("⚠️ 无法连接至代理接口，请检查网络。\n提示：可在浏览器中直接输入接口地址进行自检。");
+                    translateBtn.disabled = false;
+                    uploadTriggerBtn.disabled = false;
+                    loadingSection.classList.add('hidden');
+                };
 
             } catch (err) {
-                alert("请求发生错误: " + err.message);
-            } finally {
+                alert("发生错误: " + err.message);
                 translateBtn.disabled = false;
                 uploadTriggerBtn.disabled = false;
                 loadingSection.classList.add('hidden');

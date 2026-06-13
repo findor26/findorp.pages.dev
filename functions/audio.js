@@ -4,139 +4,148 @@ export async function onRequest(context) {
     const { request, env } = context;
     const apiKey = env.GEMINI_API_KEY;
 
-    // 1. 诊断自检模式 (如果不是 WebSocket 升级，则执行 HTTP 自检)
-    if (request.headers.get("Upgrade") !== "websocket") {
-        const diagnostics = {
-            cloudflare_worker_status: "正常运行 (Active)",
-            api_key_configured: !!apiKey,
-            google_api_test: null
-        };
-
-        if (!apiKey) {
-            return new Response(JSON.stringify({
-                status: "error",
-                message: "后端未配置 GEMINI_API_KEY 环境变量",
-                diagnostics: diagnostics
-            }, null, 2), {
-                status: 500,
-                headers: { "Content-Type": "application/json; charset=utf-8" }
-            });
-        }
-
-        try {
-            const testUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
-            const testResponse = await fetch(testUrl);
-            const testData = await testResponse.json();
-
-            if (testResponse.ok) {
-                diagnostics.google_api_test = {
-                    status: "成功 (Success)",
-                    message: "API Key 有效，且代理服务器成功连接到了 Google API",
-                    available_models_sample: testData.models ? testData.models.slice(0, 3).map(m => m.name) : []
-                };
-                return new Response(JSON.stringify({
-                    status: "success",
-                    message: "🎉 后端自检通过！接口一切正常，请在前端页面中上传文件进行翻译。",
-                    diagnostics: diagnostics
-                }, null, 2), {
-                    status: 200,
-                    headers: { "Content-Type": "application/json; charset=utf-8" }
-                });
-            } else {
-                diagnostics.google_api_test = {
-                    status: "失败 (Failed)",
-                    error_from_google: testData
-                };
-                return new Response(JSON.stringify({
-                    status: "error",
-                    message: "Google 拒绝了你的请求。请查看下方来自 Google 的详细错误原因：",
-                    diagnostics: diagnostics
-                }, null, 2), {
-                    status: 400,
-                    headers: { "Content-Type": "application/json; charset=utf-8" }
-                });
+    // 处理预检请求
+    if (request.method === 'OPTIONS') {
+        return new Response(null, {
+            status: 204,
+            headers: {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'POST, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type',
+                'Access-Control-Max-Age': '86400'
             }
-        } catch (err) {
-            diagnostics.google_api_test = {
-                status: "异常 (Exception)",
-                error_message: err.message
-            };
-            return new Response(JSON.stringify({
-                status: "error",
-                message: "代理服务器无法建立与 Google 的连接。",
-                diagnostics: diagnostics
-            }, null, 2), {
-                status: 500,
-                headers: { "Content-Type": "application/json; charset=utf-8" }
-            });
-        }
+        });
     }
 
-    // 2. ⭐️ 核心逻辑：双向流 Live API 代理转发 (采用 Cloudflare 官方原生出站 WebSocket 连接)
+    if (request.method !== 'POST') {
+        return new Response(JSON.stringify({ error: "仅支持 POST 请求" }), {
+            status: 405,
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+        });
+    }
+
     if (!apiKey) {
-        return new Response("服务器未配置 API Key", { status: 500 });
+        return new Response(JSON.stringify({ error: "服务器未配置 API Key" }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+        });
     }
 
-    // 对准 v1beta 接口下的 BidiGenerateContent 传译端点
-    const targetUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${apiKey}`;
+    try {
+        const body = await request.json();
+        const { pcmDataB64 } = body;
 
-    // 创建本地 WebSocket 对，与浏览器端握手
-    const [clientWS, serverWS] = Object.values(new WebSocketPair());
-    serverWS.accept(); // 立即接受浏览器的连接，防止前端 Pending 卡死
-
-    // ⭐️ 核心：在 Cloudflare 后端直接发起指向 Google 的原生出站加密 WebSocket
-    const googleWS = new WebSocket(targetUrl);
-
-    // 数据缓存队列，防止 Google WebSocket 尚未 Open 时丢失前端发来的 Setup 配置
-    let pendingMessages = [];
-
-    googleWS.addEventListener("open", () => {
-        // 连接建立后，一次性发送积压的所有数据帧
-        for (const msg of pendingMessages) {
-            if (googleWS.readyState === 1) {
-                googleWS.send(msg);
-            }
+        if (!pcmDataB64) {
+            return new Response(JSON.stringify({ error: "未接收到音频数据" }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+            });
         }
-        pendingMessages = [];
-    });
 
-    // 浏览器 -> 代理 -> Google
-    serverWS.addEventListener("message", (event) => {
-        if (googleWS.readyState === 1) { // OPEN
-            googleWS.send(event.data);
-        } else {
-            pendingMessages.push(event.data);
+        // 将前端上传的 Base64 字节流还原为标准的 16-bit PCM 数组
+        const binary = atob(pcmDataB64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
         }
-    });
+        const pcmData = new Int16Array(bytes.buffer);
 
-    // Google -> 代理 -> 浏览器
-    googleWS.addEventListener("message", (event) => {
-        if (serverWS.readyState === 1) { // OPEN
-            serverWS.send(event.data);
-        }
-    });
+        // 🎯 目标 Google 官方同传专属 WebSocket 端点 (Live API 支持 v1alpha 通道)
+        const targetUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${apiKey}`;
 
-    // 同步断开与关闭
-    serverWS.addEventListener("close", (event) => {
-        googleWS.close(event.code, event.reason);
-    });
+        // 在 Cloudflare 服务器后台建立与 Google 的同传双向管道，并返回最终收集结果
+        const translatedChunks = await new Promise((resolve, reject) => {
+            // ⭐️ 利用 Cloudflare Workers 官方原生出站 WebSocket 实例
+            const googleWS = new WebSocket(targetUrl);
+            const receivedChunks = [];
 
-    googleWS.addEventListener("close", (event) => {
-        serverWS.close(event.code, event.reason);
-    });
+            // 异常超时保护（最大等待 25 秒）
+            const timeout = setTimeout(() => {
+                googleWS.close();
+                reject(new Error("Google 传译响应超时"));
+            }, 25000);
 
-    // 错误同步
-    serverWS.addEventListener("error", () => {
-        googleWS.close(1011, "Client tunnel error");
-    });
+            googleWS.addEventListener("open", () => {
+                // ⭐️ 发送针对 gemini-3.5-live-translate-preview 模型的专属同传配置
+                googleWS.send(JSON.stringify({
+                    setup: {
+                        model: "models/gemini-3.5-live-translate-preview",
+                        generationConfig: {
+                            responseModalities: ["AUDIO"],
+                            translationConfig: {
+                                targetLanguageCode: "zh-Hans", // 简体中文
+                                echoTargetLanguage: false
+                            }
+                        }
+                    }
+                }));
+            });
 
-    googleWS.addEventListener("error", () => {
-        serverWS.close(1011, "Google tunnel error");
-    });
+            googleWS.addEventListener("message", async (e) => {
+                const msg = JSON.parse(e.data);
 
-    // 返回 101 Switching Protocols 给浏览器
-    return new Response(null, {
-        status: 101,
-        webSocket: clientWS
-    });
+                // Setup 成功，利用服务器间骨干网，瞬间把整个音频所有切片全部推给 Google
+                if (msg.setupComplete) {
+                    const CHUNK_SIZE = 4096;
+                    for (let i = 0; i < pcmData.length; i += CHUNK_SIZE) {
+                        const chunk = pcmData.subarray(i, i + CHUNK_SIZE);
+                        const uint8 = new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength);
+                        
+                        let chunkBinary = '';
+                        for (let j = 0; j < uint8.length; j++) {
+                            chunkBinary += String.fromCharCode(uint8[j]);
+                        }
+
+                        googleWS.send(JSON.stringify({
+                            realtimeInput: { mediaChunks: [{ mimeType: "audio/pcm;rate=16000", data: btoa(chunkBinary) }] }
+                        }));
+                    }
+                    // 音频传输完毕，通知 Google 结束
+                    googleWS.send(JSON.stringify({ clientContent: { turnComplete: true, turns: [] } }));
+                }
+
+                // 收集传回的翻译音频 Base64 碎片
+                if (msg.serverContent?.modelTurn?.parts) {
+                    msg.serverContent.modelTurn.parts.forEach(part => {
+                        if (part.inlineData && part.inlineData.data) {
+                            receivedChunks.push(part.inlineData.data);
+                        }
+                    });
+                }
+
+                // Google 翻译完毕并生成语音
+                if (msg.serverContent?.turnComplete) {
+                    clearTimeout(timeout);
+                    googleWS.close();
+                    resolve(receivedChunks);
+                }
+            });
+
+            googleWS.addEventListener("close", (e) => {
+                clearTimeout(timeout);
+                if (e.code !== 1000 && e.code !== 1005) {
+                    reject(new Error(`Google 连接被拒 [代码 ${e.code}]: ${e.reason || '无原因'}`));
+                } else {
+                    resolve(receivedChunks);
+                }
+            });
+
+            googleWS.addEventListener("error", () => {
+                clearTimeout(timeout);
+                reject(new Error("与 Google 服务器连接发生错误"));
+            });
+        });
+
+        // 将收集齐的所有音频 Base64 切片，通过 HTTP 响应一次性安全地回传给浏览器
+        return new Response(JSON.stringify({ status: "success", chunks: translatedChunks }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+        });
+
+    } catch (err) {
+        return new Response(JSON.stringify({ error: err.message }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+        });
+    }
 }

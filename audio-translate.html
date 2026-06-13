@@ -265,6 +265,7 @@
                 loadingText.textContent = "正在建立 WebSocket 同传通道...";
                 ws = new WebSocket(url);
 
+                // ... 保持上面不变 ...
                 ws.onopen = () => {
                     ws.send(JSON.stringify({
                         setup: {
@@ -272,13 +273,14 @@
                             generationConfig: {
                                 responseModalities: ["AUDIO"],
                                 translationConfig: {
-                                    targetLanguageCode: "zh", 
+                                    targetLanguageCode: "zh-Hans", // ⭐️ 核心修改：改为官方标准的简体中文代码
                                     echoTargetLanguage: false
                                 }
                             }
                         }
                     }));
                 };
+                // ... 保持下面不变 ...
 
                 ws.onmessage = async (e) => {
                     const msg = JSON.parse(e.data);

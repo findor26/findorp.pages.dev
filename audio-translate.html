@@ -204,9 +204,17 @@
                     }
                 };
 
-                ws.onclose = () => {
+                // ... 保持上面不变 ...
+
+                ws.onclose = (e) => {
                     loadingSection.classList.add('hidden');
                     translateBtn.disabled = false;
+
+                    // 1000 是正常关闭，如果是其他代码，说明中途报错了
+                    if (e.code !== 1000 && e.code !== 1005) {
+                        alert(`❌ WebSocket 异常断开\n错误码: ${e.code}\n原因: ${e.reason || '无详细原因(可能API Key权限不足或模型不存在)'}`);
+                        return; // 中断，不执行后面的音频合成
+                    }
 
                     if (receivedPcmChunks.length > 0) {
                         // 组装模型返回的所有 24kHz 音频碎片，压制成可供播放的 .wav 格式
@@ -224,12 +232,12 @@
                             a.click();
                         };
                     } else {
-                        alert("转换完成，但没有收到翻译后的音频内容。");
+                        alert("⚠️ 转换已完成，但没有收到任何翻译后的音频流数据。");
                     }
                 };
 
                 ws.onerror = (e) => {
-                    alert("WebSocket 连接出错，请检查接口。");
+                    alert("⚠️ 无法连接到代理接口，请检查网络或确认 audio.js 已部署。");
                     translateBtn.disabled = false;
                     loadingSection.classList.add('hidden');
                 };

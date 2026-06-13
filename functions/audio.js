@@ -2,10 +2,10 @@
 
 export async function onRequest(context) {
     const { request, env } = context;
+    const apiKey = env.GEMINI_API_KEY;
 
-    // 1. 拦截非 WebSocket 请求 (保留自检诊断功能)
+    // 1. 拦截非 WebSocket 升级请求（保留自检功能）
     if (request.headers.get("Upgrade") !== "websocket") {
-        const apiKey = env.GEMINI_API_KEY;
         const diagnostics = {
             cloudflare_worker_status: "正常运行 (Active)",
             api_key_configured: !!apiKey,
@@ -72,17 +72,80 @@ export async function onRequest(context) {
         }
     }
 
-    // 2. 正常 WebSocket 代理流 (采用最标准的单行透明转发)
-    const apiKey = env.GEMINI_API_KEY;
+    // 2. 正常 WebSocket 代理流
     if (!apiKey) {
         return new Response("服务器未配置 API Key", { status: 500 });
     }
 
-    // ⭐️ 核心对齐 1：同传双向流 Live API 仅存在于 v1alpha 命名空间下
+    // ⭐️ 核心对齐 1：双向流 Live API 只存在于 v1alpha 命名空间下
     // ⭐️ 核心对齐 2：使用 https:// 作为出站 fetch 的目标前缀，规避 CF 报错崩溃
     const targetUrl = `https://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${apiKey}`;
 
-    // ⭐️ 核心对齐 3：透明转发原始 request。
-    // 这将在 Cloudflare 最底层自动握手并代理这条长连接同传通道，彻底消除 25 秒超时和挂起。
-    return fetch(targetUrl, request);
+    // ⭐️ 核心对齐 4：创建本地 WebSocket 对，手动接管浏览器连接（阻断 Origin 和 Host 污染）
+    const [clientWS, serverWS] = Object.values(new WebSocketPair());
+    serverWS.accept(); // 立即接受浏览器的连接，防止前端卡死
+
+    try {
+        // ⭐️ 核心对齐 3：使用异步 fetch 配合 Upgrade 请求头，这是 Cloudflare 沙盒中最稳定、兼容性最强的出站握手方式
+        const googleResponse = await fetch(targetUrl, {
+            headers: {
+                "Upgrade": "websocket"
+            }
+        });
+
+        // 如果握手不成功，捕获 Google 端的拒绝并关闭
+        if (googleResponse.status !== 101) {
+            const errText = await googleResponse.text().catch(() => "Google 握手未返回 101");
+            serverWS.close(1011, `Google 拒绝连接 [${googleResponse.status}]: ${errText}`);
+            return new Response(null, { status: 101, webSocket: clientWS });
+        }
+
+        const googleWS = googleResponse.webSocket;
+        if (!googleWS) {
+            serverWS.close(1011, "Google 握手未返回 WebSocket 实例");
+            return new Response(null, { status: 101, webSocket: clientWS });
+        }
+
+        // 接受 Google 的连接
+        googleWS.accept();
+
+        // 建立双向手动数据流分发
+        serverWS.addEventListener("message", (event) => {
+            if (googleWS.readyState === 1) {
+                googleWS.send(event.data);
+            }
+        });
+
+        googleWS.addEventListener("message", (event) => {
+            if (serverWS.readyState === 1) {
+                serverWS.send(event.data);
+            }
+        });
+
+        serverWS.addEventListener("close", (event) => {
+            googleWS.close(event.code, event.reason);
+        });
+
+        googleWS.addEventListener("close", (event) => {
+            serverWS.close(event.code, event.reason);
+        });
+
+        serverWS.addEventListener("error", () => {
+            googleWS.close(1011, "Client tunnel error");
+        });
+
+        googleWS.addEventListener("error", () => {
+            serverWS.close(1011, "Google tunnel error");
+        });
+
+    } catch (err) {
+        // 若代理连接 Google 失败，通过连接关闭帧将真实错误发送并弹窗在前端
+        serverWS.close(1011, "代理连接 Google 失败: " + err.message);
+    }
+
+    // 返回 101 Switching Protocols 给浏览器
+    return new Response(null, {
+        status: 101,
+        webSocket: clientWS
+    });
 }

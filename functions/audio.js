@@ -2,10 +2,10 @@
 
 export async function onRequest(context) {
     const { request, env } = context;
-    const apiKey = env.GEMINI_API_KEY;
 
-    // 1. 拦截非 WebSocket 请求（自检与诊断模式保持不变）
+    // 1. 拦截非 WebSocket 请求（保留自检诊断功能）
     if (request.headers.get("Upgrade") !== "websocket") {
+        const apiKey = env.GEMINI_API_KEY;
         const diagnostics = {
             cloudflare_worker_status: "正常运行 (Active)",
             api_key_configured: !!apiKey,
@@ -72,69 +72,17 @@ export async function onRequest(context) {
         }
     }
 
-    // 2. 正常 WebSocket 代理流 (采用手动双向管道转发，避开 Cloudflare 透明转发在 3.5 上的 1006 网关 Bug)
+    // 2. 正常 WebSocket 代理流 (采用极其简练的原生透明转发)
+    const apiKey = env.GEMINI_API_KEY;
     if (!apiKey) {
         return new Response("服务器未配置 API Key", { status: 500 });
     }
 
-    const targetUrl = `https://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${apiKey}`;
+    // ⭐️ 核心对齐 1：双向流 Live API 只存在于 v1alpha 通道中
+    // ⭐️ 核心对齐 2：使用 https:// 作为 fetch 目标前缀
+    const targetUrl = `https://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${apiKey}`;
 
-    // 创建本地 WebSocket 对
-    const [clientWS, serverWS] = Object.values(new WebSocketPair());
-    serverWS.accept(); // 立即接受浏览器的连接，防止前端卡死
-
-    try {
-        // 向 Google 发起纯净出站 WebSocket 升级（抹除所有本地请求头，避免 Origin 污染）
-        const googleResponse = await fetch(targetUrl, {
-            headers: {
-                "Upgrade": "websocket"
-            }
-        });
-
-        const googleWS = googleResponse.webSocket;
-        if (!googleWS) {
-            serverWS.close(1011, "Google 拒绝了出站 WebSocket 升级请求");
-            return new Response(null, { status: 101, webSocket: clientWS });
-        }
-
-        // 接受 Google 的连接
-        googleWS.accept();
-
-        // ⭐️ 双向手动数据管道转发（直接内存抽水中转数据帧，不通过网关转发，完美解决 1006 异常）
-        serverWS.addEventListener("message", (event) => {
-            if (googleWS.readyState === 1) {
-                googleWS.send(event.data);
-            }
-        });
-
-        googleWS.addEventListener("message", (event) => {
-            if (serverWS.readyState === 1) {
-                serverWS.send(event.data);
-            }
-        });
-
-        serverWS.addEventListener("close", (event) => {
-            googleWS.close(event.code, event.reason);
-        });
-
-        googleWS.addEventListener("close", (event) => {
-            serverWS.close(event.code, event.reason);
-        });
-
-        serverWS.addEventListener("error", () => {
-            googleWS.close(1011, "Client tunnel error");
-        });
-
-        googleWS.addEventListener("error", () => {
-            serverWS.close(1011, "Google tunnel error");
-        });
-
-    } catch (err) {
-        serverWS.close(1011, "代理连接 Google 失败: " + err.message);
-    }
-
-    return new Response(null, {
-        status: 101,
-        webSocket: clientWS
-    });
+    // ⭐️ 核心对齐 3：透明转发原始 request。
+    // Cloudflare 网关会以原生极速性能直接升级、握手并代理这条同传通道，完美消除 1006 与卡死挂起。
+    return fetch(targetUrl, request);
 }

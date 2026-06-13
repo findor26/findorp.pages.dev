@@ -1,88 +1,69 @@
-// 文件路径: functions/audio.js
+// 文件路径: functions/audioTranslate.js
 
 export async function onRequest(context) {
     const { request, env } = context;
-
-    // 1. 拦截非 WebSocket 请求（保留自检诊断功能）
-    if (request.headers.get("Upgrade") !== "websocket") {
-        const apiKey = env.GEMINI_API_KEY;
-        const diagnostics = {
-            cloudflare_worker_status: "正常运行 (Active)",
-            api_key_configured: !!apiKey,
-            google_api_test: null
-        };
-
-        if (!apiKey) {
-            return new Response(JSON.stringify({
-                status: "error",
-                message: "后端未配置 GEMINI_API_KEY 环境变量",
-                diagnostics: diagnostics
-            }, null, 2), {
-                status: 500,
-                headers: { "Content-Type": "application/json; charset=utf-8" }
-            });
-        }
-
-        try {
-            const testUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
-            const testResponse = await fetch(testUrl);
-            const testData = await testResponse.json();
-
-            if (testResponse.ok) {
-                diagnostics.google_api_test = {
-                    status: "成功 (Success)",
-                    message: "API Key 有效，且代理服务器成功连接到了 Google API",
-                    available_models_sample: testData.models ? testData.models.slice(0, 3).map(m => m.name) : []
-                };
-                return new Response(JSON.stringify({
-                    status: "success",
-                    message: "🎉 后端自检通过！接口一切正常，请在前端页面中上传文件进行翻译。",
-                    diagnostics: diagnostics
-                }, null, 2), {
-                    status: 200,
-                    headers: { "Content-Type": "application/json; charset=utf-8" }
-                });
-            } else {
-                diagnostics.google_api_test = {
-                    status: "失败 (Failed)",
-                    error_from_google: testData
-                };
-                return new Response(JSON.stringify({
-                    status: "error",
-                    message: "Google 拒绝了你的请求。请查看下方来自 Google 的详细错误原因：",
-                    diagnostics: diagnostics
-                }, null, 2), {
-                    status: 400,
-                    headers: { "Content-Type": "application/json; charset=utf-8" }
-                });
-            }
-        } catch (err) {
-            diagnostics.google_api_test = {
-                status: "异常 (Exception)",
-                error_message: err.message
-            };
-            return new Response(JSON.stringify({
-                status: "error",
-                message: "代理服务器无法建立与 Google 的连接。",
-                diagnostics: diagnostics
-            }, null, 2), {
-                status: 500,
-                headers: { "Content-Type": "application/json; charset=utf-8" }
-            });
-        }
-    }
-
-    // 2. 正常 WebSocket 代理流 (采用极其简练的原生透明转发)
     const apiKey = env.GEMINI_API_KEY;
+
     if (!apiKey) {
-        return new Response("服务器未配置 API Key", { status: 500 });
+        return jsonResponse({ error: '服务器未配置 API Key', code: 'NO_API_KEY' }, 500);
     }
 
-    // ⭐️ 核心对齐 1：双向流 Live API 只存在于 v1alpha 通道中
-    // ⭐️ 核心对齐 2：使用 https:// 作为 fetch 目标前缀
-    const targetUrl = `https://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${apiKey}`;
+    if (request.method === 'OPTIONS') {
+        return new Response(null, {
+            status: 204,
+            headers: {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'POST, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type',
+                'Access-Control-Max-Age': '86400'
+            }
+        });
+    }
 
-    // ⭐️ 核心对齐 3：透明转发原始 request。
-    // Cloudflare 网关会以原生极速性能直接升级、握手并代理这条同传通道，完美消除 1006 与卡死挂起。
-    return fetch(targetUrl, request);
+    if (request.method !== 'POST') {
+        return jsonResponse({ error: '仅支持 POST 请求', code: 'METHOD_NOT_ALLOWED' }, 405);
+    }
+
+    try {
+        const body = await request.json();
+        const { model, contents, generationConfig } = body;
+
+        if (!model) {
+            return jsonResponse({ error: '未指定模型', code: 'INVALID_MODEL' }, 400);
+        }
+
+        // 拼接标准的 Google Gemini REST 接口 (使用 v1beta)
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+        // 向 Google 转发请求
+        const geminiResponse = await fetch(geminiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents,
+                generationConfig
+            })
+        });
+
+        if (!geminiResponse.ok) {
+            const errorData = await geminiResponse.json().catch(() => ({}));
+            return jsonResponse({ error: errorData.error?.message || 'API 错误' }, geminiResponse.status);
+        }
+
+        const data = await geminiResponse.json();
+        return jsonResponse(data, 200);
+
+    } catch (err) {
+        return jsonResponse({ error: '服务器内部错误', message: err.message }, 500);
+    }
+}
+
+function jsonResponse(data, status = 200) {
+    return new Response(JSON.stringify(data), {
+        status, 
+        headers: { 
+            'Content-Type': 'application/json; charset=utf-8', 
+            'Access-Control-Allow-Origin': '*' 
+        }
+    });
 }

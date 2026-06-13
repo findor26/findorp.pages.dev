@@ -4,135 +4,27 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gemini 3.5 同声传译</title>
-
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
-
-    <script type="importmap">
-        {
-            "imports": {
-                "@material/web/": "https://esm.run/@material/web/"
-            }
-        }
-    </script>
-    <script type="module">
-        import '@material/web/all.js';
-    </script>
-
+    <script type="importmap">{"imports": {"@material/web/": "https://esm.run/@material/web/"}}</script>
+    <script type="module">import '@material/web/all.js';</script>
     <style>
-        :root {
-            --md-sys-color-background: #fcfcff;
-            --md-sys-color-on-background: #1a1c1e;
-            --md-sys-color-primary: #0061a4;
-            --md-sys-color-on-primary: #ffffff;
-            --md-sys-color-surface-container: #f0f4fa;
-            --md-sys-color-on-surface: #1a1c1e;
-        }
-
-        body {
-            font-family: 'Roboto', system-ui, -apple-system, sans-serif;
-            background-color: var(--md-sys-color-background);
-            color: var(--md-sys-color-on-background);
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            box-sizing: border-box;
-        }
-
-        .main-card {
-            background-color: var(--md-sys-color-surface-container);
-            border-radius: 28px;
-            padding: 32px;
-            width: 100%;
-            max-width: 500px;
-            box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.08);
-            display: flex;
-            flex-direction: column;
-            gap: 24px;
-            transition: all 0.3s ease;
-        }
-
-        .header {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            color: var(--md-sys-color-primary);
-        }
-
-        .header md-icon {
-            font-size: 32px;
-        }
-
-        .header h1 {
-            margin: 0;
-            font-size: 22px;
-            font-weight: 500;
-            color: var(--md-sys-color-on-surface);
-        }
-
-        input[type="file"] {
-            display: none;
-        }
-
-        .file-upload-section {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            background: #e1e8f0;
-            padding: 12px 16px;
-            border-radius: 16px;
-        }
-
-        #fileName {
-            font-size: 14px;
-            color: #444;
-            flex-grow: 1;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .hidden {
-            display: none !important;
-        }
-
-        .loading-container {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            align-items: center;
-            text-align: center;
-        }
-
-        #loadingText {
-            font-size: 14px;
-            color: var(--md-sys-color-primary);
-        }
-
-        .audio-result-box {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            background: #fff;
-            padding: 16px;
-            border-radius: 16px;
-            border: 1px solid #d1d8e0;
-        }
-
-        audio {
-            width: 100%;
-            height: 40px;
-        }
-
-        md-outlined-text-field {
-            width: 100%;
-            --md-outlined-text-field-container-shape: 16px;
-        }
+        :root { --md-sys-color-background: #fcfcff; --md-sys-color-surface-container: #f0f4fa; --md-sys-color-primary: #0061a4; }
+        body { font-family: 'Roboto', sans-serif; background: var(--md-sys-color-background); margin: 0; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; box-sizing: border-box; }
+        .main-card { background: var(--md-sys-color-surface-container); border-radius: 28px; padding: 32px; width: 100%; max-width: 500px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); display: flex; flex-direction: column; gap: 24px; }
+        .header { display: flex; align-items: center; gap: 12px; color: var(--md-sys-color-primary); }
+        .header h1 { margin: 0; font-size: 22px; font-weight: 500; color: #1a1c1e; }
+        input[type="file"] { display: none; }
+        .file-section { display: flex; align-items: center; gap: 16px; background: #e1e8f0; padding: 12px 16px; border-radius: 16px; }
+        #fileName { font-size: 14px; color: #444; flex-grow: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .hidden { display: none !important; }
+        .loading-container { display: flex; flex-direction: column; gap: 8px; align-items: center; text-align: center; }
+        #loadingText { font-size: 14px; color: var(--md-sys-color-primary); }
+        .audio-result-box { display: flex; flex-direction: column; gap: 12px; background: #fff; padding: 16px; border-radius: 16px; border: 1px solid #d1d8e0; }
+        audio { width: 100%; height: 40px; }
+        md-outlined-text-field { width: 100%; --md-outlined-text-field-container-shape: 16px; }
     </style>
 </head>
 <body>
@@ -143,38 +35,25 @@
             <h1>Gemini 3.5 同声传译</h1>
         </div>
 
-        <md-outlined-text-field
-            id="proxyUrl"
-            label="WebSocket 代理地址"
-            value="https://findorp.pages.dev/audio">
-        </md-outlined-text-field>
+        <md-outlined-text-field id="proxyUrl" label="接口地址 (标准的 HTTP 接口)" value="/audio"></md-outlined-text-field>
 
-        <div class="file-upload-section">
+        <div class="file-section">
             <input type="file" id="audioFile" accept="audio/*, video/*">
-            <md-filled-tonal-button id="uploadTriggerBtn">
-                <md-icon slot="icon">audio_file</md-icon>
-                选择音频
-            </md-filled-tonal-button>
+            <md-filled-tonal-button id="uploadTriggerBtn"><md-icon slot="icon">audio_file</md-icon>选择音频</md-filled-tonal-button>
             <span id="fileName">尚未选择文件</span>
         </div>
 
-        <md-filled-button id="translateBtn">
-            <md-icon slot="icon">translate</md-icon>
-            开始同声传译
-        </md-filled-button>
+        <md-filled-button id="translateBtn"><md-icon slot="icon">translate</md-icon>开始同声传译</md-filled-button>
 
         <div id="loadingSection" class="loading-container hidden">
             <md-linear-progress indeterminate style="width: 100%;"></md-linear-progress>
-            <span id="loadingText">正在准备，请稍候...</span>
+            <span id="loadingText">正在向 Cloudflare 上传音频并执行后台同传翻译...</span>
         </div>
 
         <div id="resultSection" class="audio-result-box hidden">
-            <span style="font-size: 14px; font-weight: bold;">🎧 同传翻译完成！请试听中文语音：</span>
+            <span style="font-size: 14px; font-weight: bold;">🎧 翻译完成！请试听中文语音：</span>
             <audio id="audioPlayer" controls></audio>
-            <md-outlined-button id="saveBtn">
-                <md-icon slot="icon">download</md-icon>
-                下载翻译音频 (.wav)
-            </md-outlined-button>
+            <md-outlined-button id="saveBtn"><md-icon slot="icon">download</md-icon>下载翻译音频 (.wav)</md-outlined-button>
         </div>
     </div>
 
@@ -190,24 +69,20 @@
         const loadingSection = document.getElementById('loadingSection');
         const loadingText = document.getElementById('loadingText');
 
-        let ws = null;
-
         uploadTriggerBtn.onclick = () => audioFileInput.click();
         audioFileInput.onchange = (e) => {
             const f = e.target.files[0];
             fileNameDisplay.textContent = f ? f.name : "尚未选择文件";
         };
 
-        // 核心：手写标准的 WAV 文件头（WAV 播放器识别必需）
+        // 用于将同传返回的 24kHz 裸 PCM 片段组装成标准可播放的 WAV 音频
         function createWavFile(pcmChunks, sampleRate) {
             let totalSamples = pcmChunks.reduce((acc, chunk) => acc + chunk.length, 0);
             const buffer = new ArrayBuffer(44 + totalSamples * 2);
             const view = new DataView(buffer);
             
             const writeString = (v, offset, str) => { 
-                for (let i = 0; i < str.length; i++) {
-                    v.setUint8(offset + i, str.charCodeAt(i)); 
-                }
+                for (let i = 0; i < str.length; i++) v.setUint8(offset + i, str.charCodeAt(i)); 
             };
             
             writeString(view, 0, 'RIFF');
@@ -215,12 +90,12 @@
             writeString(view, 8, 'WAVE');
             writeString(view, 12, 'fmt ');
             view.setUint32(16, 16, true);
-            view.setUint16(20, 1, true); // PCM format
-            view.setUint16(22, 1, true); // Mono channel
+            view.setUint16(20, 1, true); 
+            view.setUint16(22, 1, true); 
             view.setUint32(24, sampleRate, true); 
             view.setUint32(28, sampleRate * 2, true); 
             view.setUint16(32, 2, true); 
-            view.setUint16(34, 16, true); // 16 bits
+            view.setUint16(34, 16, true); 
             writeString(view, 36, 'data');
             view.setUint32(40, totalSamples * 2, true);
             
@@ -236,12 +111,10 @@
 
         translateBtn.addEventListener('click', async () => {
             const file = audioFileInput.files[0];
-            let url = proxyUrlInput.value.trim();
+            const url = proxyUrlInput.value.trim();
 
             if (!url) return alert('请输入接口地址');
             if (!file) return alert('请先选择一个音频文件');
-
-            if (url.startsWith('http')) url = url.replace(/^http/, 'ws');
 
             translateBtn.disabled = true;
             uploadTriggerBtn.disabled = true;
@@ -249,10 +122,8 @@
             loadingSection.classList.remove('hidden');
             loadingText.textContent = "本地正在提取并重采样音频...";
 
-            let receivedPcmChunks = []; 
-
             try {
-                // 将本地音频重采样为 16000Hz PCM
+                // 1. 本地重采样音频为 16000Hz PCM 单声道
                 const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
                 const arrayBuffer = await file.arrayBuffer();
                 const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
@@ -264,121 +135,65 @@
                     int16Buffer[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
                 }
 
-                loadingText.textContent = "正在建立 WebSocket 同传通道...";
-                ws = new WebSocket(url);
+                loadingText.textContent = "正在上传音频数据至 Cloudflare 代理...";
 
-                ws.onopen = () => {
-                    // ⭐️ 建立连接后发送 Setup 指令配置同传模型
-                    ws.send(JSON.stringify({
-                        setup: {
-                            model: "models/gemini-3.5-live-translate-preview",
-                            generationConfig: {
-                                responseModalities: ["AUDIO"],
-                                translationConfig: {
-                                    targetLanguageCode: "zh-Hans", // ⭐️ 修正：简体中文在 Live API 必须是 zh-Hans
-                                    echoTargetLanguage: false
-                                }
-                            }
+                // 2. 将音频数组转为字节视图，转换为一并上传的 Base64 编码
+                const uint8 = new Int16Array(int16Buffer.buffer);
+                const bytesView = new Uint8Array(uint8.buffer);
+                let binary = '';
+                for (let i = 0; i < bytesView.length; i++) {
+                    binary += String.fromCharCode(bytesView[i]);
+                }
+                const pcmDataB64 = btoa(binary);
+
+                // 3. 通过标准的 POST 请求一次性上传音频数据给你的 pages.dev
+                loadingText.textContent = "上传成功！Cloudflare 正在直连 Google 并执行流式同传处理...";
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pcmDataB64 })
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({}));
+                    throw new Error(errData.error || `HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                // 4. 处理云端回传的同传碎片
+                if (data.status === "success" && data.chunks && data.chunks.length > 0) {
+                    loadingText.textContent = "同传音频生成完毕，本地组装中...";
+                    const receivedPcmChunks = data.chunks.map(chunkB64 => {
+                        const chunkBinary = atob(chunkB64);
+                        const chunkBytes = new Uint8Array(chunkBinary.length);
+                        for(let i = 0; i < chunkBinary.length; i++) {
+                            chunkBytes[i] = chunkBinary.charCodeAt(i);
                         }
-                    }));
-                };
+                        return new Int16Array(chunkBytes.buffer, chunkBytes.byteOffset, chunkBytes.byteLength / 2);
+                    });
 
-                ws.onmessage = async (e) => {
-                    const msg = JSON.parse(e.data);
+                    // 5. 拼装 WAV 并渲染播放器
+                    const blob = createWavFile(receivedPcmChunks, 24000);
+                    const finalAudioUrl = URL.createObjectURL(blob);
+                    
+                    audioPlayer.src = finalAudioUrl;
+                    resultSection.classList.remove('hidden');
 
-                    if (msg.setupComplete) {
-                        const CHUNK_SIZE = 4096; 
-                        const totalChunks = Math.ceil(int16Buffer.length / CHUNK_SIZE);
-                        let currentChunk = 0;
-
-                        for(let i = 0; i < int16Buffer.length; i += CHUNK_SIZE) {
-                            if (ws.readyState !== WebSocket.OPEN) break;
-                            const chunk = int16Buffer.subarray(i, i + CHUNK_SIZE);
-                            
-                            // ⭐️ 只读取当前分片的字节，避免溢出和崩溃
-                            const uint8 = new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength);
-                            
-                            let binary = '';
-                            const len = uint8.length;
-                            for (let j = 0; j < len; j++) {
-                                binary += String.fromCharCode(uint8[j]);
-                            }
-                            
-                            ws.send(JSON.stringify({
-                                realtimeInput: { mediaChunks: [{ mimeType: "audio/pcm;rate=16000", data: btoa(binary) }] }
-                            }));
-                            
-                            currentChunk++;
-                            const percent = Math.round((currentChunk / totalChunks) * 100);
-                            loadingText.textContent = `正在传输音频数据: ${percent}% ...`;
-                            
-                            await new Promise(r => setTimeout(r, 15)); 
-                        }
-                        
-                        if (ws.readyState === WebSocket.OPEN) {
-                            loadingText.textContent = "音频发送完毕，正在等待同传翻译语音生成...";
-                            ws.send(JSON.stringify({ clientContent: { turnComplete: true, turns: [] } }));
-                        }
-                    }
-
-                    // 接收 Google 传回的 24000Hz 同传音频
-                    if (msg.serverContent?.modelTurn?.parts) {
-                        msg.serverContent.modelTurn.parts.forEach(part => {
-                            if (part.inlineData && part.inlineData.data) {
-                                const binary = atob(part.inlineData.data);
-                                const bytes = new Uint8Array(binary.length);
-                                for(let i = 0; i < binary.length; i++) {
-                                    bytes[i] = binary.charCodeAt(i);
-                                }
-                                
-                                receivedPcmChunks.push(new Int16Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 2));
-                            }
-                        });
-                    }
-
-                    if (msg.serverContent?.turnComplete) {
-                        ws.close();
-                    }
-                };
-
-                ws.onclose = (e) => {
-                    loadingSection.classList.add('hidden');
-                    translateBtn.disabled = false;
-                    uploadTriggerBtn.disabled = false;
-
-                    if (e.code !== 1000 && e.code !== 1005) {
-                        alert(`❌ WebSocket 异常断开\n错误码: ${e.code}\n原因: ${e.reason || '未提供具体原因'}`);
-                        return; 
-                    }
-
-                    if (receivedPcmChunks.length > 0) {
-                        const blob = createWavFile(receivedPcmChunks, 24000);
-                        const finalAudioUrl = URL.createObjectURL(blob);
-                        
-                        audioPlayer.src = finalAudioUrl;
-                        resultSection.classList.remove('hidden');
-
-                        saveBtn.onclick = () => {
-                            const a = document.createElement('a');
-                            a.href = finalAudioUrl;
-                            const dStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-                            a.download = `同声传译_中文_${dStr}.wav`;
-                            a.click();
-                        };
-                    } else {
-                        alert("⚠️ 转换完成，但未收到翻译后的音频流数据。");
-                    }
-                };
-
-                ws.onerror = (e) => {
-                    alert("⚠️ 无法连接至代理接口，请检查网络。\n提示：可在浏览器中直接输入接口地址进行自检。");
-                    translateBtn.disabled = false;
-                    uploadTriggerBtn.disabled = false;
-                    loadingSection.classList.add('hidden');
-                };
+                    saveBtn.onclick = () => {
+                        const a = document.createElement('a');
+                        a.href = finalAudioUrl;
+                        const dStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+                        a.download = `同声传译_中文_${dStr}.wav`;
+                        a.click();
+                    };
+                } else {
+                    throw new Error("后台同传成功，但未能收齐到任何同传语音切片。");
+                }
 
             } catch (err) {
-                alert("发生错误: " + err.message);
+                alert("翻译失败: " + err.message);
+            } finally {
                 translateBtn.disabled = false;
                 uploadTriggerBtn.disabled = false;
                 loadingSection.classList.add('hidden');

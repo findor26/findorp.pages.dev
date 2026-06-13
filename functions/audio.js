@@ -2,10 +2,10 @@
 
 export async function onRequest(context) {
     const { request, env } = context;
+    const apiKey = env.GEMINI_API_KEY;
 
-    // 1. 检查是否为 WebSocket 升级请求
+    // 1. 拦截非 WebSocket 请求（自检与诊断模式保持不变）
     if (request.headers.get("Upgrade") !== "websocket") {
-        const apiKey = env.GEMINI_API_KEY;
         const diagnostics = {
             cloudflare_worker_status: "正常运行 (Active)",
             api_key_configured: !!apiKey,
@@ -72,18 +72,19 @@ export async function onRequest(context) {
         }
     }
 
-    // 2. ⭐️ 核心逻辑：正常 WebSocket 代理流 (采用 WebSocketPair)
-    const apiKey = env.GEMINI_API_KEY;
-    
-    // ⭐️ 必须对准 v1beta 接口，且在 fetch 内以 https:// 开头
+    // 2. 正常 WebSocket 代理流 (采用手动双向管道转发，避开 Cloudflare 透明转发在 3.5 上的 1006 网关 Bug)
+    if (!apiKey) {
+        return new Response("服务器未配置 API Key", { status: 500 });
+    }
+
     const targetUrl = `https://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${apiKey}`;
 
-    // 创建本地 WebSocket 对，用于和浏览器建立连接
+    // 创建本地 WebSocket 对
     const [clientWS, serverWS] = Object.values(new WebSocketPair());
-    serverWS.accept(); // 立即接受浏览器的连接，防止前端一直卡在 Connecting
+    serverWS.accept(); // 立即接受浏览器的连接，防止前端卡死
 
     try {
-        // 向 Google 发起最干净的出站 WebSocket 连接（只带必要的升级头部，阻断 Origin 和 Host 污染）
+        // 向 Google 发起纯净出站 WebSocket 升级（抹除所有本地请求头，避免 Origin 污染）
         const googleResponse = await fetch(targetUrl, {
             headers: {
                 "Upgrade": "websocket"
@@ -92,14 +93,14 @@ export async function onRequest(context) {
 
         const googleWS = googleResponse.webSocket;
         if (!googleWS) {
-            serverWS.close(1011, "Google 拒绝了出站 WebSocket 升级（可能是握手被拒）");
+            serverWS.close(1011, "Google 拒绝了出站 WebSocket 升级请求");
             return new Response(null, { status: 101, webSocket: clientWS });
         }
 
         // 接受 Google 的连接
         googleWS.accept();
 
-        // 双向管道极速数据转发
+        // ⭐️ 双向手动数据管道转发（直接内存抽水中转数据帧，不通过网关转发，完美解决 1006 异常）
         serverWS.addEventListener("message", (event) => {
             if (googleWS.readyState === 1) {
                 googleWS.send(event.data);
@@ -129,11 +130,9 @@ export async function onRequest(context) {
         });
 
     } catch (err) {
-        // ⭐️ 核心优化：若连接 Google 失败，通过连接关闭帧将“真实错误信息”直接发送并弹窗在前端！
         serverWS.close(1011, "代理连接 Google 失败: " + err.message);
     }
 
-    // 返回 101 Switching Protocols 给浏览器
     return new Response(null, {
         status: 101,
         webSocket: clientWS

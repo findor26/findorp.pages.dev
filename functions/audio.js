@@ -2,10 +2,10 @@
 
 export async function onRequest(context) {
     const { request, env } = context;
-    const apiKey = env.GEMINI_API_KEY;
 
-    // ⭐️ 诊断自检模式：如果不是由前端页面发起的 WebSocket 升级请求，执行系统自检
+    // 1. 检查是否为 WebSocket 升级请求
     if (request.headers.get("Upgrade") !== "websocket") {
+        const apiKey = env.GEMINI_API_KEY;
         const diagnostics = {
             cloudflare_worker_status: "正常运行 (Active)",
             api_key_configured: !!apiKey,
@@ -15,7 +15,7 @@ export async function onRequest(context) {
         if (!apiKey) {
             return new Response(JSON.stringify({
                 status: "error",
-                message: "后端未配置 GEMINI_API_KEY 环境变量，请在 Cloudflare 仪表盘中检查 Settings -> Variables",
+                message: "后端未配置 GEMINI_API_KEY 环境变量",
                 diagnostics: diagnostics
             }, null, 2), {
                 status: 500,
@@ -23,7 +23,6 @@ export async function onRequest(context) {
             });
         }
 
-        // 测试向 Google API 发起请求，验证 Key 的有效性及网络区域限制
         try {
             const testUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
             const testResponse = await fetch(testUrl);
@@ -44,14 +43,13 @@ export async function onRequest(context) {
                     headers: { "Content-Type": "application/json; charset=utf-8" }
                 });
             } else {
-                // 如果是 Google 拒绝了（比如 Key 错、地区锁、欠费等），直接把 Google 的原装错误 JSON 吐在页面上
                 diagnostics.google_api_test = {
                     status: "失败 (Failed)",
                     error_from_google: testData
                 };
                 return new Response(JSON.stringify({
                     status: "error",
-                    message: "🚨 Google 拒绝了你的请求。请查看下方来自 Google 的详细错误原因：",
+                    message: "Google 拒绝了你的请求。请查看下方来自 Google 的详细错误原因：",
                     diagnostics: diagnostics
                 }, null, 2), {
                     status: 400,
@@ -65,7 +63,7 @@ export async function onRequest(context) {
             };
             return new Response(JSON.stringify({
                 status: "error",
-                message: "代理服务器无法建立与 Google 的连接，请确认 Cloudflare 区域网络或代理配置是否正常。",
+                message: "代理服务器无法建立与 Google 的连接。",
                 diagnostics: diagnostics
             }, null, 2), {
                 status: 500,
@@ -74,14 +72,70 @@ export async function onRequest(context) {
         }
     }
 
-    // --- 以下为正常的 WebSocket 代理流 ---
-    if (!apiKey) {
-        return new Response("未配置 API Key", { status: 500 });
-    }
-
-    // 目标官方最新 v1beta 接口
+    // 2. ⭐️ 核心逻辑：正常 WebSocket 代理流 (采用 WebSocketPair)
+    const apiKey = env.GEMINI_API_KEY;
+    
+    // ⭐️ 必须对准 v1beta 接口，且在 fetch 内以 https:// 开头
     const targetUrl = `https://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${apiKey}`;
 
-    // 原生转发
-    return fetch(targetUrl, request);
+    // 创建本地 WebSocket 对，用于和浏览器建立连接
+    const [clientWS, serverWS] = Object.values(new WebSocketPair());
+    serverWS.accept(); // 立即接受浏览器的连接，防止前端一直卡在 Connecting
+
+    try {
+        // 向 Google 发起最干净的出站 WebSocket 连接（只带必要的升级头部，阻断 Origin 和 Host 污染）
+        const googleResponse = await fetch(targetUrl, {
+            headers: {
+                "Upgrade": "websocket"
+            }
+        });
+
+        const googleWS = googleResponse.webSocket;
+        if (!googleWS) {
+            serverWS.close(1011, "Google 拒绝了出站 WebSocket 升级（可能是握手被拒）");
+            return new Response(null, { status: 101, webSocket: clientWS });
+        }
+
+        // 接受 Google 的连接
+        googleWS.accept();
+
+        // 双向管道极速数据转发
+        serverWS.addEventListener("message", (event) => {
+            if (googleWS.readyState === 1) {
+                googleWS.send(event.data);
+            }
+        });
+
+        googleWS.addEventListener("message", (event) => {
+            if (serverWS.readyState === 1) {
+                serverWS.send(event.data);
+            }
+        });
+
+        serverWS.addEventListener("close", (event) => {
+            googleWS.close(event.code, event.reason);
+        });
+
+        googleWS.addEventListener("close", (event) => {
+            serverWS.close(event.code, event.reason);
+        });
+
+        serverWS.addEventListener("error", () => {
+            googleWS.close(1011, "Client tunnel error");
+        });
+
+        googleWS.addEventListener("error", () => {
+            serverWS.close(1011, "Google tunnel error");
+        });
+
+    } catch (err) {
+        // ⭐️ 核心优化：若连接 Google 失败，通过连接关闭帧将“真实错误信息”直接发送并弹窗在前端！
+        serverWS.close(1011, "代理连接 Google 失败: " + err.message);
+    }
+
+    // 返回 101 Switching Protocols 给浏览器
+    return new Response(null, {
+        status: 101,
+        webSocket: clientWS
+    });
 }

@@ -15,8 +15,8 @@ export async function onRequest(context) {
         return new Response('Missing GEMINI_API_KEY env', { status: 500 });
     }
 
-    // 在边缘节点实时获取暂存的音频数据
-    const fileUrl = `https://files.catbox.moe/${fileId}.bin`;
+    // 从 Pixeldrain 高速直连通道获取暂存的音频数据
+    const fileUrl = `https://pixeldrain.com/api/file/${fileId}`;
     const fileResponse = await fetch(fileUrl);
     
     if (!fileResponse.ok) {
@@ -136,7 +136,7 @@ export async function onRequest(context) {
                 }));
                 offset += chunkSize;
                 
-                // 恢复为 100ms 原始推流速度，极大增强免费版稳定性，翻译质量最细腻
+                // 100ms 原始推流速度，翻译最抗干扰，且能保证输出最佳音质
                 await new Promise(r => setTimeout(r, 100)); 
             }
 

@@ -20,31 +20,34 @@ export async function onRequest(context) {
     try {
         const pcmBuffer = await request.arrayBuffer();
 
-        // 包装为标准的 multipart/form-data（表单表头）格式
+        // 包装为标准的 multipart/form-data 格式
         const formData = new FormData();
         const fileBlob = new Blob([pcmBuffer], { type: 'application/octet-stream' });
         
-        // 注意：根据 Pixeldrain API 规范，上传文件的表单字段名必须是 'file'
+        // 0x0.st 要求的上传字段名必须是 'file'
         formData.append('file', fileBlob, 'audio.bin'); 
 
-        // 改用稳定的匿名 POST 上传点
-        const pixeldrainResponse = await fetch('https://pixeldrain.com/api/file', {
+        // 上传到老牌、完全免费的匿名存储站 0x0.st
+        const response = await fetch('https://0x0.st', {
             method: 'POST',
             body: formData
         });
 
-        if (!pixeldrainResponse.ok) {
-            const errText = await pixeldrainResponse.text();
-            throw new Error(`存储端上传失败 (${pixeldrainResponse.status}): ${errText}`);
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`存储端上传失败 (${response.status}): ${errText}`);
         }
 
-        const resData = await pixeldrainResponse.json(); // 返回格式为 {"success":true,"id":"xxxxxx"}
+        const fileUrl = (await response.text()).trim(); // 返回格式为 "https://0x0.st/xxxx.bin"
+        
+        // 提取文件名（如 "xxxx.bin"）作为任务 ID 传给前端
+        const fileId = fileUrl.split('/').pop(); 
 
-        if (!resData.success || !resData.id) {
-            throw new Error('存储端未返回有效的任务 ID');
+        if (!fileId) {
+            throw new Error('未能从小端获取到有效的文件 ID');
         }
 
-        return new Response(JSON.stringify({ taskId: resData.id }), {
+        return new Response(JSON.stringify({ taskId: fileId }), {
             headers: { 'Content-Type': 'application/json' }
         });
     } catch (e) {

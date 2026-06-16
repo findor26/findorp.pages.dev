@@ -95,15 +95,18 @@ export async function onRequest(context) {
             writer.close();
         });
 
-        // 核心修复点：将 targetLanguageCode 设定为简短代码 "zh"
-        // 同时简化 setup 结构，去除冗余的空配置项
+        // 核心修复点：
+        // 1. inputAudioTranscription 和 outputAudioTranscription 必须强制处于 setup 根目录下！
+        // 2. 补齐这两个原本在 v1beta 中属于必填项的占位空对象，彻底消灭 1007 协议结构冲突错误
         ws.send(JSON.stringify({
             setup: {
                 model: "models/gemini-3.5-live-translate-preview",
+                inputAudioTranscription: {}, 
+                outputAudioTranscription: {}, 
                 generationConfig: {
                     responseModalities: ["AUDIO"],
                     translationConfig: {
-                        targetLanguageCode: "zh",
+                        targetLanguageCode: "zh-Hans",
                         echoTargetLanguage: false
                     }
                 }

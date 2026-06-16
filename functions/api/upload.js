@@ -20,28 +20,24 @@ export async function onRequest(context) {
     try {
         const pcmBuffer = await request.arrayBuffer();
 
-        // 将文件打包为 Multipart/Form-Data 格式，转存到稳定的免注册存储站 Catbox
-        const formData = new FormData();
-        formData.append('reqtype', 'fileupload');
-        
-        const fileBlob = new Blob([pcmBuffer], { type: 'application/octet-stream' });
-        formData.append('fileToUpload', fileBlob, 'audio.bin');
-
-        const catboxResponse = await fetch('https://catbox.moe/user/api.php', {
-            method: 'POST',
-            body: formData
+        // 使用 Pixeldrain 极其稳定的纯二进制 PUT 接口进行中转投递
+        const pixeldrainResponse = await fetch('https://pixeldrain.com/api/file/audio.bin', {
+            method: 'PUT',
+            body: pcmBuffer
         });
 
-        if (!catboxResponse.ok) {
-            throw new Error(`存储端上传失败: ${catboxResponse.status}`);
+        if (!pixeldrainResponse.ok) {
+            const errText = await pixeldrainResponse.text();
+            throw new Error(`存储端上传失败 (${pixeldrainResponse.status}): ${errText}`);
         }
 
-        const fileUrl = await catboxResponse.text(); // 获取形如 https://files.catbox.moe/xxxxxx.bin 的链接
-        
-        // 提取中间唯一的 6 位编码作为任务 ID
-        const fileId = fileUrl.split('/').pop().split('.')[0]; 
+        const resData = await pixeldrainResponse.json(); // 返回格式为 {"success":true,"id":"xxxxxx"}
 
-        return new Response(JSON.stringify({ taskId: fileId }), {
+        if (!resData.success || !resData.id) {
+            throw new Error('存储端未返回有效的任务 ID');
+        }
+
+        return new Response(JSON.stringify({ taskId: resData.id }), {
             headers: { 'Content-Type': 'application/json' }
         });
     } catch (e) {

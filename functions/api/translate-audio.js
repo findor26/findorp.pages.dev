@@ -3,29 +3,27 @@
 export async function onRequest(context) {
     const { request, env } = context;
 
-    if (request.method === 'OPTIONS') {
-        return new Response(null, {
-            headers: {
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'POST, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type',
-            }
-        });
-    }
+    const urlObj = new URL(request.url);
+    const fileId = urlObj.searchParams.get('id');
 
-    if (request.method !== 'POST') {
-        return new Response('Method Not Allowed', { status: 405 });
+    if (!fileId) {
+        return new Response('Missing task ID', { status: 400 });
     }
 
     const apiKey = env.GEMINI_API_KEY;
     if (!apiKey) {
-        return new Response(JSON.stringify({ error: '服务端未配置 GEMINI_API_KEY' }), { 
-            status: 500, 
-            headers: { 'Content-Type': 'application/json' } 
-        });
+        return new Response('Missing GEMINI_API_KEY env', { status: 500 });
     }
 
-    const pcmBuffer = await request.arrayBuffer();
+    // 在边缘节点实时获取暂存的音频数据
+    const fileUrl = `https://files.catbox.moe/${fileId}.bin`;
+    const fileResponse = await fetch(fileUrl);
+    
+    if (!fileResponse.ok) {
+        return new Response('Task file not found', { status: 444 });
+    }
+
+    const pcmBuffer = await fileResponse.arrayBuffer();
 
     const { readable, writable } = new TransformStream();
     const writer = writable.getWriter();
@@ -109,8 +107,7 @@ export async function onRequest(context) {
 
         (async () => {
             const uint8 = new Uint8Array(pcmBuffer);
-            // 修复点 1：16kHz 16-bit Mono 音频，100ms 对应的字节数应为 3200 字节 (1600采样点 * 2字节)
-            const chunkSize = 3200; 
+            const chunkSize = 3200; // 100ms
             let offset = 0;
 
             function bufferToBase64(buf) {
@@ -122,7 +119,6 @@ export async function onRequest(context) {
             }
 
             while (offset < uint8.length) {
-                // 修复点 2：1秒 = 32000 字节。换算时间必须除以 32000 才能得出正确秒数
                 sendSSE('progress', {
                     ratio: offset / uint8.length,
                     currentSec: offset / 32000,
@@ -140,8 +136,8 @@ export async function onRequest(context) {
                 }));
                 offset += chunkSize;
                 
-                // 修复点 3：将延迟设为安全的 30ms (约 3.3 倍速翻译)。这处于 Google 的安全频控线以内，非常稳定
-                await new Promise(r => setTimeout(r, 30)); 
+                // 恢复为 100ms 原始推流速度，极大增强免费版稳定性，翻译质量最细腻
+                await new Promise(r => setTimeout(r, 100)); 
             }
 
             sendSSE('progress', { ratio: 1, currentSec: uint8.length/32000, totalSec: uint8.length/32000 });

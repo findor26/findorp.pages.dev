@@ -57,23 +57,10 @@ export async function onRequest(context) {
 
         let isDone = false;
 
-        // 构建 Latch 锁，必须等待 Google 的 setupComplete 确认帧
-        let resolveSetupLatch;
-        const setupLatchPromise = new Promise((resolve) => {
-            resolveSetupLatch = resolve;
-        });
-
+        // 监听并实时转发 Google 的响应消息
         ws.addEventListener("message", (event) => {
             try {
                 const msg = JSON.parse(event.data);
-
-                // 收到 Google 传回的 setupComplete 确认帧，释放锁并提示客户端
-                if (msg.setupComplete !== undefined) {
-                    sendSSE('transcription', '[系统]: Google 翻译配置就绪，开始流式处理音频...');
-                    resolveSetupLatch(); // 解开推流锁
-                    return;
-                }
-
                 const content = msg.serverContent;
                 if (content) {
                     if (content.outputTranscription?.text) {
@@ -118,7 +105,7 @@ export async function onRequest(context) {
                 generationConfig: {
                     responseModalities: ["AUDIO"],
                     translationConfig: {
-                        targetLanguageCode: "zh-Hans", // 官方支持的标准简体中文代码
+                        targetLanguageCode: "zh-Hans", // 官方标准的简体中文代码
                         echoTargetLanguage: false
                     }
                 }
@@ -126,8 +113,9 @@ export async function onRequest(context) {
         }));
 
         (async () => {
-            // 强行锁死协程，必须等待 Google 的 setupComplete 成功解开，才允许向下运行发送音频数据
-            await setupLatchPromise;
+            // 核心修复点：不使用复杂的异步锁，直接物理等待 500ms 让 Google 初始化完毕，随后直接开始稳定推流
+            await new Promise(r => setTimeout(r, 500));
+            sendSSE('transcription', '[系统]: 通道初始化完毕，正在以 2 倍速流式传输并翻译音频...');
 
             const uint8 = new Uint8Array(pcmBuffer);
             const chunkSize = 3200; // 100ms
@@ -150,9 +138,6 @@ export async function onRequest(context) {
 
                 const chunk = uint8.subarray(offset, offset + chunkSize);
                 
-                // 核心修复点：
-                // 摒弃 SDK 封装的 realtimeInput.audio，改用原生 Protobuf 定义的唯一合法字段 `mediaChunks`。
-                // 格式完全回归最本质、不触发任何解析异常的标准定义。
                 ws.send(JSON.stringify({
                     realtimeInput: {
                         mediaChunks: [{
@@ -163,8 +148,8 @@ export async function onRequest(context) {
                 }));
                 offset += chunkSize;
                 
-                // 100ms 原始真实时速
-                await new Promise(r => setTimeout(r, 100)); 
+                // 50ms 稳定推流时速（2 倍速翻译）
+                await new Promise(r => setTimeout(r, 50)); 
             }
 
             sendSSE('progress', { ratio: 1, currentSec: uint8.length/32000, totalSec: uint8.length/32000 });

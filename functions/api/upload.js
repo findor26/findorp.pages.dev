@@ -20,28 +20,33 @@ export async function onRequest(context) {
     try {
         const pcmBuffer = await request.arrayBuffer();
 
-        // 产生一个高密度的 16 位 16 进制字符串作为专属 Bin 空间 ID
-        const binId = Array.from(crypto.getRandomValues(new Uint8Array(8)))
-            .map(b => b.toString(16).padStart(2, '0'))
-            .join('');
+        // 核心修复点 1：构建标准的 FormData。通过 Blob 对象包装，Cloudflare 会精确计算并发送 Content-Length，
+        // 彻底解决 Filebin 因不支持 Chunked 分块传输而导致默默保存为 0 字节空文件的问题！
+        const formData = new FormData();
+        formData.append('reqtype', 'fileupload');
+        
+        const fileBlob = new Blob([pcmBuffer], { type: 'application/octet-stream' });
+        formData.append('fileToUpload', fileBlob, 'audio.bin');
 
-        // 发送给 Hetzner 物理独立服务器上运行的知名存储站 filebin.net
-        // 它的独占带宽和无门槛 PUT 二进制极速上传在同类中最为稳定
-        const filebinResponse = await fetch(`https://filebin.net/${binId}/audio.bin`, {
-            method: 'PUT',
-            body: pcmBuffer,
-            headers: {
-                'Content-Type': 'application/octet-stream'
-            }
+        // 投递给拥有 10 年历史、极高带宽、完全不封锁 Cloudflare 节点的匿名存储站 Catbox
+        const catboxResponse = await fetch('https://catbox.moe/user/api.php', {
+            method: 'POST',
+            body: formData
         });
 
-        if (!filebinResponse.ok) {
-            const errText = await filebinResponse.text();
-            throw new Error(`中转存储端上传失败 (${filebinResponse.status}): ${errText}`);
+        if (!catboxResponse.ok) {
+            const errText = await catboxResponse.text();
+            throw new Error(`存储端上传失败 (${catboxResponse.status}): ${errText}`);
         }
 
-        // 上传成功后，将 binId 作为任务 ID 传回给前端
-        return new Response(JSON.stringify({ taskId: binId }), {
+        const fileUrl = (await catboxResponse.text()).trim(); // 返回例如 "https://files.catbox.moe/xxxxxx.bin"
+        const fileId = fileUrl.split('/').pop(); // 提取 "xxxxxx.bin" 作为 taskId 传回给前端
+
+        if (!fileId) {
+            throw new Error('未获取到有效的文件 ID');
+        }
+
+        return new Response(JSON.stringify({ taskId: fileId }), {
             headers: { 'Content-Type': 'application/json' }
         });
     } catch (e) {

@@ -95,16 +95,16 @@ export async function onRequest(context) {
             writer.close();
         });
 
-        // 核心修复：
-        // 1. 结构完全还原为你提供的官方规范，将转写配置放回 generationConfig 内
-        // 2. targetLanguageCode 改为极简代码 "zh"，彻底绕过 Google 1007 参数冲突限制
+        // 终极修复：
+        // 1. inputAudioTranscription 和 outputAudioTranscription 必须强制处于 setup 的根级目录下！
+        // 2. targetLanguageCode 必须设定为简短代码 "zh"，避开 Google 1007 参数冲突限制
         ws.send(JSON.stringify({
             setup: {
                 model: "models/gemini-3.5-live-translate-preview",
+                inputAudioTranscription: {}, 
+                outputAudioTranscription: {}, 
                 generationConfig: {
                     responseModalities: ["AUDIO"],
-                    inputAudioTranscription: {}, 
-                    outputAudioTranscription: {}, 
                     translationConfig: {
                         targetLanguageCode: "zh",
                         echoTargetLanguage: false

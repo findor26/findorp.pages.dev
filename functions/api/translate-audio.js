@@ -4,7 +4,7 @@ export async function onRequest(context) {
     const { request, env } = context;
 
     const urlObj = new URL(request.url);
-    const fileId = urlObj.searchParams.get('id'); // 获取诸如 "xxxx.bin" 的任务 ID
+    const fileId = urlObj.searchParams.get('id'); // 获取 Bin 空间 ID
 
     if (!fileId) {
         return new Response('Missing task ID', { status: 400 });
@@ -15,8 +15,8 @@ export async function onRequest(context) {
         return new Response('Missing GEMINI_API_KEY env', { status: 500 });
     }
 
-    // 从 uguu.se 高速直连通道获取暂存数据，并附加模拟浏览器 User-Agent 标头防止任何防火墙拦截
-    const fileUrl = `https://a.uguu.se/${fileId}`;
+    // 从 10Gbps 带宽的 Hetzner 物理节点上瞬间拉回原始音频
+    const fileUrl = `https://filebin.net/${fileId}/audio.bin`;
     const fileResponse = await fetch(fileUrl, {
         headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'

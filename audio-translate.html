@@ -293,20 +293,18 @@
                     }
                 };
 
+                // 替换 index.html 中对应的 ws 监听部分：
                 ws.onerror = (e) => setStatus('WebSocket 连接发生错误', true);
                 
                 ws.onclose = () => {
                     if (isTranslating) {
                         setStatus('连接意外断开', true);
+                        finishTranslation(true); // 传入 true 表示异常结束，防止误判
+                    } else {
+                        setStatus('连接失败，请检查 API Key 或控制台网络请求', true);
+                        finishTranslation(true); // 传入 true 阻止显示“处理完毕”
                     }
-                    finishTranslation();
                 };
-
-            } catch (e) {
-                setStatus(`执行失败: ${e.message}`, true);
-                finishTranslation(true);
-            }
-        });
 
         function startSendingAudio(int16Data) {
             const chunkSize = 1600; // 每次发 1600 个采样点 (100ms)

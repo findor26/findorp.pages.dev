@@ -72,6 +72,10 @@
             font-size: 1.15rem; line-height: 1.8; color: var(--md-sys-color-on-surface); text-align: justify; word-break: break-all;
         }
         .translation-segment { transition: opacity 0.3s ease; }
+        
+        /* 共享链接展示样式 */
+        .form-row { display: flex; flex-direction: column; gap: 20px; margin-bottom: 24px; }
+        md-filled-text-field { width: 100%; }
     </style>
 
     <script type="importmap">
@@ -81,7 +85,8 @@
 </head>
 <body>
     <div class="container">
-        <div class="m3-card">
+        <!-- 模式 1：上传控制面板 -->
+        <div class="m3-card" id="uploadCard">
             <h1>音频实时翻译</h1>
             <div class="file-picker-container">
                 <input type="file" id="audioFileInput" accept="audio/*" style="display: none">
@@ -92,7 +97,34 @@
                 <span id="fileName">未选择文件...</span>
             </div>
 
-            <div class="progress-container" id="progressContainer">
+            <!-- 文件物理上传进度条 -->
+            <div class="progress-container" id="uploadProgressContainer">
+                <div class="progress-labels">
+                    <span>文件正在高速上传至云端存储...</span>
+                    <span id="uploadPercent">0%</span>
+                </div>
+                <md-linear-progress id="uploadProgressBar" value="0"></md-linear-progress>
+            </div>
+
+            <div class="actions">
+                <md-filled-button id="startBtn">
+                    <md-icon slot="icon">cloud_upload</md-icon>
+                    上传并生成共享链接
+                </md-filled-button>
+            </div>
+        </div>
+
+        <!-- 模式 2：任务流进度查看与翻译输出面板 -->
+        <div class="m3-card" id="taskCard" style="display: none;">
+            <h1>正在执行翻译任务</h1>
+            
+            <div class="form-row">
+                <md-filled-text-field id="shareLinkInput" label="可共享的任务链接 (复制发送给他人可实时查看进度)" readonly>
+                    <md-icon slot="leading-icon">share</md-icon>
+                </md-filled-text-field>
+            </div>
+
+            <div class="progress-container" id="progressContainer" style="display: flex;">
                 <div class="progress-labels">
                     <span id="progressText">00:00 / 00:00</span>
                     <span id="progressPercent">0%</span>
@@ -101,13 +133,9 @@
             </div>
 
             <div class="actions">
-                <md-filled-button id="startBtn">
-                    <md-icon slot="icon">play_arrow</md-icon>
-                    开始翻译
-                </md-filled-button>
-                <md-outlined-button id="stopBtn" disabled>
+                <md-outlined-button id="stopBtn">
                     <md-icon slot="icon">stop</md-icon>
-                    停止并生成
+                    中止当前任务
                 </md-outlined-button>
                 <a id="downloadLink" download="translated_audio.wav" style="display: none; text-decoration: none;">
                     <md-elevated-button id="downloadBtn">
@@ -115,11 +143,15 @@
                         下载翻译音频
                     </md-elevated-button>
                 </a>
+                <md-filled-tonal-button id="newBtn" href="/">
+                    <md-icon slot="icon">add</md-icon>
+                    新建翻译
+                </md-filled-tonal-button>
             </div>
         </div>
 
         <div class="m3-card" style="padding-top: 24px;">
-            <h2>翻译结果</h2>
+            <h2>翻译输出</h2>
             <div id="statusText">等待操作 (自动跳过静音片段)</div>
             <div id="translationArea"></div>
         </div>
@@ -139,6 +171,15 @@
         const progressPercent = document.getElementById('progressPercent');
         const progressBar = document.getElementById('progressBar');
 
+        // 上传专有节点
+        const uploadCard = document.getElementById('uploadCard');
+        const taskCard = document.getElementById('taskCard');
+        const uploadProgressContainer = document.getElementById('uploadProgressContainer');
+        const uploadProgressBar = document.getElementById('uploadProgressBar');
+        const uploadPercent = document.getElementById('uploadPercent');
+        const shareLinkInput = document.getElementById('shareLinkInput');
+        const newBtn = document.getElementById('newBtn');
+
         let abortController = null;
         let outputAudioChunks = []; 
 
@@ -149,11 +190,15 @@
             return `${m}:${s}`;
         }
 
+        newBtn.addEventListener('click', () => {
+            window.location.href = window.location.pathname;
+        });
+
         fileBtn.addEventListener('click', () => audioFileInput.click());
         audioFileInput.addEventListener('change', () => {
             const file = audioFileInput.files[0];
             fileNameDisplay.textContent = file ? file.name : '未选择文件...';
-            progressContainer.style.display = 'none';
+            uploadProgressContainer.style.display = 'none';
         });
 
         function setStatus(text, isError = false) {
@@ -215,41 +260,91 @@
             return new Blob([wavData], { type: 'audio/wav' });
         }
 
+        // 上传处理流程 (利用 XMLHttpRequest 实时捕获文件上传到中转站的百分比进度)
         btnStart.addEventListener('click', async () => {
             const file = audioFileInput.files[0];
             if (!file) return alert("请先选择音频文件");
 
             btnStart.disabled = true;
-            btnStop.disabled = false;
-            downloadLink.style.display = 'none';
-            translationArea.innerHTML = '';
-            outputAudioChunks = [];
-            
-            progressContainer.style.display = 'flex';
-            progressBar.value = 0;
-            progressBar.indeterminate = false;
-            progressText.textContent = `00:00 / 00:00`;
-            progressPercent.textContent = `0%`;
-
-            abortController = new AbortController();
+            uploadProgressContainer.style.display = 'flex';
+            uploadProgressBar.value = 0;
+            uploadPercent.textContent = `0%`;
 
             try {
                 const int16Data = await decodeAndResampleAudio(file);
                 const uint8Data = new Uint8Array(int16Data.buffer, int16Data.byteOffset, int16Data.byteLength);
 
-                setStatus('音频重采样完成，正在上传至 Cloudflare 极速翻译通道...');
+                setStatus('音频重采样完毕，正在上传文件到中转节点...');
 
-                const response = await fetch('/api/translate-audio', {
-                    method: 'POST',
-                    body: uint8Data,
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', '/api/upload', true);
+
+                // 物理上传进度监测
+                xhr.upload.onprogress = (e) => {
+                    if (e.lengthComputable) {
+                        const ratio = e.loaded / e.total;
+                        uploadProgressBar.value = ratio;
+                        uploadPercent.textContent = `${Math.floor(ratio * 100)}%`;
+                    }
+                };
+
+                xhr.onload = () => {
+                    if (xhr.status === 200) {
+                        try {
+                            const res = JSON.parse(xhr.responseText);
+                            const shareUrl = `${window.location.origin}${window.location.pathname}?task=${res.taskId}`;
+                            setStatus("上传成功，正在载入共享视图...");
+                            window.location.href = shareUrl; // 自动刷新网页，重定向到 ?task=xxxxxx 链接
+                        } catch (e) {
+                            setStatus("上传解析错误，服务端未能返回任务 ID", true);
+                            btnStart.disabled = false;
+                        }
+                    } else {
+                        setStatus(`上传失败 (错误代码: ${xhr.status}): ${xhr.responseText}`, true);
+                        btnStart.disabled = false;
+                    }
+                };
+
+                xhr.onerror = () => {
+                    setStatus("上传连接异常，请检查网络状况", true);
+                    btnStart.disabled = false;
+                };
+
+                xhr.send(uint8Data);
+
+            } catch (e) {
+                setStatus(`执行失败: ${e.message}`, true);
+                btnStart.disabled = false;
+            }
+        });
+
+        // 任务模式执行器 (流式拉取翻译，支持任意用户通过共享链接点入查看)
+        async function runTask(taskId) {
+            uploadCard.style.display = 'none';
+            taskCard.style.display = 'block';
+            
+            shareLinkInput.value = window.location.href; // 展示链接
+
+            translationArea.innerHTML = '';
+            outputAudioChunks = [];
+            downloadLink.style.display = 'none';
+
+            abortController = new AbortController();
+            setStatus('正在建立专用同声传译信道...');
+
+            try {
+                const response = await fetch(`/api/translate-audio?id=${taskId}`, {
                     signal: abortController.signal
                 });
 
+                if (response.status === 444) {
+                    throw new Error("查找不到对应的音频文件。存储可能已被清理，请刷新重新创建上传。");
+                }
                 if (!response.ok) {
-                    throw new Error(`服务器返回异常: ${response.status}`);
+                    throw new Error(`建立翻译流失败，状态码: ${response.status}`);
                 }
 
-                setStatus('连接成功，正在流式同步翻译结果...');
+                setStatus('连接成功，翻译同传加载中...');
 
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder("utf-8");
@@ -283,20 +378,20 @@
                                 for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
                                 outputAudioChunks.push(bytes);
                             } else if (event === 'progress') {
+                                // 100ms 原始真实时长的推流进度
                                 progressBar.value = data.ratio;
                                 progressText.textContent = `${formatTime(data.currentSec)} / ${formatTime(data.totalSec)}`;
                                 progressPercent.textContent = `${Math.floor(data.ratio * 100)}%`;
                             } else if (event === 'upload_complete') {
-                                setStatus("Cloudflare 已将音频全部极速推送至 Google，正在等待模型最终响应...");
+                                setStatus("音频推流完毕，等待翻译模型输出最终音频...");
                                 progressBar.indeterminate = true;
                             } else if (event === 'error') {
                                 setStatus(`服务端错误: ${data}`, true);
                             } else if (event === 'done') {
-                                // 修复点 4：精准识别 done 事件。如果是正常的 'success' 才判定为成功，如果是异常关闭则显示实际错误原因
                                 if (data === 'success') {
                                     finishTranslation(false);
                                 } else {
-                                    setStatus(`翻译未能正常完成：${data}`, true);
+                                    setStatus(`翻译未正常结束：${data}`, true);
                                     finishTranslation(true);
                                 }
                             }
@@ -305,13 +400,13 @@
                 }
             } catch (e) {
                 if (e.name === 'AbortError') {
-                    setStatus("已手动中止任务", false);
+                    setStatus("已手动中止翻译任务", false);
                 } else {
                     setStatus(`执行失败: ${e.message}`, true);
                 }
                 finishTranslation(true);
             }
-        });
+        }
 
         btnStop.addEventListener('click', () => {
             if (abortController) abortController.abort();
@@ -320,7 +415,6 @@
         });
 
         function finishTranslation(isError = false) {
-            btnStart.disabled = false;
             btnStop.disabled = true;
             progressBar.indeterminate = false;
             
@@ -336,6 +430,15 @@
                 downloadLink.style.display = 'block';
             }
         }
+
+        // 页面初始化判断：如果 URL 里包含 ?task=xxxxxx 则自动执行查看与翻译模式
+        window.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const taskId = urlParams.get('task');
+            if (taskId && taskId.trim() !== '') {
+                runTask(taskId.trim());
+            }
+        });
     </script>
 </body>
 </html>

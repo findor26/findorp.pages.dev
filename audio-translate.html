@@ -63,7 +63,7 @@
         .actions { display: flex; gap: 16px; margin-top: 32px; flex-wrap: wrap; }
 
         #statusText { font-size: 0.85rem; color: var(--md-sys-color-on-surface-variant); margin-bottom: 16px; font-weight: 500; min-height: 20px; line-height: 1.5; }
-        #statusText.error { color: var(--md-sys-color-error); }
+        #statusText.error { color: var(--md-sys-error); }
 
         #translationArea {
             background-color: var(--md-sys-color-surface-container-lowest);
@@ -242,19 +242,19 @@
                     connectionOpened = true; 
                     setStatus('连接成功！正在进行同声传译...');
                     
-                    // 严格对齐官方文档，补充 inputAudioTranscription 占位符
+                    // 已将 inputAudioTranscription 和 outputAudioTranscription 移至 setup 根目录下
                     const setupMessage = {
                         setup: {
                             model: "models/gemini-3.5-live-translate-preview",
                             generationConfig: {
                                 responseModalities: ['AUDIO'],
-                                inputAudioTranscription: {}, 
-                                outputAudioTranscription: {},
                                 translationConfig: {
                                     targetLanguageCode: 'zh-Hans',
                                     echoTargetLanguage: false
                                 }
-                            }
+                            },
+                            inputAudioTranscription: {}, 
+                            outputAudioTranscription: {}
                         }
                     };
                     ws.send(JSON.stringify(setupMessage));
@@ -295,7 +295,6 @@
                 ws.onerror = (e) => setStatus('WebSocket 通道在传输过程中断开。', true);
                 
                 ws.onclose = (event) => {
-                    // 自定义常见错误映射
                     let reasonMsg = `代码: ${event.code}`;
                     if (event.reason) {
                         reasonMsg += `, 原因: ${event.reason}`;

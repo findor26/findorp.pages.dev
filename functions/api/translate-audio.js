@@ -4,7 +4,7 @@ export async function onRequest(context) {
     const { request, env } = context;
 
     const urlObj = new URL(request.url);
-    const fileId = urlObj.searchParams.get('id'); // 获取 Bin 空间 ID
+    const fileId = urlObj.searchParams.get('id'); // 获取诸如 "xxxxxx.bin" 的任务 ID
 
     if (!fileId) {
         return new Response('Missing task ID', { status: 400 });
@@ -15,11 +15,11 @@ export async function onRequest(context) {
         return new Response('Missing GEMINI_API_KEY env', { status: 500 });
     }
 
-    // 从 filebin.net 极速直连通道获取暂存数据
-    const fileUrl = `https://filebin.net/${fileId}/audio.bin`;
+    // 从 Catbox 极速直连通道获取暂存的音频数据
+    const fileUrl = `https://files.catbox.moe/${fileId}`;
     const fileResponse = await fetch(fileUrl, {
         headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
     });
     
@@ -38,7 +38,6 @@ export async function onRequest(context) {
         writer.write(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
     }
 
-    // 终极对齐 1：使用 v1alpha 协议端点
     const targetUrl = `https://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${apiKey}`;
 
     try {
@@ -96,16 +95,18 @@ export async function onRequest(context) {
             writer.close();
         });
 
-        // 终极对齐 2：这是 v1alpha 模式下完美合规的 setup 初始化配置
+        // 终极对齐 1：在 v1alpha 端点下，数据结构完全和你本地工作的结构同步：
+        // 1. 将 outputAudioTranscription 重新嵌套入 generationConfig 内
+        // 2. 移除最外层的 inputAudioTranscription
+        // 3. targetLanguageCode 使用标准的 "zh-Hans"（中文简体）
         ws.send(JSON.stringify({
             setup: {
                 model: "models/gemini-3.5-live-translate-preview",
-                inputAudioTranscription: {}, 
-                outputAudioTranscription: {}, 
                 generationConfig: {
                     responseModalities: ["AUDIO"],
+                    outputAudioTranscription: {}, 
                     translationConfig: {
-                        targetLanguageCode: "zh-Hans", // 支持精准的 zh-Hans 代码
+                        targetLanguageCode: "zh-Hans",
                         echoTargetLanguage: false
                     }
                 }
@@ -138,7 +139,7 @@ export async function onRequest(context) {
 
                 const chunk = uint8.subarray(offset, offset + chunkSize);
                 
-                // 终极对齐 3：在 v1alpha 端点下，必须像官方 SDK 底层做的那样，使用原生的 `mediaChunks` 数组进行音频传输
+                // 终极对齐 2：在 v1alpha 端点下，必须像官方 SDK 底层做的那样，使用原生的 `mediaChunks` 数组进行音频传输
                 ws.send(JSON.stringify({
                     realtimeInput: {
                         mediaChunks: [{

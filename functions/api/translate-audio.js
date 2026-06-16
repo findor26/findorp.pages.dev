@@ -15,7 +15,7 @@ export async function onRequest(context) {
         return new Response('Missing GEMINI_API_KEY env', { status: 500 });
     }
 
-    // 从 filebin.net 高速下载原始 PCM 音频
+    // 从 filebin.net 极速直连通道获取暂存数据
     const fileUrl = `https://filebin.net/${fileId}/audio.bin`;
     const fileResponse = await fetch(fileUrl, {
         headers: {
@@ -57,7 +57,7 @@ export async function onRequest(context) {
 
         let isDone = false;
 
-        // 核心修复点 1：构建 Latch（锁相环）Promise，只有当 Google 握手成功才会解开
+        // 构建 Latch 锁，必须等待 Google 的 setupComplete 确认帧
         let resolveSetupLatch;
         const setupLatchPromise = new Promise((resolve) => {
             resolveSetupLatch = resolve;
@@ -67,7 +67,7 @@ export async function onRequest(context) {
             try {
                 const msg = JSON.parse(event.data);
 
-                // 核心修复点 2：收到 Google 传回的 setupComplete 确认帧，释放锁并提示客户端
+                // 收到 Google 传回的 setupComplete 确认帧，释放锁并提示客户端
                 if (msg.setupComplete !== undefined) {
                     sendSSE('transcription', '[系统]: Google 翻译配置就绪，开始流式处理音频...');
                     resolveSetupLatch(); // 解开推流锁
@@ -118,7 +118,7 @@ export async function onRequest(context) {
                 generationConfig: {
                     responseModalities: ["AUDIO"],
                     translationConfig: {
-                        targetLanguageCode: "zh-Hans", // 恢复为最标准的简体中文代码
+                        targetLanguageCode: "zh-Hans", // 官方支持的标准简体中文代码
                         echoTargetLanguage: false
                     }
                 }
@@ -126,7 +126,7 @@ export async function onRequest(context) {
         }));
 
         (async () => {
-            // 核心修复点 3：强行锁死协程，必须等待 Google 的 setupComplete 成功解开，才允许向下运行发送音频数据
+            // 强行锁死协程，必须等待 Google 的 setupComplete 成功解开，才允许向下运行发送音频数据
             await setupLatchPromise;
 
             const uint8 = new Uint8Array(pcmBuffer);
@@ -149,12 +149,16 @@ export async function onRequest(context) {
                 });
 
                 const chunk = uint8.subarray(offset, offset + chunkSize);
+                
+                // 核心修复点：
+                // 摒弃 SDK 封装的 realtimeInput.audio，改用原生 Protobuf 定义的唯一合法字段 `mediaChunks`。
+                // 格式完全回归最本质、不触发任何解析异常的标准定义。
                 ws.send(JSON.stringify({
                     realtimeInput: {
-                        audio: {
+                        mediaChunks: [{
                             mimeType: "audio/pcm;rate=16000",
                             data: bufferToBase64(chunk)
-                        }
+                        }]
                     }
                 }));
                 offset += chunkSize;

@@ -38,7 +38,7 @@ export async function onRequest(context) {
         writer.write(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
     }
 
-    // 核心修复点 1：切换为和你本地运行成功的 SDK 完全一致的 v1alpha 原生端点
+    // 终极对齐 1：使用 v1alpha 协议端点
     const targetUrl = `https://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${apiKey}`;
 
     try {
@@ -96,18 +96,16 @@ export async function onRequest(context) {
             writer.close();
         });
 
-        // 核心修复点 2：在 v1alpha 端点下，数据结构完全和你本地工作的结构同步：
-        // 1. 将 outputAudioTranscription 重新嵌套进 generationConfig 内
-        // 2. 移除最外层的 inputAudioTranscription
-        // 3. targetLanguageCode 使用标准的 "zh-Hans"（中文简体）
+        // 终极对齐 2：这是 v1alpha 模式下完美合规的 setup 初始化配置
         ws.send(JSON.stringify({
             setup: {
                 model: "models/gemini-3.5-live-translate-preview",
+                inputAudioTranscription: {}, 
+                outputAudioTranscription: {}, 
                 generationConfig: {
                     responseModalities: ["AUDIO"],
-                    outputAudioTranscription: {}, 
                     translationConfig: {
-                        targetLanguageCode: "zh-Hans",
+                        targetLanguageCode: "zh-Hans", // 支持精准的 zh-Hans 代码
                         echoTargetLanguage: false
                     }
                 }
@@ -140,12 +138,13 @@ export async function onRequest(context) {
 
                 const chunk = uint8.subarray(offset, offset + chunkSize);
                 
+                // 终极对齐 3：在 v1alpha 端点下，必须像官方 SDK 底层做的那样，使用原生的 `mediaChunks` 数组进行音频传输
                 ws.send(JSON.stringify({
                     realtimeInput: {
-                        audio: {
+                        mediaChunks: [{
                             mimeType: "audio/pcm;rate=16000",
                             data: bufferToBase64(chunk)
-                        }
+                        }]
                     }
                 }));
                 offset += chunkSize;

@@ -139,7 +139,9 @@
         const progressPercent = document.getElementById('progressPercent');
         const progressBar = document.getElementById('progressBar');
 
-        let abortController = null;
+        let ws = null;
+        let isTranslating = false;
+        let sendInterval = null;
         let outputAudioChunks = []; 
 
         function formatTime(seconds) {
@@ -171,7 +173,7 @@
             translationArea.scrollTop = translationArea.scrollHeight;
         }
 
-        // 音频重采样函数保持不变，因为后端仍需要标准的 16kHz
+        // 解码并重采样为模型所需的 16kHz 小端序
         async function decodeAndResampleAudio(file) {
             setStatus(`正在解析和重采样: ${file.name}...`);
             const arrayBuffer = await file.arrayBuffer();
@@ -217,100 +219,162 @@
             downloadLink.style.display = 'none';
             translationArea.innerHTML = '';
             outputAudioChunks = [];
+            
             progressContainer.style.display = 'flex';
             progressBar.value = 0;
             progressBar.indeterminate = false;
             progressText.textContent = `00:00 / 00:00`;
             progressPercent.textContent = `0%`;
 
-            abortController = new AbortController();
-
             try {
-                // 1. 获取处理后的二进制字节流
                 const int16Data = await decodeAndResampleAudio(file);
-                const uint8Data = new Uint8Array(int16Data.buffer, int16Data.byteOffset, int16Data.byteLength);
+                
+                setStatus('正在连接代理通道...');
+                
+                // 根据当前网页协议自动判断是 ws:// 还是 wss://
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${window.location.host}/api/ws`;
 
-                setStatus('已发起安全加密请求，请稍候...');
+                ws = new WebSocket(wsUrl);
 
-                // 2. 将字节流一次性 POST 到 Cloudflare 后端点
-                // 注意这里要保证路径和你创建的函数对应，如果不是 /api/ 则按需修改为 /translate-audio 等
-                const response = await fetch('/translate-audio', {
-                    method: 'POST',
-                    body: uint8Data,
-                    signal: abortController.signal
-                });
+                ws.onopen = () => {
+                    setStatus('连接成功！正在进行同声传译...');
+                    
+                    // 1. 发送初始化配置（严格参照文档规范）
+                    const setupMessage = {
+                        setup: {
+                            model: "models/gemini-3.5-live-translate-preview",
+                            generationConfig: {
+                                responseModalities: ['AUDIO'],
+                                outputAudioTranscription: {},
+                                translationConfig: {
+                                    targetLanguageCode: 'zh-Hans',
+                                    echoTargetLanguage: false
+                                }
+                            }
+                        }
+                    };
+                    ws.send(JSON.stringify(setupMessage));
 
-                if (!response.ok) {
-                    throw new Error(`服务器返回异常: ${response.status}`);
-                }
+                    // 2. 开始推送本地音频数据
+                    startSendingAudio(int16Data);
+                };
 
-                setStatus('连接成功！同声传译进行中...');
-
-                // 3. 读取 Cloudflare 发送过来的 SSE 事件流
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder("utf-8");
-                let buffer = "";
-
-                while (true) {
-                    const { value, done } = await reader.read();
-                    if (done) break;
-
-                    buffer += decoder.decode(value, { stream: true });
-                    let lines = buffer.split("\n\n");
-                    buffer = lines.pop(); // 缓存不完整的块
-
-                    for (let block of lines) {
-                        let event = '', dataStr = '';
-                        const blockLines = block.split('\n');
-                        for (let line of blockLines) {
-                            if (line.startsWith('event:')) event = line.substring(6).trim();
-                            if (line.startsWith('data:')) dataStr = line.substring(5).trim();
+                ws.onmessage = (event) => {
+                    const response = JSON.parse(event.data);
+                    if (response.serverContent) {
+                        const content = response.serverContent;
+                        
+                        // 提取翻译文字
+                        if (content.outputTranscription && content.outputTranscription.text) {
+                            appendTranslation(content.outputTranscription.text);
+                        }
+                        
+                        // 提取 24kHz 音频
+                        if (content.modelTurn?.parts) {
+                            for (const part of content.modelTurn.parts) {
+                                if (part.inlineData && part.inlineData.data) {
+                                    const binaryStr = atob(part.inlineData.data);
+                                    const bytes = new Uint8Array(binaryStr.length);
+                                    for (let i = 0; i < binaryStr.length; i++) {
+                                        bytes[i] = binaryStr.charCodeAt(i);
+                                    }
+                                    outputAudioChunks.push(bytes);
+                                }
+                            }
                         }
 
-                        if (event && dataStr) {
-                            let data;
-                            try { data = JSON.parse(dataStr); } catch(e) { continue; }
-
-                            if (event === 'transcription') {
-                                appendTranslation(data);
-                            } else if (event === 'audio') {
-                                // 解码 Server 传回来的 Base64 音频
-                                const binaryStr = atob(data);
-                                const bytes = new Uint8Array(binaryStr.length);
-                                for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
-                                outputAudioChunks.push(bytes);
-                            } else if (event === 'progress') {
-                                // 精确跟随 Cloudflare 的推送进度
-                                progressBar.value = data.ratio;
-                                progressText.textContent = `${formatTime(data.currentSec)} / ${formatTime(data.totalSec)}`;
-                                progressPercent.textContent = `${Math.floor(data.ratio * 100)}%`;
-                            } else if (event === 'upload_complete') {
-                                setStatus("音频推流完毕，等待模型补充最后句段...");
-                                progressBar.indeterminate = true;
-                            } else if (event === 'error') {
-                                setStatus(`遇到错误: ${data}`, true);
-                            } else if (event === 'done') {
-                                finishTranslation();
+                        // 如果模型表示它已经把这一回合翻译并朗读完毕了
+                        if (content.turnComplete) {
+                            if (!isTranslating) {
+                                ws.close(); // 本地音频推完了，且模型翻译完了，安全关闭
                             }
                         }
                     }
-                }
+                };
+
+                ws.onerror = (e) => setStatus('WebSocket 连接发生错误', true);
+                
+                ws.onclose = () => {
+                    if (isTranslating) {
+                        setStatus('连接意外断开', true);
+                    }
+                    finishTranslation();
+                };
+
             } catch (e) {
-                if (e.name === 'AbortError') {
-                    setStatus("已手动终止连接", false);
-                } else {
-                    setStatus(`执行失败: ${e.message}`, true);
-                }
-                finishTranslation(true); // 异常结束也允许提供当前获取到的音频
+                setStatus(`执行失败: ${e.message}`, true);
+                finishTranslation(true);
             }
         });
 
+        function startSendingAudio(int16Data) {
+            const chunkSize = 1600; // 每次发 1600 个采样点 (100ms)
+            let offset = 0;
+            isTranslating = true;
+            
+            const totalSeconds = int16Data.length / 16000;
+
+            sendInterval = setInterval(() => {
+                if (!isTranslating) return;
+
+                if (offset >= int16Data.length) {
+                    clearInterval(sendInterval);
+                    isTranslating = false;
+                    setStatus("本地音频推送完毕，等待模型进行最终响应...");
+                    progressBar.indeterminate = true;
+                    
+                    // 告诉服务器：客户端这边的输入已经结束了
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ clientContent: { turnComplete: true } }));
+                    }
+                    return;
+                }
+
+                // 进度条跟随
+                const currentSeconds = offset / 16000;
+                const progressRatio = offset / int16Data.length;
+                progressBar.value = progressRatio;
+                progressText.textContent = `${formatTime(currentSeconds)} / ${formatTime(totalSeconds)}`;
+                progressPercent.textContent = `${Math.floor(progressRatio * 100)}%`;
+
+                const chunk = int16Data.subarray(offset, offset + chunkSize);
+                const uint8 = new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength);
+
+                let binaryStr = '';
+                for (let i = 0; i < uint8.byteLength; i++) {
+                    binaryStr += String.fromCharCode(uint8[i]);
+                }
+
+                // 严格遵守文档中 realtimeInput 规范发送音频块
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    const audioMessage = {
+                        realtimeInput: {
+                            audio: {
+                                data: btoa(binaryStr),
+                                mimeType: 'audio/pcm;rate=16000'
+                            }
+                        }
+                    };
+                    ws.send(JSON.stringify(audioMessage));
+                }
+
+                offset += chunkSize;
+            }, 100);
+        }
+
         btnStop.addEventListener('click', () => {
-            if (abortController) abortController.abort();
-            finishTranslation();
+            isTranslating = false;
+            if (sendInterval) clearInterval(sendInterval);
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.close();
+            }
+            setStatus("已手动中止任务");
         });
 
         function finishTranslation(isError = false) {
+            isTranslating = false;
+            if (sendInterval) clearInterval(sendInterval);
             btnStart.disabled = false;
             btnStop.disabled = true;
             progressBar.indeterminate = false;
@@ -325,8 +389,6 @@
                 const url = URL.createObjectURL(blob);
                 downloadLink.href = url;
                 downloadLink.style.display = 'block';
-            } else if (!isError) {
-                setStatus("结束：未获取到有效的返回音频数据 (可能是无声文件)", true);
             }
         }
     </script>

@@ -4,7 +4,7 @@ export async function onRequest(context) {
     const { request, env } = context;
 
     const urlObj = new URL(request.url);
-    const fileId = urlObj.searchParams.get('id'); // 获取诸如 "public/2026-06-16/uuid/audio.bin" 的任务 ID
+    const fileId = urlObj.searchParams.get('id'); // 获取诸如 "xxxx.bin" 的任务 ID
 
     if (!fileId) {
         return new Response('Missing task ID', { status: 400 });
@@ -15,12 +15,17 @@ export async function onRequest(context) {
         return new Response('Missing GEMINI_API_KEY env', { status: 500 });
     }
 
-    // 从 tfLink 的 Cloudflare 局域网高速通道瞬间获取暂存数据
-    const fileUrl = `https://d.tmpfile.link/${fileId}`;
-    const fileResponse = await fetch(fileUrl);
+    // 从 uguu.se 高速直连通道获取暂存数据，并附加模拟浏览器 User-Agent 标头防止任何防火墙拦截
+    const fileUrl = `https://a.uguu.se/${fileId}`;
+    const fileResponse = await fetch(fileUrl, {
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+    });
     
     if (!fileResponse.ok) {
-        return new Response('Task file not found', { status: 444 });
+        const errText = await fileResponse.text().catch(() => '');
+        return new Response(`无法从临时存储下载文件 (${fileResponse.status}): ${errText}`, { status: 444 });
     }
 
     const pcmBuffer = await fileResponse.arrayBuffer();

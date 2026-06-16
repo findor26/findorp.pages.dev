@@ -95,9 +95,9 @@ export async function onRequest(context) {
             writer.close();
         });
 
-        // 终极修复：
-        // 1. inputAudioTranscription 和 outputAudioTranscription 必须强制处于 setup 的根级目录下！
-        // 2. targetLanguageCode 必须设定为简短代码 "zh"，避开 Google 1007 参数冲突限制
+        // 终极对齐配置：
+        // 1. inputAudioTranscription 和 outputAudioTranscription 留在 setup 根级目录下
+        // 2. targetLanguageCode 恢复为官方注册且完全支持的标准简体中文代码: "zh-Hans"
         ws.send(JSON.stringify({
             setup: {
                 model: "models/gemini-3.5-live-translate-preview",
@@ -106,7 +106,7 @@ export async function onRequest(context) {
                 generationConfig: {
                     responseModalities: ["AUDIO"],
                     translationConfig: {
-                        targetLanguageCode: "zh",
+                        targetLanguageCode: "zh-Hans",
                         echoTargetLanguage: false
                     }
                 }

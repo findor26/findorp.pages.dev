@@ -38,7 +38,8 @@ export async function onRequest(context) {
         writer.write(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
     }
 
-    const targetUrl = `https://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${apiKey}`;
+    // 核心修复点 1：切换为和你本地运行成功的 SDK 完全一致的 v1alpha 原生端点
+    const targetUrl = `https://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${apiKey}`;
 
     try {
         const wsResponse = await fetch(targetUrl, {
@@ -95,16 +96,16 @@ export async function onRequest(context) {
             writer.close();
         });
 
-        // 终极修复：
-        // 1. inputAudioTranscription 和 outputAudioTranscription 必须处于最外层 `setup` 根级下！
-        // 2. 目标语言恢复为官方绝对完全支持的标准简体中文代码: "zh-Hans"
+        // 核心修复点 2：在 v1alpha 端点下，数据结构完全和你本地工作的结构同步：
+        // 1. 将 outputAudioTranscription 重新嵌套进 generationConfig 内
+        // 2. 移除最外层的 inputAudioTranscription
+        // 3. targetLanguageCode 使用标准的 "zh-Hans"（中文简体）
         ws.send(JSON.stringify({
             setup: {
                 model: "models/gemini-3.5-live-translate-preview",
-                inputAudioTranscription: {}, 
-                outputAudioTranscription: {}, 
                 generationConfig: {
                     responseModalities: ["AUDIO"],
+                    outputAudioTranscription: {}, 
                     translationConfig: {
                         targetLanguageCode: "zh-Hans",
                         echoTargetLanguage: false

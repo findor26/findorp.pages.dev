@@ -239,7 +239,6 @@
 
                 setStatus('音频重采样完成，正在上传至 Cloudflare 极速翻译通道...');
 
-                // 一次性上传到 Cloudflare 端点
                 const response = await fetch('/api/translate-audio', {
                     method: 'POST',
                     body: uint8Data,
@@ -250,7 +249,7 @@
                     throw new Error(`服务器返回异常: ${response.status}`);
                 }
 
-                setStatus('连接成功，正在极速同步翻译结果...');
+                setStatus('连接成功，正在流式同步翻译结果...');
 
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder("utf-8");
@@ -284,7 +283,6 @@
                                 for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
                                 outputAudioChunks.push(bytes);
                             } else if (event === 'progress') {
-                                // 进度条完全由 Cloudflare 在后台处理的进度提供，不占用手机资源
                                 progressBar.value = data.ratio;
                                 progressText.textContent = `${formatTime(data.currentSec)} / ${formatTime(data.totalSec)}`;
                                 progressPercent.textContent = `${Math.floor(data.ratio * 100)}%`;
@@ -294,7 +292,13 @@
                             } else if (event === 'error') {
                                 setStatus(`服务端错误: ${data}`, true);
                             } else if (event === 'done') {
-                                finishTranslation(false);
+                                // 修复点 4：精准识别 done 事件。如果是正常的 'success' 才判定为成功，如果是异常关闭则显示实际错误原因
+                                if (data === 'success') {
+                                    finishTranslation(false);
+                                } else {
+                                    setStatus(`翻译未能正常完成：${data}`, true);
+                                    finishTranslation(true);
+                                }
                             }
                         }
                     }

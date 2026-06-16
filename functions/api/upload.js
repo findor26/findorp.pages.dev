@@ -20,37 +20,28 @@ export async function onRequest(context) {
     try {
         const pcmBuffer = await request.arrayBuffer();
 
-        // 包装为标准的 multipart/form-data 格式
-        const formData = new FormData();
-        const fileBlob = new Blob([pcmBuffer], { type: 'application/octet-stream' });
-        
-        // 按照 Uguu 的标准表单参数上传 (注意字段名必须是 'files[]')
-        formData.append('files[]', fileBlob, 'audio.bin'); 
+        // 产生一个高密度的 16 位 16 进制字符串作为专属 Bin 空间 ID
+        const binId = Array.from(crypto.getRandomValues(new Uint8Array(8)))
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join('');
 
-        // 投递到纯外部、不走 Cloudflare WAF 阻断的知名临时存储站 uguu.se（免配置且非常稳定）
-        const response = await fetch('https://uguu.se/upload', {
-            method: 'POST',
-            body: formData
+        // 发送给 Hetzner 物理独立服务器上运行的知名存储站 filebin.net
+        // 它的独占带宽和无门槛 PUT 二进制极速上传在同类中最为稳定
+        const filebinResponse = await fetch(`https://filebin.net/${binId}/audio.bin`, {
+            method: 'PUT',
+            body: pcmBuffer,
+            headers: {
+                'Content-Type': 'application/octet-stream'
+            }
         });
 
-        if (!response.ok) {
-            const errText = await response.text();
-            throw new Error(`存储端上传失败 (${response.status}): ${errText}`);
+        if (!filebinResponse.ok) {
+            const errText = await filebinResponse.text();
+            throw new Error(`中转存储端上传失败 (${filebinResponse.status}): ${errText}`);
         }
 
-        const resData = await response.json(); 
-        // 返回格式为 {"success":true,"files":[{"name":"audio.bin","url":"https://a.uguu.se/xxxx.bin","size":1234}]}
-
-        if (!resData.success || !resData.files || resData.files.length === 0) {
-            throw new Error('存储端未返回有效的文件信息');
-        }
-
-        const fileUrl = resData.files[0].url; // 形如 "https://a.uguu.se/xxxx.bin"
-        
-        // 提取域名后面的文件名作为任务 ID（例如 "xxxx.bin"）
-        const pathId = fileUrl.replace('https://a.uguu.se/', '');
-
-        return new Response(JSON.stringify({ taskId: pathId }), {
+        // 上传成功后，将 binId 作为任务 ID 传回给前端
+        return new Response(JSON.stringify({ taskId: binId }), {
             headers: { 'Content-Type': 'application/json' }
         });
     } catch (e) {

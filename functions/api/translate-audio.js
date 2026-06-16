@@ -4,7 +4,7 @@ export async function onRequest(context) {
     const { request, env } = context;
 
     const urlObj = new URL(request.url);
-    const fileId = urlObj.searchParams.get('id');
+    const fileId = urlObj.searchParams.get('id'); // 获取诸如 "Ab1c.bin" 的任务 ID
 
     if (!fileId) {
         return new Response('Missing task ID', { status: 400 });
@@ -15,8 +15,8 @@ export async function onRequest(context) {
         return new Response('Missing GEMINI_API_KEY env', { status: 500 });
     }
 
-    // 从 Pixeldrain 高速直连通道获取暂存的音频数据
-    const fileUrl = `https://pixeldrain.com/api/file/${fileId}`;
+    // 从 0x0.st 极速直连通道获取暂存的音频数据
+    const fileUrl = `https://0x0.st/${fileId}`;
     const fileResponse = await fetch(fileUrl);
     
     if (!fileResponse.ok) {
@@ -136,7 +136,7 @@ export async function onRequest(context) {
                 }));
                 offset += chunkSize;
                 
-                // 100ms 原始推流速度，翻译最抗干扰，且能保证输出最佳音质
+                // 100ms 原始真实时速
                 await new Promise(r => setTimeout(r, 100)); 
             }
 

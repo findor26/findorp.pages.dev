@@ -62,7 +62,7 @@
 
         .actions { display: flex; gap: 16px; margin-top: 32px; flex-wrap: wrap; }
 
-        #statusText { font-size: 0.85rem; color: var(--md-sys-color-on-surface-variant); margin-bottom: 16px; font-weight: 500; min-height: 20px; }
+        #statusText { font-size: 0.85rem; color: var(--md-sys-color-on-surface-variant); margin-bottom: 16px; font-weight: 500; min-height: 20px; line-height: 1.5; }
         #statusText.error { color: var(--md-sys-color-error); }
 
         #translationArea {
@@ -141,7 +141,7 @@
 
         let ws = null;
         let isTranslating = false;
-        let connectionOpened = false; // 用于精确追踪连接是否成功开启过
+        let connectionOpened = false; 
         let sendInterval = null;
         let outputAudioChunks = []; 
 
@@ -226,7 +226,7 @@
             progressText.textContent = `00:00 / 00:00`;
             progressPercent.textContent = `0%`;
 
-            connectionOpened = false; // 重置连接状态记录
+            connectionOpened = false; 
 
             try {
                 const int16Data = await decodeAndResampleAudio(file);
@@ -239,14 +239,16 @@
                 ws = new WebSocket(wsUrl);
 
                 ws.onopen = () => {
-                    connectionOpened = true; // 连接成功开启
+                    connectionOpened = true; 
                     setStatus('连接成功！正在进行同声传译...');
                     
+                    // 严格对齐官方文档，补充 inputAudioTranscription 占位符
                     const setupMessage = {
                         setup: {
                             model: "models/gemini-3.5-live-translate-preview",
                             generationConfig: {
                                 responseModalities: ['AUDIO'],
+                                inputAudioTranscription: {}, 
                                 outputAudioTranscription: {},
                                 translationConfig: {
                                     targetLanguageCode: 'zh-Hans',
@@ -284,25 +286,30 @@
 
                         if (content.turnComplete) {
                             if (!isTranslating) {
-                                ws.close(); // 音频和最终响应全部结束后，安全断开
+                                ws.close(); 
                             }
                         }
                     }
                 };
 
-                ws.onerror = (e) => setStatus('WebSocket 连接发生错误', true);
+                ws.onerror = (e) => setStatus('WebSocket 通道在传输过程中断开。', true);
                 
-                ws.onclose = () => {
+                ws.onclose = (event) => {
+                    // 自定义常见错误映射
+                    let reasonMsg = `代码: ${event.code}`;
+                    if (event.reason) {
+                        reasonMsg += `, 原因: ${event.reason}`;
+                    } else if (event.code === 1006) {
+                        reasonMsg += ` (连接异常关闭。可能是 API 报错、免费额度耗尽、地区 IP 限制或 Cloudflare 超时)`;
+                    }
+
                     if (!connectionOpened) {
-                        // 连初始化都没连上，必然是服务端配置/密钥异常
-                        setStatus('连接失败，请检查 Cloudflare 上的 API Key 或控制台网络请求', true);
+                        setStatus(`连接失败，请确认 Cloudflare 环境变量部署成功。[${reasonMsg}]`, true);
                         finishTranslation(true);
                     } else if (isTranslating) {
-                        // 传输中意外断开
-                        setStatus('连接意外断开', true);
+                        setStatus(`连接意外断开，可能由于音频过长或网络拥堵。[${reasonMsg}]`, true);
                         finishTranslation(true);
                     } else {
-                        // 正常结束
                         finishTranslation(false);
                     }
                 };
@@ -325,7 +332,7 @@
 
                 if (offset >= int16Data.length) {
                     clearInterval(sendInterval);
-                    isTranslating = false; // 音频发送完毕，切换状态
+                    isTranslating = false; 
                     setStatus("本地音频推送完毕，等待模型进行最终响应...");
                     progressBar.indeterminate = true;
                     

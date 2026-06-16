@@ -67,7 +67,7 @@ export async function onRequest(context) {
                     }
                     if (content.modelTurn?.parts) {
                         for (const part of content.modelTurn.parts) {
-                            if (part.inlineData?.data) {
+                            if (part.inlineData && part.inlineData.data) {
                                 sendSSE('audio', part.inlineData.data);
                             }
                         }
@@ -95,18 +95,18 @@ export async function onRequest(context) {
             writer.close();
         });
 
+        // 核心修复点：将 targetLanguageCode 设定为简短代码 "zh"
+        // 同时简化 setup 结构，去除冗余的空配置项
         ws.send(JSON.stringify({
             setup: {
                 model: "models/gemini-3.5-live-translate-preview",
                 generationConfig: {
                     responseModalities: ["AUDIO"],
                     translationConfig: {
-                        targetLanguageCode: "zh-Hans",
+                        targetLanguageCode: "zh",
                         echoTargetLanguage: false
                     }
-                },
-                inputAudioTranscription: {},
-                outputAudioTranscription: {}
+                }
             }
         }));
 
@@ -141,7 +141,7 @@ export async function onRequest(context) {
                 }));
                 offset += chunkSize;
                 
-                // 100ms 原始真实时速
+                // 原始真实推流时速 (100ms 间隔)
                 await new Promise(r => setTimeout(r, 100)); 
             }
 

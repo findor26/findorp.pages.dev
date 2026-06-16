@@ -25,7 +25,6 @@ export async function onRequest(context) {
         });
     }
 
-    // 接收整段 PCM 字节流
     const pcmBuffer = await request.arrayBuffer();
 
     const { readable, writable } = new TransformStream();
@@ -36,7 +35,6 @@ export async function onRequest(context) {
         writer.write(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
     }
 
-    // 修复点 1：在 Cloudflare 中连接 Google WebSocket，协议必须写 https:// 而不是 wss://
     const targetUrl = `https://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${apiKey}`;
 
     try {
@@ -78,7 +76,7 @@ export async function onRequest(context) {
                     }
                 }
             } catch (e) {
-                // 忽略解析错
+                // 忽略
             }
         });
 
@@ -94,7 +92,6 @@ export async function onRequest(context) {
             writer.close();
         });
 
-        // 修复点 2：将 inputAudioTranscription 移动到 setup 根层级，对齐官方协议
         ws.send(JSON.stringify({
             setup: {
                 model: "models/gemini-3.5-live-translate-preview",
@@ -110,10 +107,10 @@ export async function onRequest(context) {
             }
         }));
 
-        // 3. 在 Cloudflare 边缘端代劳：异步 10 倍速极速推流
         (async () => {
             const uint8 = new Uint8Array(pcmBuffer);
-            const chunkSize = 1600; 
+            // 修复点 1：16kHz 16-bit Mono 音频，100ms 对应的字节数应为 3200 字节 (1600采样点 * 2字节)
+            const chunkSize = 3200; 
             let offset = 0;
 
             function bufferToBase64(buf) {
@@ -125,11 +122,11 @@ export async function onRequest(context) {
             }
 
             while (offset < uint8.length) {
-                // 流式向前端汇报 Cloudflare 在后端的推流进度
+                // 修复点 2：1秒 = 32000 字节。换算时间必须除以 32000 才能得出正确秒数
                 sendSSE('progress', {
                     ratio: offset / uint8.length,
-                    currentSec: offset / 16000,
-                    totalSec: uint8.length / 16000
+                    currentSec: offset / 32000,
+                    totalSec: uint8.length / 32000
                 });
 
                 const chunk = uint8.subarray(offset, offset + chunkSize);
@@ -143,15 +140,13 @@ export async function onRequest(context) {
                 }));
                 offset += chunkSize;
                 
-                // 将 100ms 间隔缩短到 10ms，实现 10 倍速极速处理！
-                await new Promise(r => setTimeout(r, 10)); 
+                // 修复点 3：将延迟设为安全的 30ms (约 3.3 倍速翻译)。这处于 Google 的安全频控线以内，非常稳定
+                await new Promise(r => setTimeout(r, 30)); 
             }
 
-            // 发送完毕，更新进度条至 100%
-            sendSSE('progress', { ratio: 1, currentSec: uint8.length/16000, totalSec: uint8.length/16000 });
+            sendSSE('progress', { ratio: 1, currentSec: uint8.length/32000, totalSec: uint8.length/32000 });
             sendSSE('upload_complete', true);
 
-            // 告诉 Google 输入流已结束
             ws.send(JSON.stringify({
                 clientContent: { turnComplete: true }
             }));

@@ -15,7 +15,7 @@ export async function onRequest(context) {
         return new Response('Missing GEMINI_API_KEY env', { status: 500 });
     }
 
-    // 从 10Gbps 带宽的 Hetzner 物理节点上瞬间拉回原始音频
+    // 从 filebin.net 高速下载原始 PCM 音频
     const fileUrl = `https://filebin.net/${fileId}/audio.bin`;
     const fileResponse = await fetch(fileUrl, {
         headers: {
@@ -57,9 +57,23 @@ export async function onRequest(context) {
 
         let isDone = false;
 
+        // 核心修复点 1：构建 Latch（锁相环）Promise，只有当 Google 握手成功才会解开
+        let resolveSetupLatch;
+        const setupLatchPromise = new Promise((resolve) => {
+            resolveSetupLatch = resolve;
+        });
+
         ws.addEventListener("message", (event) => {
             try {
                 const msg = JSON.parse(event.data);
+
+                // 核心修复点 2：收到 Google 传回的 setupComplete 确认帧，释放锁并提示客户端
+                if (msg.setupComplete !== undefined) {
+                    sendSSE('transcription', '[系统]: Google 翻译配置就绪，开始流式处理音频...');
+                    resolveSetupLatch(); // 解开推流锁
+                    return;
+                }
+
                 const content = msg.serverContent;
                 if (content) {
                     if (content.outputTranscription?.text) {
@@ -95,9 +109,7 @@ export async function onRequest(context) {
             writer.close();
         });
 
-        // 终极对齐配置：
-        // 1. inputAudioTranscription 和 outputAudioTranscription 留在 setup 根级目录下
-        // 2. targetLanguageCode 恢复为官方注册且完全支持的标准简体中文代码: "zh-Hans"
+        // 发送标准的 setup 初始化消息
         ws.send(JSON.stringify({
             setup: {
                 model: "models/gemini-3.5-live-translate-preview",
@@ -106,7 +118,7 @@ export async function onRequest(context) {
                 generationConfig: {
                     responseModalities: ["AUDIO"],
                     translationConfig: {
-                        targetLanguageCode: "zh-Hans",
+                        targetLanguageCode: "zh-Hans", // 恢复为最标准的简体中文代码
                         echoTargetLanguage: false
                     }
                 }
@@ -114,6 +126,9 @@ export async function onRequest(context) {
         }));
 
         (async () => {
+            // 核心修复点 3：强行锁死协程，必须等待 Google 的 setupComplete 成功解开，才允许向下运行发送音频数据
+            await setupLatchPromise;
+
             const uint8 = new Uint8Array(pcmBuffer);
             const chunkSize = 3200; // 100ms
             let offset = 0;
@@ -144,7 +159,7 @@ export async function onRequest(context) {
                 }));
                 offset += chunkSize;
                 
-                // 原始真实推流时速 (100ms 间隔)
+                // 100ms 原始真实时速
                 await new Promise(r => setTimeout(r, 100)); 
             }
 

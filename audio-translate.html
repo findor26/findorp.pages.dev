@@ -141,6 +141,7 @@
 
         let ws = null;
         let isTranslating = false;
+        let connectionOpened = false; // 用于精确追踪连接是否成功开启过
         let sendInterval = null;
         let outputAudioChunks = []; 
 
@@ -173,7 +174,6 @@
             translationArea.scrollTop = translationArea.scrollHeight;
         }
 
-        // 解码并重采样为模型所需的 16kHz 小端序
         async function decodeAndResampleAudio(file) {
             setStatus(`正在解析和重采样: ${file.name}...`);
             const arrayBuffer = await file.arrayBuffer();
@@ -226,21 +226,22 @@
             progressText.textContent = `00:00 / 00:00`;
             progressPercent.textContent = `0%`;
 
+            connectionOpened = false; // 重置连接状态记录
+
             try {
                 const int16Data = await decodeAndResampleAudio(file);
                 
                 setStatus('正在连接代理通道...');
                 
-                // 根据当前网页协议自动判断是 ws:// 还是 wss://
                 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
                 const wsUrl = `${protocol}//${window.location.host}/api/ws`;
 
                 ws = new WebSocket(wsUrl);
 
                 ws.onopen = () => {
+                    connectionOpened = true; // 连接成功开启
                     setStatus('连接成功！正在进行同声传译...');
                     
-                    // 1. 发送初始化配置（严格参照文档规范）
                     const setupMessage = {
                         setup: {
                             model: "models/gemini-3.5-live-translate-preview",
@@ -256,7 +257,6 @@
                     };
                     ws.send(JSON.stringify(setupMessage));
 
-                    // 2. 开始推送本地音频数据
                     startSendingAudio(int16Data);
                 };
 
@@ -265,12 +265,10 @@
                     if (response.serverContent) {
                         const content = response.serverContent;
                         
-                        // 提取翻译文字
                         if (content.outputTranscription && content.outputTranscription.text) {
                             appendTranslation(content.outputTranscription.text);
                         }
                         
-                        // 提取 24kHz 音频
                         if (content.modelTurn?.parts) {
                             for (const part of content.modelTurn.parts) {
                                 if (part.inlineData && part.inlineData.data) {
@@ -284,30 +282,39 @@
                             }
                         }
 
-                        // 如果模型表示它已经把这一回合翻译并朗读完毕了
                         if (content.turnComplete) {
                             if (!isTranslating) {
-                                ws.close(); // 本地音频推完了，且模型翻译完了，安全关闭
+                                ws.close(); // 音频和最终响应全部结束后，安全断开
                             }
                         }
                     }
                 };
 
-                // 替换 index.html 中对应的 ws 监听部分：
                 ws.onerror = (e) => setStatus('WebSocket 连接发生错误', true);
                 
                 ws.onclose = () => {
-                    if (isTranslating) {
+                    if (!connectionOpened) {
+                        // 连初始化都没连上，必然是服务端配置/密钥异常
+                        setStatus('连接失败，请检查 Cloudflare 上的 API Key 或控制台网络请求', true);
+                        finishTranslation(true);
+                    } else if (isTranslating) {
+                        // 传输中意外断开
                         setStatus('连接意外断开', true);
-                        finishTranslation(true); // 传入 true 表示异常结束，防止误判
+                        finishTranslation(true);
                     } else {
-                        setStatus('连接失败，请检查 API Key 或控制台网络请求', true);
-                        finishTranslation(true); // 传入 true 阻止显示“处理完毕”
+                        // 正常结束
+                        finishTranslation(false);
                     }
                 };
 
+            } catch (e) {
+                setStatus(`执行失败: ${e.message}`, true);
+                finishTranslation(true);
+            }
+        });
+
         function startSendingAudio(int16Data) {
-            const chunkSize = 1600; // 每次发 1600 个采样点 (100ms)
+            const chunkSize = 1600; 
             let offset = 0;
             isTranslating = true;
             
@@ -318,18 +325,16 @@
 
                 if (offset >= int16Data.length) {
                     clearInterval(sendInterval);
-                    isTranslating = false;
+                    isTranslating = false; // 音频发送完毕，切换状态
                     setStatus("本地音频推送完毕，等待模型进行最终响应...");
                     progressBar.indeterminate = true;
                     
-                    // 告诉服务器：客户端这边的输入已经结束了
                     if (ws && ws.readyState === WebSocket.OPEN) {
                         ws.send(JSON.stringify({ clientContent: { turnComplete: true } }));
                     }
                     return;
                 }
 
-                // 进度条跟随
                 const currentSeconds = offset / 16000;
                 const progressRatio = offset / int16Data.length;
                 progressBar.value = progressRatio;
@@ -344,7 +349,6 @@
                     binaryStr += String.fromCharCode(uint8[i]);
                 }
 
-                // 严格遵守文档中 realtimeInput 规范发送音频块
                 if (ws && ws.readyState === WebSocket.OPEN) {
                     const audioMessage = {
                         realtimeInput: {

@@ -20,10 +20,17 @@ export async function onRequest(context) {
     try {
         const pcmBuffer = await request.arrayBuffer();
 
-        // 使用 Pixeldrain 极其稳定的纯二进制 PUT 接口进行中转投递
-        const pixeldrainResponse = await fetch('https://pixeldrain.com/api/file/audio.bin', {
-            method: 'PUT',
-            body: pcmBuffer
+        // 包装为标准的 multipart/form-data（表单表头）格式
+        const formData = new FormData();
+        const fileBlob = new Blob([pcmBuffer], { type: 'application/octet-stream' });
+        
+        // 注意：根据 Pixeldrain API 规范，上传文件的表单字段名必须是 'file'
+        formData.append('file', fileBlob, 'audio.bin'); 
+
+        // 改用稳定的匿名 POST 上传点
+        const pixeldrainResponse = await fetch('https://pixeldrain.com/api/file', {
+            method: 'POST',
+            body: formData
         });
 
         if (!pixeldrainResponse.ok) {

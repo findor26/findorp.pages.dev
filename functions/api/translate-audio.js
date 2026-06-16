@@ -95,16 +95,16 @@ export async function onRequest(context) {
             writer.close();
         });
 
-        // 终极对齐 1：完全对照你本地运行成功的配置结构：
-        // 1. 将 outputAudioTranscription: {} 嵌套入 generationConfig 内
-        // 2. 移除 inputAudioTranscription
-        // 3. 目标语言恢复为最标准的简体中文代码 "zh-Hans"
+        // 终极修复：
+        // 1. inputAudioTranscription 和 outputAudioTranscription 必须处于最外层 `setup` 根级下！
+        // 2. 目标语言恢复为官方绝对完全支持的标准简体中文代码: "zh-Hans"
         ws.send(JSON.stringify({
             setup: {
                 model: "models/gemini-3.5-live-translate-preview",
+                inputAudioTranscription: {}, 
+                outputAudioTranscription: {}, 
                 generationConfig: {
                     responseModalities: ["AUDIO"],
-                    outputAudioTranscription: {}, 
                     translationConfig: {
                         targetLanguageCode: "zh-Hans",
                         echoTargetLanguage: false
@@ -139,7 +139,6 @@ export async function onRequest(context) {
 
                 const chunk = uint8.subarray(offset, offset + chunkSize);
                 
-                // 终极对齐 2：使用最新的 `realtimeInput.audio` 结构发包，Google 3.1+ 接口不再支持 mediaChunks 
                 ws.send(JSON.stringify({
                     realtimeInput: {
                         audio: {

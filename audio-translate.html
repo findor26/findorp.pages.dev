@@ -63,7 +63,7 @@
         .actions { display: flex; gap: 16px; margin-top: 32px; flex-wrap: wrap; }
 
         #statusText { font-size: 0.85rem; color: var(--md-sys-color-on-surface-variant); margin-bottom: 16px; font-weight: 500; min-height: 20px; line-height: 1.5; }
-        #statusText.error { color: var(--md-sys-error); }
+        #statusText.error { color: var(--md-sys-color-error); }
 
         #translationArea {
             background-color: var(--md-sys-color-surface-container-lowest);
@@ -139,10 +139,7 @@
         const progressPercent = document.getElementById('progressPercent');
         const progressBar = document.getElementById('progressBar');
 
-        let ws = null;
-        let isTranslating = false;
-        let connectionOpened = false; 
-        let sendInterval = null;
+        let abortController = null;
         let outputAudioChunks = []; 
 
         function formatTime(seconds) {
@@ -191,6 +188,14 @@
                 let s = Math.max(-1, Math.min(1, floatData[i]));
                 int16Data[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
             }
+
+            let isSilent = true;
+            for (let i = 0; i < int16Data.length; i++) {
+                if (int16Data[i] !== 0) { isSilent = false; break; }
+            }
+            if (isSilent) {
+                setStatus("警告：解析出的音频数据全为静音！请确认您的浏览器支持或换个文件重试。", true);
+            }
             return int16Data;
         }
 
@@ -226,163 +231,91 @@
             progressText.textContent = `00:00 / 00:00`;
             progressPercent.textContent = `0%`;
 
-            connectionOpened = false; 
+            abortController = new AbortController();
 
             try {
                 const int16Data = await decodeAndResampleAudio(file);
-                
-                setStatus('正在连接代理通道...');
-                
-                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                const wsUrl = `${protocol}//${window.location.host}/api/ws`;
+                const uint8Data = new Uint8Array(int16Data.buffer, int16Data.byteOffset, int16Data.byteLength);
 
-                ws = new WebSocket(wsUrl);
+                setStatus('音频重采样完成，正在上传至 Cloudflare 极速翻译通道...');
 
-                ws.onopen = () => {
-                    connectionOpened = true; 
-                    setStatus('连接成功！正在进行同声传译...');
-                    
-                    // 已将 inputAudioTranscription 和 outputAudioTranscription 移至 setup 根目录下
-                    const setupMessage = {
-                        setup: {
-                            model: "models/gemini-3.5-live-translate-preview",
-                            generationConfig: {
-                                responseModalities: ['AUDIO'],
-                                translationConfig: {
-                                    targetLanguageCode: 'zh-Hans',
-                                    echoTargetLanguage: false
-                                }
-                            },
-                            inputAudioTranscription: {}, 
-                            outputAudioTranscription: {}
+                // 一次性上传到 Cloudflare 端点
+                const response = await fetch('/api/translate-audio', {
+                    method: 'POST',
+                    body: uint8Data,
+                    signal: abortController.signal
+                });
+
+                if (!response.ok) {
+                    throw new Error(`服务器返回异常: ${response.status}`);
+                }
+
+                setStatus('连接成功，正在极速同步翻译结果...');
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder("utf-8");
+                let buffer = "";
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    let lines = buffer.split("\n\n");
+                    buffer = lines.pop(); 
+
+                    for (let block of lines) {
+                        let event = '', dataStr = '';
+                        const blockLines = block.split('\n');
+                        for (let line of blockLines) {
+                            if (line.startsWith('event:')) event = line.substring(6).trim();
+                            if (line.startsWith('data:')) dataStr = line.substring(5).trim();
                         }
-                    };
-                    ws.send(JSON.stringify(setupMessage));
 
-                    startSendingAudio(int16Data);
-                };
+                        if (event && dataStr) {
+                            let data;
+                            try { data = JSON.parse(dataStr); } catch(e) { continue; }
 
-                ws.onmessage = (event) => {
-                    const response = JSON.parse(event.data);
-                    if (response.serverContent) {
-                        const content = response.serverContent;
-                        
-                        if (content.outputTranscription && content.outputTranscription.text) {
-                            appendTranslation(content.outputTranscription.text);
-                        }
-                        
-                        if (content.modelTurn?.parts) {
-                            for (const part of content.modelTurn.parts) {
-                                if (part.inlineData && part.inlineData.data) {
-                                    const binaryStr = atob(part.inlineData.data);
-                                    const bytes = new Uint8Array(binaryStr.length);
-                                    for (let i = 0; i < binaryStr.length; i++) {
-                                        bytes[i] = binaryStr.charCodeAt(i);
-                                    }
-                                    outputAudioChunks.push(bytes);
-                                }
+                            if (event === 'transcription') {
+                                appendTranslation(data);
+                            } else if (event === 'audio') {
+                                const binaryStr = atob(data);
+                                const bytes = new Uint8Array(binaryStr.length);
+                                for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+                                outputAudioChunks.push(bytes);
+                            } else if (event === 'progress') {
+                                // 进度条完全由 Cloudflare 在后台处理的进度提供，不占用手机资源
+                                progressBar.value = data.ratio;
+                                progressText.textContent = `${formatTime(data.currentSec)} / ${formatTime(data.totalSec)}`;
+                                progressPercent.textContent = `${Math.floor(data.ratio * 100)}%`;
+                            } else if (event === 'upload_complete') {
+                                setStatus("Cloudflare 已将音频全部极速推送至 Google，正在等待模型最终响应...");
+                                progressBar.indeterminate = true;
+                            } else if (event === 'error') {
+                                setStatus(`服务端错误: ${data}`, true);
+                            } else if (event === 'done') {
+                                finishTranslation(false);
                             }
                         }
-
-                        if (content.turnComplete) {
-                            if (!isTranslating) {
-                                ws.close(); 
-                            }
-                        }
                     }
-                };
-
-                ws.onerror = (e) => setStatus('WebSocket 通道在传输过程中断开。', true);
-                
-                ws.onclose = (event) => {
-                    let reasonMsg = `代码: ${event.code}`;
-                    if (event.reason) {
-                        reasonMsg += `, 原因: ${event.reason}`;
-                    } else if (event.code === 1006) {
-                        reasonMsg += ` (连接异常关闭。可能是 API 报错、免费额度耗尽、地区 IP 限制或 Cloudflare 超时)`;
-                    }
-
-                    if (!connectionOpened) {
-                        setStatus(`连接失败，请确认 Cloudflare 环境变量部署成功。[${reasonMsg}]`, true);
-                        finishTranslation(true);
-                    } else if (isTranslating) {
-                        setStatus(`连接意外断开，可能由于音频过长或网络拥堵。[${reasonMsg}]`, true);
-                        finishTranslation(true);
-                    } else {
-                        finishTranslation(false);
-                    }
-                };
-
+                }
             } catch (e) {
-                setStatus(`执行失败: ${e.message}`, true);
+                if (e.name === 'AbortError') {
+                    setStatus("已手动中止任务", false);
+                } else {
+                    setStatus(`执行失败: ${e.message}`, true);
+                }
                 finishTranslation(true);
             }
         });
 
-        function startSendingAudio(int16Data) {
-            const chunkSize = 1600; 
-            let offset = 0;
-            isTranslating = true;
-            
-            const totalSeconds = int16Data.length / 16000;
-
-            sendInterval = setInterval(() => {
-                if (!isTranslating) return;
-
-                if (offset >= int16Data.length) {
-                    clearInterval(sendInterval);
-                    isTranslating = false; 
-                    setStatus("本地音频推送完毕，等待模型进行最终响应...");
-                    progressBar.indeterminate = true;
-                    
-                    if (ws && ws.readyState === WebSocket.OPEN) {
-                        ws.send(JSON.stringify({ clientContent: { turnComplete: true } }));
-                    }
-                    return;
-                }
-
-                const currentSeconds = offset / 16000;
-                const progressRatio = offset / int16Data.length;
-                progressBar.value = progressRatio;
-                progressText.textContent = `${formatTime(currentSeconds)} / ${formatTime(totalSeconds)}`;
-                progressPercent.textContent = `${Math.floor(progressRatio * 100)}%`;
-
-                const chunk = int16Data.subarray(offset, offset + chunkSize);
-                const uint8 = new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength);
-
-                let binaryStr = '';
-                for (let i = 0; i < uint8.byteLength; i++) {
-                    binaryStr += String.fromCharCode(uint8[i]);
-                }
-
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    const audioMessage = {
-                        realtimeInput: {
-                            audio: {
-                                data: btoa(binaryStr),
-                                mimeType: 'audio/pcm;rate=16000'
-                            }
-                        }
-                    };
-                    ws.send(JSON.stringify(audioMessage));
-                }
-
-                offset += chunkSize;
-            }, 100);
-        }
-
         btnStop.addEventListener('click', () => {
-            isTranslating = false;
-            if (sendInterval) clearInterval(sendInterval);
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.close();
-            }
+            if (abortController) abortController.abort();
             setStatus("已手动中止任务");
+            finishTranslation(true);
         });
 
         function finishTranslation(isError = false) {
-            isTranslating = false;
-            if (sendInterval) clearInterval(sendInterval);
             btnStart.disabled = false;
             btnStop.disabled = true;
             progressBar.indeterminate = false;

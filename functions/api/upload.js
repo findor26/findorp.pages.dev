@@ -24,16 +24,13 @@ export async function onRequest(context) {
         const formData = new FormData();
         const fileBlob = new Blob([pcmBuffer], { type: 'application/octet-stream' });
         
-        // 按照 tfLink 的标准表单参数上传
-        formData.append('file', fileBlob, 'audio.bin'); 
+        // 按照 Uguu 的标准表单参数上传 (注意字段名必须是 'files[]')
+        formData.append('files[]', fileBlob, 'audio.bin'); 
 
-        // 投递给同样位于 Cloudflare 局域网的高速中转站 tfLink
-        const response = await fetch('https://tmpfile.link/api/upload', {
+        // 投递到纯外部、不走 Cloudflare WAF 阻断的知名临时存储站 uguu.se（免配置且非常稳定）
+        const response = await fetch('https://uguu.se/upload', {
             method: 'POST',
-            body: formData,
-            headers: {
-                'Accept': 'application/json'
-            }
+            body: formData
         });
 
         if (!response.ok) {
@@ -42,14 +39,16 @@ export async function onRequest(context) {
         }
 
         const resData = await response.json(); 
-        // 期望的返回格式为 {"downloadLink":"https://d.tmpfile.link/public/YYYY-MM-DD/UUID/audio.bin", ...}
+        // 返回格式为 {"success":true,"files":[{"name":"audio.bin","url":"https://a.uguu.se/xxxx.bin","size":1234}]}
 
-        if (!resData.downloadLink) {
-            throw new Error('存储端未返回有效的下载链接');
+        if (!resData.success || !resData.files || resData.files.length === 0) {
+            throw new Error('存储端未返回有效的文件信息');
         }
 
-        // 提取域名后面的路径部分作为轻量任务 ID 传给前端（例如 "public/2026-06-16/uuid/audio.bin"）
-        const pathId = resData.downloadLink.replace('https://d.tmpfile.link/', '');
+        const fileUrl = resData.files[0].url; // 形如 "https://a.uguu.se/xxxx.bin"
+        
+        // 提取域名后面的文件名作为任务 ID（例如 "xxxx.bin"）
+        const pathId = fileUrl.replace('https://a.uguu.se/', '');
 
         return new Response(JSON.stringify({ taskId: pathId }), {
             headers: { 'Content-Type': 'application/json' }

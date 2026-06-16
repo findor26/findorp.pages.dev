@@ -24,13 +24,16 @@ export async function onRequest(context) {
         const formData = new FormData();
         const fileBlob = new Blob([pcmBuffer], { type: 'application/octet-stream' });
         
-        // 0x0.st 要求的上传字段名必须是 'file'
+        // 按照 tfLink 的标准表单参数上传
         formData.append('file', fileBlob, 'audio.bin'); 
 
-        // 上传到老牌、完全免费的匿名存储站 0x0.st
-        const response = await fetch('https://0x0.st', {
+        // 投递给同样位于 Cloudflare 局域网的高速中转站 tfLink
+        const response = await fetch('https://tmpfile.link/api/upload', {
             method: 'POST',
-            body: formData
+            body: formData,
+            headers: {
+                'Accept': 'application/json'
+            }
         });
 
         if (!response.ok) {
@@ -38,16 +41,17 @@ export async function onRequest(context) {
             throw new Error(`存储端上传失败 (${response.status}): ${errText}`);
         }
 
-        const fileUrl = (await response.text()).trim(); // 返回格式为 "https://0x0.st/xxxx.bin"
-        
-        // 提取文件名（如 "xxxx.bin"）作为任务 ID 传给前端
-        const fileId = fileUrl.split('/').pop(); 
+        const resData = await response.json(); 
+        // 期望的返回格式为 {"downloadLink":"https://d.tmpfile.link/public/YYYY-MM-DD/UUID/audio.bin", ...}
 
-        if (!fileId) {
-            throw new Error('未能从小端获取到有效的文件 ID');
+        if (!resData.downloadLink) {
+            throw new Error('存储端未返回有效的下载链接');
         }
 
-        return new Response(JSON.stringify({ taskId: fileId }), {
+        // 提取域名后面的路径部分作为轻量任务 ID 传给前端（例如 "public/2026-06-16/uuid/audio.bin"）
+        const pathId = resData.downloadLink.replace('https://d.tmpfile.link/', '');
+
+        return new Response(JSON.stringify({ taskId: pathId }), {
             headers: { 'Content-Type': 'application/json' }
         });
     } catch (e) {

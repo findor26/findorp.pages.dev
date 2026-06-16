@@ -234,7 +234,7 @@
 
                 // 2. 将字节流一次性 POST 到 Cloudflare 后端点
                 // 注意这里要保证路径和你创建的函数对应，如果不是 /api/ 则按需修改为 /translate-audio 等
-                const response = await fetch('/api/translate-audio', {
+                const response = await fetch('/translate-audio', {
                     method: 'POST',
                     body: uint8Data,
                     signal: abortController.signal

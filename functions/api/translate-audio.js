@@ -57,7 +57,6 @@ export async function onRequest(context) {
 
         let isDone = false;
 
-        // 监听并实时转发 Google 的响应消息
         ws.addEventListener("message", (event) => {
             try {
                 const msg = JSON.parse(event.data);
@@ -96,16 +95,18 @@ export async function onRequest(context) {
             writer.close();
         });
 
-        // 发送标准的 setup 初始化消息
+        // 终极对齐 1：完全对照你本地运行成功的配置结构：
+        // 1. 将 outputAudioTranscription: {} 嵌套入 generationConfig 内
+        // 2. 移除 inputAudioTranscription
+        // 3. 目标语言恢复为最标准的简体中文代码 "zh-Hans"
         ws.send(JSON.stringify({
             setup: {
                 model: "models/gemini-3.5-live-translate-preview",
-                inputAudioTranscription: {}, 
-                outputAudioTranscription: {}, 
                 generationConfig: {
                     responseModalities: ["AUDIO"],
+                    outputAudioTranscription: {}, 
                     translationConfig: {
-                        targetLanguageCode: "zh-Hans", // 官方标准的简体中文代码
+                        targetLanguageCode: "zh-Hans",
                         echoTargetLanguage: false
                     }
                 }
@@ -113,7 +114,7 @@ export async function onRequest(context) {
         }));
 
         (async () => {
-            // 核心修复点：不使用复杂的异步锁，直接物理等待 500ms 让 Google 初始化完毕，随后直接开始稳定推流
+            // 物理等待 500ms 让 Google 彻底就绪
             await new Promise(r => setTimeout(r, 500));
             sendSSE('transcription', '[系统]: 通道初始化完毕，正在以 2 倍速流式传输并翻译音频...');
 
@@ -138,17 +139,18 @@ export async function onRequest(context) {
 
                 const chunk = uint8.subarray(offset, offset + chunkSize);
                 
+                // 终极对齐 2：使用最新的 `realtimeInput.audio` 结构发包，Google 3.1+ 接口不再支持 mediaChunks 
                 ws.send(JSON.stringify({
                     realtimeInput: {
-                        mediaChunks: [{
+                        audio: {
                             mimeType: "audio/pcm;rate=16000",
                             data: bufferToBase64(chunk)
-                        }]
+                        }
                     }
                 }));
                 offset += chunkSize;
                 
-                // 50ms 稳定推流时速（2 倍速翻译）
+                // 50ms 稳定推流时速
                 await new Promise(r => setTimeout(r, 50)); 
             }
 

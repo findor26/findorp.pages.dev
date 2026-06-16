@@ -4,7 +4,7 @@ export async function onRequest(context) {
     const { request, env } = context;
 
     const urlObj = new URL(request.url);
-    const fileId = urlObj.searchParams.get('id'); // 获取诸如 "Ab1c.bin" 的任务 ID
+    const fileId = urlObj.searchParams.get('id'); // 获取诸如 "public/2026-06-16/uuid/audio.bin" 的任务 ID
 
     if (!fileId) {
         return new Response('Missing task ID', { status: 400 });
@@ -15,8 +15,8 @@ export async function onRequest(context) {
         return new Response('Missing GEMINI_API_KEY env', { status: 500 });
     }
 
-    // 从 0x0.st 极速直连通道获取暂存的音频数据
-    const fileUrl = `https://0x0.st/${fileId}`;
+    // 从 tfLink 的 Cloudflare 局域网高速通道瞬间获取暂存数据
+    const fileUrl = `https://d.tmpfile.link/${fileId}`;
     const fileResponse = await fetch(fileUrl);
     
     if (!fileResponse.ok) {

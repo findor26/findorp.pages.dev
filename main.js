@@ -40,36 +40,35 @@ class OptimizedWatcher {
     }
 
     async fetchData() {
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), this.config.timeout);
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), this.config.timeout);
+        
+        try {
+            const url = `https://3dtank.com/s/status.js?t=${Date.now()}`;
+            
+            const response = await fetch(url, {
+                signal: controller.signal,
+                cache: 'no-store'
+            });
     
-    try {
-        /* 使用 Cloudflare Worker 代理以绕过官方接口的 CORS 限制并解决 HTTPS 协议冲突 */
-        const proxyUrl = `https://tanki-proxy.findor.workers.dev/?t=${Date.now()}`;
-        
-        const response = await fetch(proxyUrl, {
-            signal: controller.signal,
-            cache: 'no-store'
-        });
-
-        /* 处理 502 Bad Gateway 或其他官方维护导致的服务器错误 */
-        if (!response.ok) {
-            console.warn(`官方接口可能正在维护: ${response.status}`);
+            /* 处理 502 Bad Gateway 或其他官方维护导致的服务器错误 */
+            if (!response.ok) {
+                console.warn(`官方接口可能正在维护: ${response.status}`);
+                return null;
+            }
+    
+            return await response.json();
+        } catch (err) {
+            /* 避免超时中断抛出异常导致控制台报错堆叠 */
+            if (err.name === 'AbortError') return null;
+            
+            /* 捕获网络断开或其他不可预知的抓取失败 */
+            console.error("数据抓取异常:", err);
             return null;
+        } finally {
+            clearTimeout(id);
         }
-
-        return await response.json();
-    } catch (err) {
-        /* 避免超时中断抛出异常导致控制台报错堆叠 */
-        if (err.name === 'AbortError') return null;
-        
-        /* 捕获网络断开或其他不可预知的抓取失败 */
-        console.error("数据抓取异常:", err);
-        return null;
-    } finally {
-        clearTimeout(id);
     }
-}
 
     process(data) {
         if (!data || !data.nodes) return;
